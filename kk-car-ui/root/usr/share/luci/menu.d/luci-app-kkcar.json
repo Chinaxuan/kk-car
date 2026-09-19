@@ -1,0 +1,8 @@
+{
+  "admin/kkcar": {
+    "title": "车载网络",
+    "order": 1,
+    "action": {"type": "view", "path": "kkcar/overview"},
+    "depends": {"acl": ["luci-app-kkcar"]}
+  }
+}
