@@ -1,0 +1,7 @@
+{
+  "luci-app-kkcar": {
+    "description": "KK-Car simplified management",
+    "read": { "ubus": { "kkcar": ["status", "history"] } },
+    "write": { "ubus": { "kkcar": ["action", "auto_connect", "wifi_save", "wifi_confirm", "port_save", "port_confirm"] } }
+  }
+}
