@@ -1,0 +1,4 @@
+#!/bin/sh
+case "$ACTION" in
+    ifup|ifupdate) /etc/kk-car/disable-ipv6.sh ;;
+esac
