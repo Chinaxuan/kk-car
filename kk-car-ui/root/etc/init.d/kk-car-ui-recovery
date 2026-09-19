@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+START=19
+boot() {
+    if [ -f /etc/kk-car/ui-port-pending.json ] && [ -s /etc/kk-car/ui-port-backup ]; then
+        cp /etc/kk-car/ui-port-backup /etc/config/network || return 1
+        chmod 600 /etc/config/network
+        rm -f /etc/kk-car/ui-port-pending.json /etc/kk-car/ui-port-backup
+        logger -t kk-car-ui 'Restored unconfirmed Ethernet settings at boot'
+    fi
+    if [ -f /etc/kk-car/ui-wifi-pending.json ] && [ -s /etc/kk-car/ui-wifi-backup ]; then
+        cp /etc/kk-car/ui-wifi-backup /etc/config/wireless || return 1
+        chmod 600 /etc/config/wireless
+        rm -f /etc/kk-car/ui-wifi-pending.json /etc/kk-car/ui-wifi-backup
+        logger -t kk-car-ui 'Restored unconfirmed Wi-Fi settings at boot'
+    fi
+}
