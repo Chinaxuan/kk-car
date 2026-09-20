@@ -140,3 +140,7 @@ VPN 累计错/丢是内核接口历史计数；实时 Ping 丢包率是本轮检
 - 网络四项与地区两项分开计数；检查时间对应本次结果。不自动后台轮询 AI 网站。20 项隔离测试覆盖地区、失效格式、验证码/HTTP 错误、超时、语言误判等场景。
 
 来源说明：Cloudflare trace 官方示例 https://developers.cloudflare.com/privacy-proxy/get-started/；Gemini 官方位置说明 https://support.google.com/gemini/answer/13275745?hl=en 。页面内部地区字段通过本次未登录真实响应验证，不是 Google 官方接口承诺。
+
+## 飞书通知模块
+
+2026-09-20 增加独立后台事件监控。纯状态机、私密配置和工作器分离；复用既有 VPN Ping、蜂窝与路由状态，使用有限队列、每地址投递记录、退避重试与正常关机钩子。专用 LuCI 页面与 RPC 沿用原管理权限。完整数据流、文件位置和边界见 [NOTIFICATIONS.md](NOTIFICATIONS.md)。

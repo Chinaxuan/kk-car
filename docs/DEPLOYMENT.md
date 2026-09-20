@@ -59,7 +59,14 @@
 | `kk-car-uplink` | 有线 / 4G 出口选择 |
 | `kk-car-modem` | 上网棒 ADB 状态采集 |
 | `kk-car-vpn-ping` | VPN 探测与历史保存 |
+| `kk-car-notify` | 事件推送、限频队列与开关机通知 |
 
 首次部署需要按依赖启用相应服务。备份清单应覆盖 `/etc/kk-car/`、对应 init.d 与启动链接、热插拔文件、nftables、strongSwan 行为配置、LuCI 前端/菜单和 rpcd 后台/ACL。
 
 仓库没有经空白 SD 卡完整重装验证，不能把这些步骤视作已验收的一键安装器。
+
+## 增量部署飞书推送
+
+上传 `notify-config.uc`、`notify-engine.uc`、`notify-worker.uc`、`notify-watch.sh` 和 `init.d/kk-car-notify`，同时更新 rpcd 后台、ACL、LuCI 菜单及前端 `notifications.js/css` 和首页入口。先放齐模块，再刷新 rpcd，避免导入缺失影响原页面。设置 `notify-watch.sh` 与 init.d 服务为 0755，启用并启动 `kk-car-notify`。源代码默认关闭推送；在设备页面配置自己的地址后启用。不需要重载 network、firewall 或 VPN。
+
+服务启动优先级 99，正常关机优先级 10；`shutdown` 与普通服务 `stop/restart` 区分，维护服务不会伪造关机通知。保留私密配置权限与启动链接。参见 [推送说明](NOTIFICATIONS.md)。
