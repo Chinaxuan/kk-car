@@ -71,7 +71,7 @@ return view.extend({
         this.root.append(
             E('div',{'class':'kk-header',role:'banner'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'KK'),E('div',{},[E('h1',{},'车载网络'),E('p',{},'KK-Car · 你的随行网络')])]),
-                E('div',{'class':'kk-header-links'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{href:L.url('admin/logout')},'退出')])
+                E('div',{'class':'kk-header-links'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{href:L.url('admin/kkcar_notifications')},'飞书推送'),E('a',{href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{href:L.url('admin/logout')},'退出')])
             ]),
             E('div',{id:'kk-message','class':'kk-notice',role:'status','aria-live':'polite',hidden:true}),
             E('div',{id:'kk-pending','class':'kk-notice warning',hidden:true},[
@@ -199,7 +199,7 @@ return view.extend({
                     ])
                 ])
             ]),
-            E('div',{'class':'kk-footer',role:'contentinfo'},[E('span',{},'KK-Car 简易管理 · OpenWrt 25.12.5'),E('span',{},'设置保存在路由器上，无需外部服务')])
+            E('div',{'class':'kk-footer',role:'contentinfo'},[E('span',{},'KK-Car 简易管理 · OpenWrt 25.12.5'),E('span',{},'设置保存在路由器上 · 飞书推送按开关启用')])
         );
         this.compactLayout();
         this.dashboardLayout();
