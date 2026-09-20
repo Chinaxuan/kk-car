@@ -2,7 +2,27 @@
   "admin/kkcar": {
     "title": "车载网络",
     "order": 1,
-    "action": {"type": "view", "path": "kkcar/overview"},
-    "depends": {"acl": ["luci-app-kkcar"]}
+    "action": {
+      "type": "view",
+      "path": "kkcar/overview"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-kkcar"
+      ]
+    }
+  },
+  "admin/kkcar_notifications": {
+    "title": "飞书推送",
+    "order": 2,
+    "action": {
+      "type": "view",
+      "path": "kkcar/notifications"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-kkcar"
+      ]
+    }
   }
 }
