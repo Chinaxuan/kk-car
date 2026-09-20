@@ -70,3 +70,8 @@
 上传 `notify-config.uc`、`notify-engine.uc`、`notify-worker.uc`、`notify-watch.sh` 和 `init.d/kk-car-notify`，同时更新 rpcd 后台、ACL、LuCI 菜单及前端 `notifications.js/css` 和首页入口。先放齐模块，再刷新 rpcd，避免导入缺失影响原页面。设置 `notify-watch.sh` 与 init.d 服务为 0755，启用并启动 `kk-car-notify`。源代码默认关闭推送；在设备页面配置自己的地址后启用。不需要重载 network、firewall 或 VPN。
 
 服务启动优先级 99，正常关机优先级 10；`shutdown` 与普通服务 `stop/restart` 区分，维护服务不会伪造关机通知。保留私密配置权限与启动链接。参见 [推送说明](NOTIFICATIONS.md)。
+
+
+## HDMI 本地状态屏
+
+可选的 `kk-car-hdmi` 服务直接输出到树莓派 HDMI；安装前备份启动配置，停止服务可恢复文本控制台。显示模式、安装、检查与撤销步骤见 [HDMI 状态屏](HDMI.md)。原设备启动配置与画面截图只保留在私密备份中。

@@ -1,0 +1,22 @@
+#!/bin/sh /etc/rc.common
+USE_PROCD=1
+START=99
+STOP=10
+
+start_service() {
+    [ -c /dev/fb0 ] || return 1
+    # Only change the local display; do not restart the router or its network.
+    /usr/bin/vcgencmd display_power 1 >/dev/null 2>&1
+    printf '\033[9;0\033[?25l' > /dev/tty1
+    procd_open_instance
+    procd_set_param command /usr/bin/ucode /etc/kk-car/hdmi.uc
+    procd_set_param nice 10
+    procd_set_param respawn 3600 10 3
+    procd_set_param stdout 0
+    procd_set_param stderr 1
+    procd_close_instance
+}
+
+stop_service() {
+    printf '\033[2J\033[H\033[?25h\033[9;10' > /dev/tty1
+}
