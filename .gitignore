@@ -28,3 +28,8 @@ kk-car-ui/root/etc/kk-car/history/
 kk-car-ui/root/etc/swanctl/
 kk-car-ui/root/etc/wireguard/
 kk-car-ui/root/etc/config/
+
+# Feishu endpoints and runtime delivery state
+**/notify.json
+**/notify-boot.json
+**/kk-car-notify-*.json
