@@ -3,6 +3,7 @@ import { readfile, writefile, popen, access, mkdir, rmdir, chmod, unlink } from 
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 import { history } from '/etc/kk-car/history.uc';
+import { read_config, public_config, save_config } from '/etc/kk-car/notify-config.uc';
 
 function run(cmd) {
     let p = popen(cmd + ' 2>/dev/null');
@@ -30,6 +31,24 @@ function launch(kind) {
 function failjob() { rmdir('/tmp/kk-car-ui-lock'); }
 
 return { 'kkcar': {
+    notify_get: {call:function() {return {config:public_config(read_config()),status:jsonfile('/tmp/kk-car-notify-status.json')};}},
+    notify_save: {args:{settings:''},call:function(req) {
+        if(length(req.args.settings)>8192)return {ok:false,error:'设置内容过长'};
+        let input;try{input=json(req.args.settings);}catch(e){return {ok:false,error:'设置格式错误'};}
+        return save_config(input);
+    }},
+    notify_test: {call:function() {
+        let c=read_config();
+        if(!c.enabled || !length(filter(c.destinations,d=>d.enabled && d.url)))return {ok:false,error:'请先保存并启用推送和至少一个地址'};
+        let previous=jsonfile('/tmp/kk-car-notify-test-last.json');
+        let monotonic=int(+(split(readfile('/proc/uptime') || '0',' ')[0]));
+        if(previous.uptime!=null && monotonic-previous.uptime<60)return {ok:false,error:'测试推送每分钟最多一次'};
+        let request={at:time(),uptime:monotonic,revision:c.revision};
+        if(!writefile('/tmp/kk-car-notify-test.json',sprintf('%J',request)))return {ok:false,error:'无法提交测试'};
+        chmod('/tmp/kk-car-notify-test.json',0600);
+        writefile('/tmp/kk-car-notify-test-last.json',sprintf('%J',request));
+        return {ok:true};
+    }},
     history: {args:{range:'1h'}, call:function(req) { return history(req.args.range); }},
     status: { call: function() {
         let bus = connect(), c = cursor();
