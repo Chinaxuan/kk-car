@@ -1,92 +1,92 @@
-# HDMI 本地状态屏
+# HDMI 中文状态屏
 
-`kk-car-hdmi` 直接在树莓派自带 HDMI 对应的 framebuffer 上绘制只读状态页。每 5 秒刷新，由树莓派独立运行，不需要 Mac、浏览器、桌面环境或额外字体。当前为英文像素字体，避免在路由器安装大型图形组件。
+树莓派独立在 HDMI framebuffer 绘制一屏中文网络数据，沿用管理页的深色配色和指标分类。它是只读状态屏，不安装浏览器，不依赖 Mac 连续截图，也不提供点击配置功能。
 
-## 显示内容
+## 内容与数据
 
-- IKEv2 连接状态与最近一轮 VPN Ping；超过 25 秒的探测不显示旧延迟。
-- LTE RSRP 与信号格数；上网棒缓存超过 75 秒时显示未知。
-- CPU 使用率、温度、已使用内存比例、Wi-Fi 在线客户端数。
-- 当前出口、下载/上传速率，以及最近约 5 分钟的 VPN 延迟柱状图。
-- 运行时间、当前欠压状态、IPv6 状态和持续变化的时钟。
+- 顶部显示当前出口、VPN、热点频段/信道、运行时长和时钟。
+- 六项关键读数：下载、上传、VPN 延迟、本轮丢包、LTE RSRP、CPU 使用率。
+- 双趋势图：上下行速率，以及共用时间轴的 VPN 延迟/蜂窝信号。左右轴分别为 ms、dBm，颜色沿用管理页面。
+- 四组 32 项详情：系统/CPU、出口/接口、VPN/IPsec、蜂窝/F30A Pro。
+- 底部显示热点、已确认在线的无线设备内网地址、上次六项网络检查结果和本地/VPN 管理地址。
 
-首帧 CPU 和速率为 `--`，下一轮计数采样后才显示。内存占比使用 `MemAvailable`，不是只计算完全空闲内存。出口切换、计数器归零时跳过该轮速率。接口流量不是运营商账单。
+复用现有 `kkcar.status`。不显示 VPN 服务器公网 IP、密码、Webhook 或客户端 MAC，不执行网络切换、VPN 重启或新的外部探测。网络检查为空时显示“未检测”，超过 5 分钟标为旧结果；地区信号不保证账号可用。
 
-数据复用已有 `kkcar.status` RPC。屏幕不会显示 VPN 服务端地址、出口公网 IP、密码、Webhook 或客户端身份；不执行联网测试、切换网络或重启 VPN。屏幕记录与诊断只写入 `/tmp`。
+正常每约 5 秒刷新，首帧需初始化本地字形缓存。首次 CPU/速率显示“未知”，取得第二次计数后才显示；出口变化或计数器归零时丢弃该轮速率。VPN Ping 过期 25 秒、蜂窝缓存过期 75 秒后不继续显示旧的实时读数。
 
-## 支持范围
+图表保留本次显示进程启动后的最多 120 个样本，正常约 10 分钟；采集变慢时实际跨度会增加。它不加载管理页面的 1 小时/1 天/30 天历史，重启显示服务会清空屏幕图表。内存占用按 MemAvailable 计算，缺少时才回退 MemFree，未知不显示成 100%。累计字节不是运营商套餐账单，累计错误也不是当前丢包率。
 
-本版仅针对 Raspberry Pi 3B+ 的 legacy `BCM2708 FB`、32 位 BGRA、零偏移 framebuffer；设备启动参数需含 `bcm2708_fb.fbswap=1`。最低逻辑画面为 640×360，按整数倍居中，支持本次设置的 1280×720。未知格式拒绝写入，错误不会修改网络配置。
+## 支持与字体
 
-这不代表已验证 KMS/DRM、其他树莓派型号或 e-Paper 屏幕。HDMI 显示与未来 SPI 墨水屏使用不同的底层驱动。
+支持 Pi 3B+ 的 legacy `BCM2708 FB`、32 位 BGRA、零偏移，启动参数需含 `bcm2708_fb.fbswap=1`。布局按 1920×1080 设计，在 1280×720 下可等比缩小；1080p 显示更多清晰像素，不只是放大原版八项状态卡。
 
-## 安装与启动
+中文使用本地 Noto Sans CJK SC 的位图子集，约 0.6 MB，字体许可位于 `hdmi-font.LICENSE`。路由器不需要 Pillow 或整套字体。界面用到的汉字已包含；未包含的动态字符会显示 `?`，设备列表使用内网地址，避免未知设备名影响排版。
 
-先完成 KK-Car 主程序部署，保证 `ucode`、`ucode-mod-fs`、`ucode-mod-ubus`、`vcgencmd` 和 `kkcar.status` 可用。将下列两个文件按同名绝对路径安装：
-
-```text
-kk-car-ui/root/etc/kk-car/hdmi.uc
-kk-car-ui/root/etc/init.d/kk-car-hdmi
-```
+开发机可用 Pillow 和官方字体重新生成：
 
 ```sh
-chmod 755 /etc/init.d/kk-car-hdmi
-ucode -c -o /tmp/kk-hdmi-check.ucb /etc/kk-car/hdmi.uc
-sh -n /etc/init.d/kk-car-hdmi
-/etc/init.d/kk-car-hdmi enable
-/etc/init.d/kk-car-hdmi start
+python3 kk-car-ui/tools/build-hdmi-font.py NotoSansCJKsc-Regular.otf kk-car-ui/root/etc/kk-car/hdmi-font.json
 ```
 
-如果启动时没有连接显示器，固件可能保留低分辨率默认输出；`vcgencmd display_power 1` 成功也不代表显示器已收到有效信号。先私密备份 `/boot/config.txt`，按显示器能力选择模式。此次使用以下标准 720p 配置，修改后需重启才能生效：
+字体来自 [Noto CJK 官方仓库](https://github.com/notofonts/noto-cjk)，按 SIL OFL 1.1 保留版权和许可证。本项目没有分发完整字体或把字体作为独立商品。
+
+不支持 KMS/DRM、其他树莓派型号或 SPI 墨水屏，不能套用这些显示设置。
+
+## 增量安装
+
+先保证本地或 VPN 管理可靠，私密备份原 `hdmi.uc` 和启动配置。需已有 `ucode`、fs/ubus 模块、`vcgencmd`、KK-Car 主程序。上传下列文件到对应路径：
+
+```text
+/etc/kk-car/hdmi.uc
+/etc/kk-car/hdmi-font.json
+/etc/kk-car/hdmi-font.LICENSE
+/etc/init.d/kk-car-hdmi
+```
+
+不要漏传字体。前三项权限 0644，init 服务 0755。先生成预览，再只重启显示服务：
+
+```sh
+ucode -c -o /tmp/kk-hdmi-check.ucb /etc/kk-car/hdmi.uc
+ucode /etc/kk-car/hdmi.uc --simulate --preview-1080 --frames=3
+cat /tmp/kk-car-hdmi-test-status.json
+/etc/init.d/kk-car-hdmi restart
+/etc/init.d/kk-car-hdmi enable
+```
+
+`--simulate` 只写 `/tmp/kk-car-hdmi-test.raw`，不覆盖显示器；`--preview-1080` 只允许与模拟一起使用，输出 1920×1080 BGRA，stride 7680。`--frames=N` 限定模拟运行 1–120 帧后自动退出，`--once` 生成一帧。模拟诊断和实时诊断文件分离。
+
+## 设置真实 1080p 输出
+
+先读取显示器 EDID 并确认支持 CEA 16 / 1080p60。Pi 的 legacy 配置参考 [Raspberry Pi 官方说明](https://www.raspberrypi.com/documentation/computers/legacy_config_txt.html)。在现有 `/boot/config.txt` 的自定义块中修改这些项，保留 `include distroconfig.txt` 和其他原有参数：
 
 ```ini
 [all]
 hdmi_force_hotplug=1
 hdmi_group=1
-hdmi_mode=4
+hdmi_mode=16
 hdmi_drive=2
 disable_overscan=1
-framebuffer_width=1280
-framebuffer_height=720
+framebuffer_width=1920
+framebuffer_height=1080
 ```
 
-不要覆盖整个启动文件；保留原来的 `include distroconfig.txt` 与其他设备设置。重启会短暂中断热点和 VPN，管理电脑可能自动连接其他 Wi-Fi，需要重新连接路由器热点。
+当前设备的模式切换采用启动参数，必须重启才能生效。重启会中断热点、转发与 VPN，安排可恢复的维护时间；不要为显示调整重置网络配置。VPN 服务端可能重新分配车端地址，恢复连接时应检查当前地址。
 
-可将两个程序文件和 `/etc/rc.d/S99kk-car-hdmi` 加入 `/etc/sysupgrade.conf`。启动分区的显示设置需在固件升级或重刷后单独核对，不能据此假定升级后一定保留。
+回退：通过 SSH 或本地键盘恢复维护前的启动配置，或将 mode/width/height 改回 4/1280/720，再重启。只回退显示内容时恢复原 `hdmi.uc` 并重启 `kk-car-hdmi` 即可，不用重启 network。
 
-## 检查与停止
+## 验证、退出与备份
 
 ```sh
 cat /sys/class/graphics/fb0/virtual_size
 cat /tmp/kk-car-hdmi-status.json
-ubus call service list '{"name":"kk-car-hdmi"}'
+/etc/init.d/kk-car-hdmi status
 ```
 
-状态中的 `frames` 应持续增加，`simulated` 应为 `false`。这些只证明进程与 framebuffer 写入；最终还需在物理显示器上确认能看见画面和时钟更新。
-
-只生成测试画面、不覆盖显示器：
-
-```sh
-ucode /etc/kk-car/hdmi.uc --simulate --once
-```
-
-输出 `/tmp/kk-car-hdmi-test.raw`，按当前 stride 与 BGRA 格式解码。模拟结果单独写入 `/tmp/kk-car-hdmi-test-status.json`，不会覆盖正在运行的 `/tmp/kk-car-hdmi-status.json`。
-
-停止并取消开机显示：
+检查实际分辨率、帧数递增、`simulated=false`，再确认物理屏幕可见且时钟更新。显示正常不能替代 LAN/Wi-Fi/DHCP/VPN 验证，也不能证明供电正常。
 
 ```sh
 /etc/init.d/kk-car-hdmi stop
 /etc/init.d/kk-car-hdmi disable
 ```
 
-停止时恢复文本控制台及光标。若要撤销强制 HDMI 模式，只移除本功能添加的配置块，或恢复安装前私密备份，再重启。不要恢复无关的旧网络配置。
-
-运行数据、framebuffer 截图和原设备启动配置不属于公开备份内容。
-
-## 2026-09-21 恢复与修正
-
-此前为进入文字控制台排查网络，显示服务被停止并禁用。本次检查发现 HDMI 电源、1280×720 framebuffer 与内容采集均正常，恢复显示服务后，用户确认实屏可见且时钟持续更新。
-
-修复内存占用错误：ucode 的整数计数相除会截断，原公式可能把正常内存误显示为 100%。现在在除法前转换为浮点计算，优先使用 MemAvailable；仅该值缺失时回退到 MemFree，零可用内存不误用回退值，缺少或无效数据显示 `--`。模拟画面诊断与实时诊断分离。
-
-本次只替换显示脚本、重启显示服务并恢复该服务的开机启动；没有重启路由器、network、Wi-Fi 或 VPN，也没有修改启动分区和安装浏览器。此屏仍是独立只读状态画面，不是可交互的 LuCI 网页。运行检查与耐久测试边界见 [验证记录](VALIDATION.md)。
+停止服务恢复文本控制台。将脚本、字体/许可证、init 服务与启动链接列入自己的 sysupgrade 保留清单；启动分区在升级或重刷后另行核对。原始 EDID、运行截图、实际配置和采样只留在私密备份中。已实测结果与未验证范围见 [验证记录](VALIDATION.md)。
