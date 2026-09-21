@@ -2,15 +2,16 @@
 
 把闲置的树莓派 3B+ 变成车载路由器：USB 4G 上网、Wi-Fi 热点、回公司 VPN，再用一页中文面板查看和管理整条网络。
 
-本仓库保存 **2026-09-20 的已部署项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
+本仓库保存 **截至 2026-09-21 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
 
-[使用说明](docs/USAGE.md) · [HDMI 状态屏](docs/HDMI.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [验证与限制](docs/VALIDATION.md)
+[使用说明](docs/USAGE.md) · [HDMI 状态屏](docs/HDMI.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
 
 ## 它能做什么
 
 | 功能 | 实际行为 |
 | --- | --- |
 | 一屏状态面板 | 统一深色布局，电脑优先、兼容手机；流量、CPU、内存、温度、供电、VPN、蜂窝及连接设备同时显示 |
+| VPN 备用管理 | 可选开启 VPN 通道内的管理页、SSH 和 Ping；按当前 VPN 地址维护返回路由，仍需原有管理员认证 |
 | VPN 管理 | 启动、暂停、重连 IKEv2 / IPsec，设置开机连接；旧 WireGuard 配置在设备上停用保留 |
 | 流量与延迟历史 | 下载/上传曲线；VPN Ping 与 LTE RSRP 共享时间轴，支持 1 小时、1 天、30 天 |
 | 有线 / 4G 选网 | 网口可切换 LAN 或 DHCP WAN；有线探测稳定后优先，失效后回到 4G |

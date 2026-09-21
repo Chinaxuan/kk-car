@@ -13,3 +13,7 @@ if ip link show dev ikecar >/dev/null 2>&1; then
     ip -4 route show table 300 | grep -q '^default dev ikecar ' ||
         ip -4 route replace default dev ikecar table 300 metric 10
 fi
+# Optional reverse management tracks the current assigned VPN address.
+if [ -x /etc/kk-car/vpn-management-route.sh ]; then
+    /etc/kk-car/vpn-management-route.sh
+fi
