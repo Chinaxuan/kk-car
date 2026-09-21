@@ -59,6 +59,7 @@
 | `kk-car-uplink` | 有线 / 4G 出口选择 |
 | `kk-car-modem` | 上网棒 ADB 状态采集 |
 | `kk-car-vpn-ping` | VPN 探测与历史保存 |
+| `kk-car-auto-check` | 每 10 分钟执行六项网络检查，与手动检查互斥 |
 | `kk-car-notify` | 事件推送、限频队列与开关机通知 |
 
 首次部署需要按依赖启用相应服务。备份清单应覆盖 `/etc/kk-car/`、对应 init.d 与启动链接、热插拔文件、nftables、strongSwan 行为配置、LuCI 前端/菜单和 rpcd 后台/ACL。
@@ -83,3 +84,26 @@
 ## 中文高密度 HDMI 更新
 
 新版须同时部署 `hdmi.uc`、`hdmi-font.json` 与 `hdmi-font.LICENSE`，保留原 init 服务。先用模拟参数验收布局，再只重启显示服务；单纯内容更新不重启 network。真实 1080p 的启动配置、短时断网与回退方法见 [HDMI 说明](HDMI.md)。
+
+## 每 10 分钟自动网络检查
+
+上传 `kk-car-ui/root/etc/kk-car/auto-check.sh` 与 `root/etc/init.d/kk-car-auto-check` 到设备对应位置，权限 0755；同时更新 `kkcar.uc` 与 `overview.js`。若使用 HDMI，同时更新 `hdmi.uc` 和 `hdmi-font.json`。依赖已有 `flock`、`ubus`、`jsonfilter`、`jshn.sh` 与原诊断工作脚本，不新增认证信息。
+
+```sh
+/etc/init.d/rpcd reload
+/etc/init.d/kk-car-auto-check enable
+/etc/init.d/kk-car-auto-check start
+# 已安装 HDMI 且本次更新了显示文件时执行
+/etc/init.d/kk-car-hdmi restart
+```
+
+服务启动后约 15 秒首次检测；在开机阶段最早等运行满 60 秒。后续按每次成功接受任务的时间间隔 600 秒触发。任务忙碌后 15 秒重试，RPC 不可用后 60 秒重试；实际开始时间可能稍后。计时使用运行时间，系统校时不改变间隔。状态和结果只存内存，失败不会触发网络或 VPN 重启。
+
+用 `ubus call kkcar status` 查看 `diagnostics_auto`、六项结果与检查时间；管理页和 HDMI 也显示最新结果。本次更新不需要重启路由器、网络或 VPN。撤销自动检查时执行：
+
+```sh
+/etc/init.d/kk-car-auto-check stop
+/etc/init.d/kk-car-auto-check disable
+```
+
+手动检查按钮仍可使用；已经开始的单次检查可能继续至有界超时结束。恢复时重新 enable 和 start。回退显示改动时，从私密备份只恢复对应显示文件及后台文件。

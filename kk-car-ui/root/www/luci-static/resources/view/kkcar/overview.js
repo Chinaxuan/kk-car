@@ -141,7 +141,7 @@ return view.extend({
                         E('p',{'class':'kk-footnote'},'累计流量读取蜂窝接口计数，设备重启后可能归零，不是套餐用量或余量。RSRP 数值越接近 0，接收信号越强；实际速度还取决于网络拥塞。')
                     ]),
                     section('网络检查','从路由器分别探测线路，不修改当前分流。',[
-                        E('div',{id:'kk-diagnostics'},E('p',{'class':'kk-empty'},'尚未运行检查。点击右上方“检查网络”，查看国内出口、VPN 出口、公司服务和域名解析。')),
+                        E('div',{id:'kk-diagnostics'},E('p',{'class':'kk-empty'},'等待首次检查，也可点击右上方“检查网络”。')),
                         E('p',{id:'kk-diag-time','class':'kk-footnote'},'')
                     ]),
                     section('连接设备','无线设备为实时连接；其余为 DHCP 地址租约，不一定仍在线。',[
@@ -239,7 +239,7 @@ return view.extend({
         modem.querySelector('.kk-section-head p').textContent='上网棒实时状态 · 每 30 秒更新';
         modem.append(fold('信号与流量说明',[modem.lastElementChild]));
         find('连接设备').querySelector('.kk-section-head p').textContent='Wi-Fi 在线设备与 DHCP 租约';
-        find('网络检查').querySelector('.kk-section-head p').textContent='点击顶部“检查网络”重新检测';
+        find('网络检查').querySelector('.kk-section-head p').textContent='自动与手动检查结果';
         var vpn=find('VPN 控制');
         vpn.querySelector('.kk-section-head p').textContent='断线后自动恢复，必要时手动重连';
         vpn.append(fold('开机连接与旧 VPN',[vpn.querySelector('form'),this.el('kk-wg-note')]));
@@ -474,7 +474,10 @@ return view.extend({
             E('div',{},[E('strong',{},peer.name),E('span',{},peer.ip)]),
             E('span',{'class':'kk-device-state '+(peer.wireless?'online':'')},peer.wireless?'Wi-Fi 已连接':'地址租约')
         ]));});
-        var result=d.diagnostics;
+        var result=d.diagnostics, autoCheck=d.diagnostics_auto || {};
+        var autoActive=autoCheck.enabled && d.timestamp>=autoCheck.updated && d.timestamp-autoCheck.updated<=45;
+        var autoLabel=autoActive?'每10分钟自动检查':'手动检查';
+        this.text('kk-diag-time',autoLabel+(autoActive?' · 下次约 '+stamp(autoCheck.next_run):''));
         if(result.timestamp){
             var diag=this.el('kk-diagnostics');diag.replaceChildren();
             [['国内出口',result.domestic,result.domestic_detail || '目标未响应'],['VPN 出口',result.foreign,result.foreign_ip?result.foreign_ip+' · '+result.foreign_country:'目标未响应'],['公司服务',result.company,'10.8.8.15:8080 · HTTP '+result.company_code],['国外域名解析',result.dns,'www.google.com']].forEach(function(row){
@@ -494,7 +497,7 @@ return view.extend({
                 ]));
             });
             this.text('kk-diag-summary','网络检查 '+[result.domestic,result.foreign,result.company,result.dns].filter(Boolean).length+'/4 · 地区 '+[result.chatgpt,result.gemini].filter(function(a){return a && a.country;}).length+'/2 已识别');
-            this.text('kk-diag-time','检查于 '+stamp(result.timestamp)+' · CN 指中国大陆；地区结果不代表账号可用。');
+            this.text('kk-diag-time',autoLabel+' · 检查于 '+stamp(result.timestamp)+' · 地区结果不代表账号可用。');
         }
         if(this.previous && d.timestamp>this.previous.timestamp){
             var dt=d.timestamp-this.previous.timestamp;

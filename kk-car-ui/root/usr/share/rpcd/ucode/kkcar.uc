@@ -115,7 +115,8 @@ return { 'kkcar': {
             job:jsonfile('/tmp/kk-car-ui-job.json'), busy:access('/tmp/kk-car-ui-lock'),
             wifi_pending: pending.deadline ? {deadline:pending.deadline, ssid:pending.ssid} : null,
             port_pending: portpending.deadline ? {deadline:portpending.deadline, mode:portpending.mode} : null,
-            diagnostics:jsonfile('/tmp/kk-car-ui-diagnostics.json')
+            diagnostics:jsonfile('/tmp/kk-car-ui-diagnostics.json'),
+            diagnostics_auto:jsonfile('/tmp/kk-car-auto-check.json')
         };
     }},
     action: { args:{action:''}, call:function(req) {

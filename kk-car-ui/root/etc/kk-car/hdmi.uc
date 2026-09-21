@@ -106,10 +106,11 @@ while(true){let started=+(split(readfile('/proc/uptime')||'0',' ')[0]);let s=bus
  panel(32,884,916,142,'热点与设备',s.wifi.clients+' 台无线在线');
  text(54,936,'SSID '+s.wifi.ssid+'   /   '+s.wifi.band+' · '+s.wifi.width+'MHz',C.white,20,C.panel,850);
  let peers=[];for(let p in s.peers||[])if(p.wireless)push(peers,p.ip);text(54,974,length(peers)?join('   /   ',peers):'没有已确认在线的无线设备',C.muted,20,C.panel,850);
- panel(972,884,916,142,'上次网络检查','只读结果，不自动发起检测');
+ let autoCheck=s.diagnostics_auto||{},autoActive=autoCheck.enabled&&fresh(autoCheck.updated,now,45);
+ panel(972,884,916,142,'上次网络检查',autoActive?'每10分钟自动 / 也可手动':'手动检查 / 显示最近结果');
  let d=s.diagnostics||{},age=d.timestamp?now-d.timestamp:null;
  let names=['国内出口','VPN 出口','公司服务','DNS','ChatGPT','Gemini'],keys0=['domestic','foreign','company','dns','chatgpt','gemini'];
- for(let i=0;i<6;i++){let k=keys0[i],v=d[k],status=age==null?'未检测':i<4?(v?'通过':'未通过'):(v?.country||'未知');let color=age==null||age>300?C.muted:i<4?(v?C.green:C.amber):(v?.country=='CN'?C.red:v?.country?C.green:C.amber);if(age>300)status+=' / 旧结果';text(994+(i%3)*294,936+int(i/3)*38,names[i]+' '+status,color,18,C.panel,278);}
+ for(let i=0;i<6;i++){let k=keys0[i],v=d[k],status=age==null?'未检测':i<4?(v?'通过':'未通过'):(v?.country||'未知');let color=age==null||age>720?C.muted:i<4?(v?C.green:C.amber):(v?.country=='CN'?C.red:v?.country?C.green:C.amber);if(age>720)status+=' / 旧结果';text(994+(i%3)*294,936+int(i/3)*38,names[i]+' '+status,color,18,C.panel,278);}
  text(32,1045,'本地 '+ '192.168.88.1'+'   /   VPN '+(s.vpn.ip||'未分配')+'   /   只读状态屏',C.muted,18,C.bg,1320);
  text(1510,1045,preview?'1080p 布局预览':width+' x '+height+' / 5 秒刷新',C.muted,18,C.bg,375);
  let data=join('',canvas);fb.seek(0);if(fb.write(data)!=length(data)||!fb.flush())fail('framebuffer write failed');frames++;

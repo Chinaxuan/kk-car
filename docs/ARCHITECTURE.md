@@ -131,7 +131,7 @@ VPN 累计错/丢是内核接口历史计数；实时 Ping 丢包率是本轮检
 
 ## ChatGPT / Gemini 地区检查
 
-点击「检查网络」同步检查六项，新增两项均由树莓派经 `ikecar` VPN 使用 IPv4 发出，不携带账号、Cookie 或 API 密钥。每项最长 12 秒；Gemini 页面上限 1.5 MiB，ChatGPT trace 上限 32 KiB，仅保存归纳结果在内存，原始页面检查结束即删除。
+设备本地 `kk-car-auto-check` 每 600 秒通过 `kkcar.action` 检查六项，点击「检查网络」也可立即执行。自动与手动复用原任务锁；服务用单调运行时间计时，校时不会造成连续重复检查。忙碌后 15 秒重试，RPC 故障后 60 秒重试。`diagnostics_auto` 含运行心跳与下次预计时间，前端仅在心跳 45 秒内更新时显示自动检查启用。六项检查中，新增两项均由树莓派经 `ikecar` VPN 使用 IPv4 发出，不携带账号、Cookie 或 API 密钥。每项最长 12 秒；Gemini 页面上限 1.5 MiB，ChatGPT trace 上限 32 KiB，仅保存归纳结果在内存，原始页面检查结束即删除。
 
 - ChatGPT：读取 `https://chatgpt.com/cdn-cgi/trace` 的 `loc`，同时校验 `h=chatgpt.com`。这是该域名的 Cloudflare 边缘地区，不是 OpenAI 账号地区或完整模型可用性检测。
 - Gemini：读取 `https://gemini.google.com/` 返回页面的 `vXmutd` 内部地区字段。当前实测 `JP`，同页另有 `JPN`；界面明确标为「页面地区（参考）」。此字段不是公开稳定 API，格式缺失或变化时显示地区未知。
