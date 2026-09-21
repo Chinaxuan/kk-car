@@ -5,11 +5,11 @@ cd71e1ee27fba5f47592de4ab27f6ed743d2d103a2b0223266eecb45894273ae  PRODUCT.md
 acf4891b625d6356f015dc239ded428d113708c9e2b5c55b6e80f07e7611040b  docs/ARCHITECTURE.md
 28155d38b49ba3bbe387518e5f7be265f2efb2d29c7815ebf81bffaeabc32537  docs/BACKUP.md
 dcd9bc83ac131a3f7d2e47a2e8f13a563f53eaf5635fbc2c1b4daebfb540e22f  docs/DEPLOYMENT.md
-d90e4dcc941091bfce6fcd90d841f09849ab59e8785dff699f602b9f59ec4120  docs/HDMI.md
+7e69069523b3bc11468e05b173bf8bf0f547e8479f5ac9f7c66f9d2a2453ba11  docs/HDMI.md
 467e97616c3e5ebdfb8eca84c067760782fcf9f3388c34f8ce5ab47d3ff6a84a  docs/NETWORK-RECOVERY.md
 26420485b4c601493682e90eee8c935ee500502471ee5ad38f664f6f8220459e  docs/NOTIFICATIONS.md
 4e712d4f0d6ab2ce1a946717ef6cdbae8c77a4e84257d5b3f392d4e7255ba227  docs/USAGE.md
-7623ee8e48d6eb654a00367de71c962d311ab31a324b422a9c4cf1946fafea0b  docs/VALIDATION.md
+b50b85eae4d792bdff057d7dbe4e1c11d8bf6a0a5372fc15e009081894ec036b  docs/VALIDATION.md
 1b3a82628048f031aee7d4db36174c2d8a878d19b79aa072039b7b32365e5ac6  docs/packages-reference.txt
 d2909f27eace86d764a77f25d50a4b9a6c1d9b0529425f17b1deba3e82c54918  kk-car-ui/README.md
 0ae810cdef850b5e3229a088e7ac79beeb4d87f1b5258a4ea8b799c4bc5eab83  kk-car-ui/install-ethernet.uc
@@ -27,7 +27,7 @@ e2562169e96560e95d3c27429cc1d2c1ff84a38ee3c295a4581cf4a398a5c2e1  kk-car-ui/root
 cb9591eaf4edde6f31902357160451f77b7a91e44aa6553b60a8317429c04207  kk-car-ui/root/etc/kk-car/ai-region.uc
 f0a2656d5bde6dad48e5629254eca7278a889ca44eb4cd161ad70e11bbc46325  kk-car-ui/root/etc/kk-car/check-ipv6.sh
 21898f09214f9432c2ccaeaa4402274d7427bfd3d71a7170b78b329cb3d4ce60  kk-car-ui/root/etc/kk-car/disable-ipv6.sh
-e6ab039063bad9f27ba836c1fb195416934abdc24a9846e33d4c54431dbb8329  kk-car-ui/root/etc/kk-car/hdmi.uc
+0666b2234e0052a3a2db789b7abb9850667247e1de6432dd59ba07fc2dd3ca2b  kk-car-ui/root/etc/kk-car/hdmi.uc
 026ab240c536799fad1fb7175cd42ffa753c368ebfa12271c6b9b47c2d72510b  kk-car-ui/root/etc/kk-car/history-write.uc
 b7d11316a3b35c29c2ccaf9c605645b582d477e766998cd0f9dcd23403f9f3c1  kk-car-ui/root/etc/kk-car/history.uc
 fe7632891ef15217ddac95a48bf444c47d39278e815e103ae0620a5d4de5ba91  kk-car-ui/root/etc/kk-car/ike-route-ensure.sh

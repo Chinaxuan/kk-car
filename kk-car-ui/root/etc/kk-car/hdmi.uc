@@ -72,9 +72,15 @@ function bar(x,y,w,pct,color) {
 }
 function card(x,y,w,h) {rect(x,y,w,h,C.card);}
 function duration(seconds) {return sprintf('%02dH %02dM',int(seconds/3600),int(seconds%3600/60));}
+function memoryPercent(memory) {
+    let total=memory?.total, available=memory?.available ?? memory?.free;
+    if (total == null || total <= 0 || available == null || available < 0)return null;
+    // Promote before division: ubus memory counters are integers.
+    return max(0.0,min(100.0,100.0*(total-available)/total));
+}
 function fresh(stamp,now,limit) {return type(stamp)=='double' || type(stamp)=='int' ? stamp<=now && now-stamp<=limit : false;}
 function atomic(value) {
-    let path='/tmp/kk-car-hdmi-status.json';
+    let path=simulate?'/tmp/kk-car-hdmi-test-status.json':'/tmp/kk-car-hdmi-status.json';
     writefile(path+'.new',sprintf('%J\n',value));rename(path+'.new',path);
 }
 
@@ -103,8 +109,7 @@ while(true) {
     if(latency!=null && (latency<0 || latency>60000))latency=null;
     let signal=fresh(modem.timestamp,now,75) && modem.online && modem.connected && match(modem.network || '', /LTE|4G/) ? modem.rsrp : null;
     if(signal!=null && (signal>0 || signal< -160))signal=null;
-    let available=s.memory.available || s.memory.free || 0;
-    let memory=100.0*(1.0-available/max(1.0,s.memory.total));
+    let memory=memoryPercent(s.memory);
     push(samples,latency);if(length(samples)>54)shift(samples);
     canvas=[];for(let y=0;y<height;y++)push(canvas,blankrow);
 
@@ -126,12 +131,12 @@ while(true) {
     for(let i=0;i<5;i++)rect(567+i*11,125-(i+1)*7,7,(i+1)*7,signal!=null && i<(modem.bars || 0)?C.blue:C.line);
 
     let names=['CPU LOAD','TEMPERATURE','MEMORY USED','WI-FI CLIENTS'];
-    let values=[cpu==null?'--':sprintf('%.1f',cpu),sprintf('%.1f',s.temperature),sprintf('%.0f',memory),''+s.wifi.clients];
+    let values=[cpu==null?'--':sprintf('%.1f',cpu),sprintf('%.1f',s.temperature),memory==null?'--':sprintf('%.0f',memory),''+s.wifi.clients];
     let units=['%','C','%','ONLINE'],colors=[C.white,C.amber,C.blue,C.cyan];
     for(let i=0;i<4;i++) {
         let x=i*162;card(x,164,154,76);text(x+12,176,names[i],C.muted,1);
         text(x+12,197,values[i],colors[i],3);text(x+109,209,units[i],C.muted,1);
-        if(i<3)bar(x+12,229,130,i==0?(cpu || 0):i==1?s.temperature:memory,colors[i]);
+        if(i<3)bar(x+12,229,130,i==0?(cpu || 0):i==1?s.temperature:(memory || 0),colors[i]);
     }
     card(0,250,312,76);card(324,250,316,76);
     text(16,262,'VPN LATENCY / RECENT 5 MIN',C.muted,1);
@@ -156,7 +161,7 @@ while(true) {
     atomic({timestamp:now,uptime:s.uptime,frames,width,height,stride,format:'BGRA',
         render_seconds:elapsed,cpu_percent:cpu,vpn_connected:s.vpn.connected,
         latency_ms:latency,rsrp_dbm:signal,temperature:s.temperature,
-        wifi_clients:s.wifi.clients,simulated:simulate});
+        wifi_clients:s.wifi.clients,memory_percent:memory,download_mbps:down,upload_mbps:up,simulated:simulate});
     previous=s;
     if(once)break;
     sleep(int(max(1000,5000-elapsed*1000)));

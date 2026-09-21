@@ -70,7 +70,7 @@ ubus call service list '{"name":"kk-car-hdmi"}'
 ucode /etc/kk-car/hdmi.uc --simulate --once
 ```
 
-输出 `/tmp/kk-car-hdmi-test.raw`，按当前 stride 与 BGRA 格式解码。测试会更新 HDMI 诊断文件；运行中的服务会在下一轮覆盖该文件。
+输出 `/tmp/kk-car-hdmi-test.raw`，按当前 stride 与 BGRA 格式解码。模拟结果单独写入 `/tmp/kk-car-hdmi-test-status.json`，不会覆盖正在运行的 `/tmp/kk-car-hdmi-status.json`。
 
 停止并取消开机显示：
 
@@ -82,3 +82,11 @@ ucode /etc/kk-car/hdmi.uc --simulate --once
 停止时恢复文本控制台及光标。若要撤销强制 HDMI 模式，只移除本功能添加的配置块，或恢复安装前私密备份，再重启。不要恢复无关的旧网络配置。
 
 运行数据、framebuffer 截图和原设备启动配置不属于公开备份内容。
+
+## 2026-09-21 恢复与修正
+
+此前为进入文字控制台排查网络，显示服务被停止并禁用。本次检查发现 HDMI 电源、1280×720 framebuffer 与内容采集均正常，恢复显示服务后，用户确认实屏可见且时钟持续更新。
+
+修复内存占用错误：ucode 的整数计数相除会截断，原公式可能把正常内存误显示为 100%。现在在除法前转换为浮点计算，优先使用 MemAvailable；仅该值缺失时回退到 MemFree，零可用内存不误用回退值，缺少或无效数据显示 `--`。模拟画面诊断与实时诊断分离。
+
+本次只替换显示脚本、重启显示服务并恢复该服务的开机启动；没有重启路由器、network、Wi-Fi 或 VPN，也没有修改启动分区和安装浏览器。此屏仍是独立只读状态画面，不是可交互的 LuCI 网页。运行检查与耐久测试边界见 [验证记录](VALIDATION.md)。
