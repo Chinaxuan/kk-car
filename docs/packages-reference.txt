@@ -119,7 +119,9 @@ kmod-usb-hid
 kmod-usb-net
 kmod-usb-net-cdc-ether
 kmod-usb-net-cdc-ncm
+kmod-usb-net-qmi-wwan
 kmod-usb-net-rndis
+kmod-usb-serial-option
 kmod-veth
 kmod-wireguard
 kmod-xfrm-interface
@@ -185,6 +187,7 @@ luci-mod-status
 luci-mod-system
 luci-proto-ipv6
 luci-proto-ppp
+luci-proto-qmi
 luci-proto-wireguard
 luci-proto-xfrm
 luci-theme-bootstrap
@@ -210,6 +213,7 @@ rpcd-mod-luci
 rpcd-mod-rpcsys
 rpcd-mod-rrdns
 rpcd-mod-ucode
+socat
 strongswan
 strongswan-charon
 strongswan-mod-kernel-netlink
@@ -238,6 +242,7 @@ ucode-mod-uci
 ucode-mod-uloop
 uhttpd
 uhttpd-mod-ubus
+uqmi
 urandom-seed
 usbids
 usbutils

@@ -30,7 +30,7 @@ function decide(mode, wire, cell, lan, previous, probe, carrier) {
     let good = eligible && probe ? min(3, (same ? previous.good || 0 : 0)+1) : 0;
     let bad = eligible && !probe ? min(2, (same ? previous.bad || 0 : 0)+1) : 0;
     let healthy = !!(eligible && (good >= 3 || (same && previous.healthy && bad < 2)));
-    let active = healthy ? 'ethernet' : cell.up && cell.gateway ? 'cellular' : 'none';
+    let active = healthy ? 'ethernet' : cell.up && (cell.gateway || cell.default_route) ? 'cellular' : 'none';
     let reason = mode != 'wan' ? 'lan' : !carrier ? 'no_cable' : conflict ? 'subnet_conflict' : !wire.up || !wire.gateway ? 'dhcp_wait' : healthy ? 'preferred' : probe ? 'checking' : 'probe_failed';
     return {mode, identity, good, bad, healthy, active, reason, conflict};
 }

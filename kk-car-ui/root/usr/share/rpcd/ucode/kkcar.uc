@@ -4,6 +4,7 @@ import { cursor } from 'uci';
 import { connect } from 'ubus';
 import { history } from '/etc/kk-car/history.uc';
 import { read_config, public_config, save_config } from '/etc/kk-car/notify-config.uc';
+import { address, read_cellular } from '/etc/kk-car/uplink-model.uc';
 
 function run(cmd) {
     let p = popen(cmd + ' 2>/dev/null');
@@ -52,11 +53,11 @@ return { 'kkcar': {
     history: {args:{range:'1h'}, call:function(req) { return history(req.args.range); }},
     status: { call: function() {
         let bus = connect(), c = cursor();
-        let wan = bus.call('network.interface.wan', 'status') || {};
+        let wan = read_cellular(bus);
         let uplink = jsonfile('/tmp/kk-car-uplink.json');
         let wired = bus.call('network.interface.kk_ethwan', 'status') || {};
         let portmode = c.get('network','kk_ethwan','auto') == '1' ? 'wan' : 'lan';
-        let current = uplink.active == 'ethernet' ? wired : wan;
+        let current = uplink.active == 'ethernet' ? address(wired,'eth0') : wan;
         let sys = bus.call('system', 'info') || {};
         let ap = bus.call('hostapd.phy0-ap0', 'get_clients') || {};
         let sa = run('/usr/sbin/swanctl --list-sas');
@@ -91,13 +92,14 @@ return { 'kkcar': {
             telemetry:{cpu:{total,idle:+(ticks[4] || 0)+ +(ticks[5] || 0),mhz:clock ? +clock[1]/1e6 : null},
                 loads:[loads[0] || null,loads[1] || null,loads[2] || null],
                 conntrack:metricfile('/proc/sys/net/netfilter/nf_conntrack_count'),conntrack_max:metricfile('/proc/sys/net/netfilter/nf_conntrack_max'),
-                wan:netmetrics(uplink.active=='ethernet'?'eth0':'eth1'),vpn:netmetrics('ikecar'),
+                wan:netmetrics(current.device),vpn:netmetrics('ikecar'),
                 cipher:cipher ? trim(cipher[1]) : null,rekey:rekey ? +rekey[1] : null},
             temperature:numberfile('/sys/class/thermal/thermal_zone0/temp') / 1000,
             power:{known:powerbits != null, undervoltage:powerbits != null && !!(powerbits & 1), throttled:powerbits != null && !!(powerbits & 4), historical:powerbits != null && !!(powerbits & 0x50000)},
-            wan:{up:uplink.active ? uplink.active != 'none' : !!wan.up, ip:current['ipv4-address']?.[0]?.address || '', device:current.l3_device || '', uptime:current.uptime || 0,
-                rx:numberfile('/sys/class/net/eth1/statistics/rx_bytes') + (portmode=='wan' ? numberfile('/sys/class/net/eth0/statistics/rx_bytes') : 0),
-                tx:numberfile('/sys/class/net/eth1/statistics/tx_bytes') + (portmode=='wan' ? numberfile('/sys/class/net/eth0/statistics/tx_bytes') : 0)},
+            wan:{up:uplink.active ? uplink.active != 'none' : !!wan.up, ip:current.ip || '', device:current.device || '', uptime:current.uptime || 0,
+                rx:numberfile('/sys/class/net/'+wan.device+'/statistics/rx_bytes') + (portmode=='wan' && wan.device!='eth0' ? numberfile('/sys/class/net/eth0/statistics/rx_bytes') : 0),
+                tx:numberfile('/sys/class/net/'+wan.device+'/statistics/tx_bytes') + (portmode=='wan' && wan.device!='eth0' ? numberfile('/sys/class/net/eth0/statistics/tx_bytes') : 0),
+                counter_source:wan.device+'|'+portmode},
             ethernet:{mode:portmode, carrier:trim(readfile('/sys/class/net/eth0/carrier') || '')=='1', up:!!wired.up, ip:wired['ipv4-address']?.[0]?.address || ''},
             uplink,
             vpn:{connected: index(sa,'ESTABLISHED') >= 0 && index(sa,'INSTALLED') >= 0,

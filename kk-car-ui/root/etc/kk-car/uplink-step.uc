@@ -2,18 +2,18 @@
 import { readfile, writefile, rename, popen, access } from 'fs';
 import { cursor } from 'uci';
 import { connect } from 'ubus';
-import { ipv4, cidr, subnet, overlap, decide } from '/etc/kk-car/uplink-policy.uc';
+import { cidr, decide } from '/etc/kk-car/uplink-policy.uc';
+import { address, read_cellular, wan_device, route_path, route_options, selected_identity } from '/etc/kk-car/uplink-model.uc';
 function run(command) { let p=popen(command+' 2>/dev/null'); if (!p) return ''; let s=p.read('all'); p.close(); return trim(s || ''); }
 function command(s) { return system(s+' >/dev/null 2>&1') == 0; }
-function address(bus, name, device) {
-    let s = bus.call('network.interface.'+name, 'status') || {}, a=s['ipv4-address']?.[0] || {};
-    let ip=ipv4(a.address) != null ? a.address : '', mask=+a.mask, gateway='';
-    for (let r in s.route || []) if (r.target=='0.0.0.0' && r.mask==0 && ipv4(r.nexthop)!=null) gateway=r.nexthop;
-    return {up:!!s.up && !!ip, ip, mask, gateway, device, uptime:s.uptime || 0};
+function has_route(output, prefix, extra) {
+    for (let line in split(output,'\n'))
+        if ((line==prefix || index(line,prefix+' ')==0) && (!extra || index(' '+line+' ',' '+extra+' ')>=0)) return true;
+    return false;
 }
 let c=cursor(), bus=connect();
 let mode=c.get('network','kk_ethwan','auto')=='1' ? 'wan' : 'lan';
-let cell=address(bus,'wan','eth1'), wire=address(bus,'kk_ethwan','eth0'), lan=address(bus,'lan','br-lan');
+let cell=read_cellular(bus), wire=address(bus.call('network.interface.kk_ethwan','status'),'eth0'), lan=address(bus.call('network.interface.lan','status'),'br-lan');
 let prev={}; try { prev=json(readfile('/tmp/kk-car-uplink.json') || '{}'); } catch(e) {}
 let carrier=trim(readfile('/sys/class/net/eth0/carrier') || '')=='1';
 let pre=decide(mode,wire,cell,lan,prev,false,carrier), probe=false;
@@ -35,20 +35,21 @@ for (let item in [lan,cell,wire]) {
     let network=cidr(item.ip,item.mask); if (!network) continue;
     let prefix=network+' dev '+item.device;
     push(links,{network,device:item.device});
-    if (index(routes,prefix)<0 || index(routes,'src '+item.ip)<0)
+    if (!has_route(routes,prefix,'src '+item.ip))
         ok=command('ip -4 route replace '+prefix+' src '+item.ip+' table 301') && ok;
 }
 if (selected) {
-    let wanted='default via '+selected.gateway+' dev '+selected.device;
-    if (index(routes,wanted)<0)
-        ok=command('ip -4 route replace '+wanted+' table 301 metric 10') && ok;
+    let wanted='default '+route_path(selected);
+    if (!has_route(routes,wanted,trim(route_options(selected))))
+        ok=command('ip -4 route replace '+wanted+' table 301 metric 10'+route_options(selected)) && ok;
 } else if (match(routes, /(^|\n)default /)) command('ip -4 route del default table 301 metric 10');
 // Remove obsolete connected routes, retaining the unreachable default throughout.
 for (let line in split(routes,'\n')) {
-    let m=match(line,/^([0-9.]+\/\d+) dev (eth0|eth1|br-lan) /);
-    if (!m) continue;
-    let keep=false; for (let link in links) if (link.network==m[1] && link.device==m[2]) keep=true;
-    if (!keep) command('ip -4 route del '+m[1]+' dev '+m[2]+' table 301');
+    let m=match(line,/^([0-9.]+(\/\d+)?) dev ([A-Za-z0-9_-]+) /);
+    if (!m || (!wan_device(m[3]) && m[3]!='br-lan')) continue;
+    let network=index(m[1],'/')<0 ? m[1]+'/32' : m[1];
+    let keep=false; for (let link in links) if (link.network==network && link.device==m[3]) keep=true;
+    if (!keep) command('ip -4 route del '+m[1]+' dev '+m[3]+' table 301');
 }
 let main=run('ip -4 route show default dev eth0');
 if (next.active=='ethernet' && ok) {
@@ -59,16 +60,21 @@ if (next.active=='ethernet' && ok) {
 // Keep IKE source-address selection on the selected uplink too, before restarting it.
 let endpoint=run('ip -4 route show 203.0.113.10/32');
 if (selected && ok) {
-    let wanted='203.0.113.10 via '+selected.gateway+' dev '+selected.device+' metric 5';
-    if (index(endpoint,wanted)<0)
-        ok=command('ip -4 route replace 203.0.113.10/32 via '+selected.gateway+' dev '+selected.device+' metric 5') && ok;
+    let wanted='203.0.113.10 '+route_path(selected)+' metric 5';
+    if (!has_route(endpoint,wanted,trim(route_options(selected))))
+        ok=command('ip -4 route replace 203.0.113.10/32 '+route_path(selected)+' metric 5'+route_options(selected)) && ok;
 } else if (match(endpoint,/metric 5(\s|$)/)) command('ip -4 route del 203.0.113.10/32 metric 5');
 next.timestamp=time(); next.carrier=carrier; next.wire=wire; next.cell=cell;
 next.device=selected?.device || ''; next.ready=ok;
-next.changed=prev.active && prev.active!=next.active ? time() : prev.changed || time();
+let identity=selected_identity(next.active,selected);
+let oldlink=prev.active=='ethernet' ? prev.wire : prev.active=='cellular' ? prev.cell : null;
+let previous=prev.applied_identity || selected_identity(prev.active,oldlink);
+let changed=!!prev.active && previous!=identity;
+next.applied_identity=ok ? identity : previous;
+next.changed=ok && changed ? time() : prev.changed || time();
 writefile('/tmp/kk-car-uplink.json.new',sprintf('%J',next));
 rename('/tmp/kk-car-uplink.json.new','/tmp/kk-car-uplink.json');
-if (ok && prev.active && prev.active!=next.active) {
+if (ok && changed) {
     command('logger -t kk-car-uplink "Selected '+next.active+' uplink"');
     // Rebuild the VPN only if it was running; a user's paused VPN stays paused.
     if (access('/var/run/charon.pid') && next.active!='none') {

@@ -18,7 +18,7 @@ case "$kind" in
         case "$?" in
             0) result done '上网棒状态已更新' ;;
             2) result done '后台正在读取上网棒，页面会自动更新' ;;
-            *) result error '暂时无法读取上网棒 ADB；此结果不代表蜂窝网络已断开' ;;
+            *) result error '暂时无法采集模块状态；此结果不代表蜂窝网络已断开' ;;
         esac
         ;;
     vpn_restart|vpn_start|vpn_stop)
@@ -51,8 +51,14 @@ case "$kind" in
         dir=$(mktemp -d /tmp/kk-car-check.XXXXXX) || { result error '无法创建检查任务'; exit 1; }
         # Pin only the public probe endpoint; record a separate DNS check.
         direct_if=$(jsonfilter -i /tmp/kk-car-uplink.json -e '@.device' 2>/dev/null)
-        case "$direct_if" in eth0|eth1) ;; *) direct_if=eth1 ;; esac
-        curl -4 --noproxy '*' --interface "$direct_if" --connect-timeout 3 --max-time 7 -fsS https://myip.ipip.net > "$dir/domestic" 2>/dev/null & p1=$!
+        valid_wan_device() {
+            [ "${#1}" -le 15 ] && printf '%s\n' "$1" | grep -Eq '^(eth|wwan|usb)[0-9]+$' && [ -d "/sys/class/net/$1" ]
+        }
+        if ! valid_wan_device "$direct_if"; then
+            direct_if=$(ucode -e 'import {connect} from "ubus"; import {read_cellular} from "/etc/kk-car/uplink-model.uc"; let cell=read_cellular(connect()); if(cell.up && cell.default_route) print(cell.device);' 2>/dev/null)
+        fi
+        # An unknown/offline WAN must never fall back to an unbound request.
+        (valid_wan_device "$direct_if" && curl -4 --noproxy '*' --interface "$direct_if" --connect-timeout 3 --max-time 7 -fsS https://myip.ipip.net > "$dir/domestic" 2>/dev/null) & p1=$!
         curl -4 --noproxy '*' --interface ikecar --resolve www.cloudflare.com:443:104.16.124.96 --connect-timeout 3 --max-time 7 -fsS https://www.cloudflare.com/cdn-cgi/trace > "$dir/foreign" 2>/dev/null & p2=$!
         curl -4 --noproxy '*' --interface ikecar --connect-timeout 3 --max-time 7 -sS -o /dev/null -w '%{http_code}' http://10.8.8.15:8080/ > "$dir/company" 2>/dev/null & p3=$!
         (nslookup www.google.com 127.0.0.1 > "$dir/dns" 2>/dev/null) & p4=$!

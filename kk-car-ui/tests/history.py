@@ -42,6 +42,12 @@ sample(t+30,-999,t+30);sample(t+40,-60,t+100);sample(t+50,-70,t-100);
 sample(t+60,-60,t+60);
 let sig=history('1h',t+60,sr,sd);unlink(sr);
 printf('%J\n',{signal:sig,signal_recovered:history('1h',t+70,sr,sd),negative:aggregate([[t,null,null,null,0,0,null,null,1,0,-85.125,1]],t),mixed:aggregate([[t,1,2,20,3,3,10,30,1,10],[t+10,1,2,20,3,3,10,30,1,10,-80,1],[t+20,1,2,20,3,3,10,30,1,10,-100,3]],t)});
+// A replacement modem with larger counters must not create a traffic spike.
+let cr='BASE/counter-source.json',cd='BASE/counter-source';
+record(probe(t,100,3),{mode:'lan',source:'eth1',rx:100,tx:100},'sameboot',cr,cd);
+record(probe(t+10,110,3),{mode:'lan',source:'wwan0',rx:90000000,tx:90000000},'sameboot',cr,cd);
+record(probe(t+20,120,3),{mode:'lan',source:'wwan0',rx:91250000,tx:90125000},'sameboot',cr,cd);
+printf('%J\n',{sourcechange:json(readfile(cr)).rows});
 '''.replace('BASE',base)
     # ucode source requires one escaped newline, not a literal backslash-n output.
     code=code.replace('\\n','\n')
@@ -59,6 +65,8 @@ printf('%J\n',{signal:sig,signal_recovered:history('1h',t+70,sr,sd),negative:agg
     assert 720<=len(final['month']['points'])<=722 and final['month']['minutes']==30
     assert final['day']['minutes']==1 and final['invalid']['ok'] is False
     assert any(p[8]==0 and p[3] is None for p in final['month']['points'])
+    assert results[7]['sourcechange'][1][1] is None,results[7]
+    assert results[7]['sourcechange'][2][1:3]==[1,0.1],results[7]
     signal=results[6];pts=[p for p in signal['signal']['points'] if p[8]]
     assert pts[0][10:]==[-90,2] and pts[0][3] is None,pts
     assert pts[1][10:]==[-60,1],pts

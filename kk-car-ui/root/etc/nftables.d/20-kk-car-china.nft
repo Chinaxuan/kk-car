@@ -3905,16 +3905,24 @@ chain kk_car_china_direct {
     iifname "br-lan" ip saddr 192.168.88.0/24 meta mark & 0x00ff0000 == 0 ip daddr @kk_car_china4 counter meta mark set meta mark | 0x00010000 comment "KK-Car China IPv4 direct"
 }
 
-# Keep foreign client traffic off either physical WAN even while PBR restarts.
+# Keep foreign client traffic off every supported physical WAN even while PBR
+# restarts. Prefix matches cover USB enumeration changes before netifd is ready.
+chain kk_car_wan_policy {
+    ip daddr @kk_car_china4 return
+    ip daddr 192.168.0.0/24 return
+    counter reject with icmp type admin-prohibited
+}
 chain kk_car_wan_guard {
     type filter hook forward priority -1; policy accept;
-    iifname "br-lan" oifname { "eth0", "eth1" } ip saddr 192.168.88.0/24 ip daddr @kk_car_china4 return
-    iifname "br-lan" oifname { "eth0", "eth1" } ip saddr 192.168.88.0/24 ip daddr 192.168.0.0/24 return
-    iifname "br-lan" oifname { "eth0", "eth1" } ip saddr 192.168.88.0/24 counter reject with icmp type admin-prohibited
+    iifname "br-lan" oifname "eth*" ip saddr 192.168.88.0/24 jump kk_car_wan_policy
+    iifname "br-lan" oifname "wwan*" ip saddr 192.168.88.0/24 jump kk_car_wan_policy
+    iifname "br-lan" oifname "usb*" ip saddr 192.168.88.0/24 jump kk_car_wan_policy
 }
 chain kk_car_dns_guard {
     type filter hook postrouting priority -1; policy accept;
     # IPsec packets can traverse postrouting again before outer encapsulation.
     ipsec out reqid != 0 return
-    oifname { "eth0", "eth1" } ip daddr { 1.1.1.1, 1.0.0.1 } meta l4proto { tcp, udp } th dport 53 counter drop
+    oifname "eth*" ip daddr { 1.1.1.1, 1.0.0.1 } meta l4proto { tcp, udp } th dport 53 counter drop
+    oifname "wwan*" ip daddr { 1.1.1.1, 1.0.0.1 } meta l4proto { tcp, udp } th dport 53 counter drop
+    oifname "usb*" ip daddr { 1.1.1.1, 1.0.0.1 } meta l4proto { tcp, udp } th dport 53 counter drop
 }

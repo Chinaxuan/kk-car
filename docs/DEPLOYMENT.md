@@ -107,3 +107,10 @@
 ```
 
 手动检查按钮仍可使用；已经开始的单次检查可能继续至有界超时结束。恢复时重新 enable 和 start。回退显示改动时，从私密备份只恢复对应显示文件及后台文件。
+
+
+## QMI 适配更新顺序
+
+同时更新 `uplink-model.uc`、`uplink-policy.uc`、`uplink-step.uc`、`uplink-watch.sh` 及 RPC/历史调用方；新模型不能漏装。检查完整 nft 候选后启用覆盖 eth/wwan/usb 的防泄漏规则，再改 logical WAN 为 QMI。`modem-qmi-read.sh` 与 `modem-poll.sh` 应可执行；状态采集兼容原 F30A。只更新面板通常无需重启网络；首次安装协议包的情况见 [DJI QMI](DJI-QMI.md)。
+
+手动替换前端资源后，LuCI 的资源版本仍可能沿用包数据库时间。本次更新只刷新 `/lib/apk/db/installed` 的修改时间、校验文件内容哈希不变，使正常页面刷新加载新资源；没有改变已安装软件包记录。

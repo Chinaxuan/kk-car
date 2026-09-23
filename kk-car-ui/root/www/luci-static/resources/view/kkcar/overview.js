@@ -131,13 +131,13 @@ return view.extend({
                             E('div',{},[field('设备运行','—','kk-uptime'),field('处理器温度','—','kk-temp'),field('可用内存','—','kk-memory'),field('VPN 累计收 / 发','—','kk-vpn-total'),field('树莓派 IPv6','—','kk-ipv6')])
                         ])
                     ]),
-                    section('蜂窝网络 · F30A Pro','通过 ADB 每 30 秒读取；信号数据来自上网棒。',[
+                    section('蜂窝网络','每 30 秒读取当前模块；信号数据来自上网棒。',[
                         E('div',{'class':'kk-detail-grid'},[
                             E('div',{},[field('运营商','—','kk-modem-operator'),field('网络制式','—','kk-modem-network'),field('信号格数','—','kk-modem-bars'),field('LTE 信号 RSRP','—','kk-modem-rsrp')]),
                             E('div',{},[field('蜂窝连接','—','kk-modem-connected'),field('蜂窝连接时长','—','kk-modem-duration'),field('上网棒运行','—','kk-modem-uptime'),field('蜂窝接口累计收 / 发','—','kk-modem-bytes')])
                         ]),
                         E('p',{id:'kk-modem-time','class':'kk-footnote'},'尚未读取'),
-                        E('div',{'class':'kk-actions'},[button('刷新上网棒状态',function(){self.perform('modem_refresh');}),E('a',{href:'http://192.168.0.1/',target:'_blank',rel:'noopener noreferrer'},'打开上网棒管理 ↗')]),
+                        E('div',{'class':'kk-actions'},[button('刷新上网棒状态',function(){self.perform('modem_refresh');}),E('a',{id:'kk-modem-admin',hidden:true,target:'_blank',rel:'noopener noreferrer'},'打开上网棒管理 ↗')]),
                         E('p',{'class':'kk-footnote'},'累计流量读取蜂窝接口计数，设备重启后可能归零，不是套餐用量或余量。RSRP 数值越接近 0，接收信号越强；实际速度还取决于网络拥塞。')
                     ]),
                     section('网络检查','从路由器分别探测线路，不修改当前分流。',[
@@ -193,7 +193,7 @@ return view.extend({
                             E('div',{'class':'kk-links'},[
                                 E('a',{href:L.url('admin/network/network')},'网络高级设置 ↗'),
                                 E('a',{href:L.url('admin/system/flash')},'备份 / 恢复配置 ↗'),
-                                E('a',{href:'http://192.168.0.1/',target:'_blank',rel:'noopener noreferrer'},'上网棒管理 ↗')
+                                E('a',{id:'kk-modem-admin-maintenance',hidden:true,target:'_blank',rel:'noopener noreferrer'},'上网棒管理 ↗')
                             ]),E('p',{'class':'kk-footnote'},'套餐余量请以运营商查询结果为准。')
                         ])
                     ])
@@ -235,7 +235,7 @@ return view.extend({
         history.append(E('div',{'class':'kk-history-meta'},[E('span',{id:'kk-history-brief'},'正在读取…'),this.el('kk-ping-time')]),notes);
         ping.remove();
         find('连接详情').classList.add('kk-connection-section');
-        var modem=find('蜂窝网络 · F30A Pro');modem.classList.add('kk-modem-section');
+        var modem=find('蜂窝网络');modem.classList.add('kk-modem-section');
         modem.querySelector('.kk-section-head p').textContent='上网棒实时状态 · 每 30 秒更新';
         modem.append(fold('信号与流量说明',[modem.lastElementChild]));
         find('连接设备').querySelector('.kk-section-head p').textContent='Wi-Fi 在线设备与 DHCP 租约';
@@ -279,8 +279,8 @@ return view.extend({
                 ['隧道地址','kk-vpn-ip'],['已连接','kk-vpn-age'],['本 SA 收 / 发','kk-vpn-total','当前 IPsec SA 的字节计数，重新换钥后会归零'],
                 ['隧道 MTU','kk-vpn-mtu'],['ESP 加密','kk-cipher'],['CHILD 换钥剩余','kk-rekey'],
                 ['接口累计错 / 丢','kk-vpn-errors','VPN 虚拟接口累计收发错误 / 丢弃，不等于当前 Ping 丢包率'],['分流路由','kk-route']]),
-            group('蜂窝 / F30A Pro',[
-                ['运营商','kk-modem-operator'],['网络制式','kk-modem-network'],['LTE RSRP','kk-modem-rsrp'],['信号格数','kk-modem-bars'],
+            group('蜂窝 / 实时状态',[
+                ['运营商','kk-modem-operator'],['网络 / 频段','kk-modem-network'],['RSRP / RSRQ','kk-modem-rsrp'],['信号格 / SINR','kk-modem-bars'],
                 ['蜂窝连接','kk-modem-connected'],['连接时长','kk-modem-duration'],['上网棒运行','kk-modem-uptime'],['累计收 / 发','kk-modem-bytes']])
         ]);
         var deviceSection=Array.from(side.querySelectorAll('section')).find(function(s){return s.querySelector('h2')?.textContent==='连接设备';});
@@ -414,17 +414,23 @@ return view.extend({
         var activeBand=d.wifi.frequency>=5000?'5 GHz':d.wifi.frequency>=2400?'2.4 GHz':'热点未启动';
         this.text('kk-wifi-detail',activeBand+(d.wifi.width?' · '+d.wifi.width+' MHz':'')+' · '+d.wifi.clients+' 台无线设备');
         this.text('kk-ipv6',d.ipv6_disabled?'已关闭 · 无地址及路由':'需要检查');
-        var modem=d.modem || {}, fresh=modem.online && d.timestamp-modem.timestamp<75;
+        var modem=d.modem || {}, fresh=modem.online && d.timestamp>=modem.timestamp && d.timestamp-modem.timestamp<75;
         var metric=function(value,suffix){return fresh && value!=null?value+suffix:'—';};
-        this.text('kk-modem-operator',fresh?(modem.operator==='China Telecom'?'中国电信':modem.operator || '未读到'):'—');
-        this.text('kk-modem-network',fresh?(modem.network==='LTE'?'4G · LTE':modem.network || '未读到'):'—');
-        this.text('kk-modem-bars',metric(modem.bars,' / 5 格'));
-        this.text('kk-modem-rsrp',fresh && /LTE/i.test(modem.network || '')?metric(modem.rsrp,' dBm'):'—');
-        this.text('kk-modem-connected',fresh?(modem.connected?'已连接':'未连接'):'状态未更新');
+        this.text('kk-modem-operator',fresh?(['China Telecom','CT'].indexOf(modem.operator)>=0?'中国电信':modem.operator || '未读到'):'—');
+        this.text('kk-modem-network',fresh?(modem.network==='LTE'?'4G · LTE':modem.network || '未读到')+(modem.band?' · '+modem.band:''):'—');
+        this.text('kk-modem-bars',metric(modem.bars,' / 5')+(fresh && modem.snr!=null?' · '+modem.snr.toFixed(1)+' dB':''));
+        this.text('kk-modem-rsrp',fresh && /LTE/i.test(modem.network || '')?metric(modem.rsrp,' dBm')+(modem.rsrq!=null?' / '+modem.rsrq+' dB':''):'—');
+        this.text('kk-modem-connected',fresh?(modem.connected===true?'已连接':modem.sim_state==='absent'?'未插 SIM':modem.sim_state==='pin_required'?'SIM 待解锁':modem.connected===false?'未连接':'未知'):'状态未更新');
         this.text('kk-modem-duration',fresh && modem.connection_uptime!=null?duration(modem.connection_uptime):'—');
-        this.text('kk-modem-uptime',fresh?duration(modem.uptime):'—');
+        this.text('kk-modem-uptime',fresh && modem.uptime!=null?duration(modem.uptime):'—');
         this.text('kk-modem-bytes',fresh && modem.rx!=null && modem.tx!=null?bytes(modem.rx)+' / '+bytes(modem.tx):'—');
-        this.text('kk-modem-time',fresh?'读取于 '+stamp(modem.timestamp)+' · ADB 已连接':modem.timestamp?'ADB 暂未连通或数据已过期 · 最后尝试 '+stamp(modem.timestamp)+'；这不代表蜂窝网络已断开。':'正在等待首次读取上网棒…');
+        var transport=modem.transport || '模块';
+        this.text('kk-modem-time',fresh?(modem.model || '蜂窝模块')+' · '+transport+' · '+stamp(modem.timestamp)+(modem.firmware?' · '+modem.firmware:''):modem.timestamp?transport+' 暂未连通或数据已过期 · 最后尝试 '+stamp(modem.timestamp)+'；这不代表蜂窝网络已断开。':'正在等待首次读取上网棒…');
+        var admin=this.el('kk-modem-admin'), adminMatch=/^192\.168\.(\d{1,3})\.(\d{1,3})$/.exec(modem.management_ip || '');
+        admin.hidden=!(fresh && modem.transport==='ADB' && adminMatch && +adminMatch[1]<256 && +adminMatch[2]>0 && +adminMatch[2]<255);
+        if(!admin.hidden) admin.href='http://'+modem.management_ip+'/';else admin.removeAttribute('href');
+        var adminMaintenance=this.el('kk-modem-admin-maintenance');adminMaintenance.hidden=admin.hidden;
+        if(!admin.hidden) adminMaintenance.href=admin.href;else adminMaintenance.removeAttribute('href');
         this.text('kk-wan-ip',d.wan.ip || '—');this.text('kk-wan-uptime',duration(d.wan.uptime));
         this.text('kk-vpn-ip',d.vpn.ip || '未分配');this.text('kk-vpn-age',d.vpn.connected?duration(d.vpn.age):'未连接');
         this.text('kk-uptime',duration(d.uptime));this.text('kk-temp',d.temperature?d.temperature.toFixed(1)+' °C':'未读到');
@@ -438,7 +444,7 @@ return view.extend({
         this.text('kk-conntrack',telemetry.conntrack==null?'未知':telemetry.conntrack.toLocaleString()+' / '+(telemetry.conntrack_max==null?'未知':telemetry.conntrack_max.toLocaleString()));
         this.text('kk-throttle',!d.power.known?'未知':(d.power.undervoltage?'欠压':'未报欠压')+' / '+(d.power.throttled?'降频':'未降频'));
         this.tone('kk-throttle',!d.power.known?'neutral':d.power.undervoltage || d.power.throttled?'warning':'good');
-        this.tone('kk-modem-connected',!fresh?'neutral':modem.connected?'good':'bad');
+        this.tone('kk-modem-connected',!fresh || modem.connected==null?'neutral':modem.connected?'good':'bad');
         var wireStats=telemetry.wan || {}, vpnStats=telemetry.vpn || {};
         function statsPair(stats,a,b){return stats[a]==null || stats[b]==null?'未知':stats[a].toLocaleString()+' / '+stats[b].toLocaleString();}
         function errors(stats){return ['rx_errors','tx_errors','rx_dropped','tx_dropped'].some(function(k){return stats[k]==null;})?'未知':(stats.rx_errors+stats.tx_errors).toLocaleString()+' / '+(stats.rx_dropped+stats.tx_dropped).toLocaleString();}
@@ -502,7 +508,7 @@ return view.extend({
         if(this.previous && d.timestamp>this.previous.timestamp){
             var dt=d.timestamp-this.previous.timestamp;
             var rx=Math.max(0,d.wan.rx-this.previous.wan.rx)*8/dt/1e6,tx=Math.max(0,d.wan.tx-this.previous.wan.tx)*8/dt/1e6;
-            if(dt<=20 && d.wan.rx>=this.previous.wan.rx && d.wan.tx>=this.previous.wan.tx) {
+            if(dt<=20 && d.wan.counter_source===this.previous.wan.counter_source && d.wan.rx>=this.previous.wan.rx && d.wan.tx>=this.previous.wan.tx) {
                 
                 this.text('kk-rx-speed',rx.toFixed(2));this.text('kk-tx-speed',tx.toFixed(2));
             } else {this.text('kk-rx-speed','—');this.text('kk-tx-speed','—');}

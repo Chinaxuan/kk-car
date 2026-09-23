@@ -63,7 +63,7 @@ let fb=open(simulate?'/tmp/kk-car-hdmi-test.raw':'/dev/fb0',simulate?'w+':'r+');
 let previous=null,points=[];let blank=repeat(pixel(C.bg),width)+repeat(chr(0),stride-width*4);
 while(true){let started=+(split(readfile('/proc/uptime')||'0',' ')[0]);let s=bus.call('kkcar','status'),now=time();if(!s?.telemetry)fail('status RPC unavailable');
  let cpu=null,down=null,up=null;if(previous&&s.uptime>previous.uptime){let t=s.telemetry.cpu.total-previous.telemetry.cpu.total,i=s.telemetry.cpu.idle-previous.telemetry.cpu.idle,dt=s.uptime-previous.uptime;if(t>0&&i>=0&&i<=t)cpu=100.0*(t-i)/t;
- if(s.uplink?.active==previous.uplink?.active&&s.wan.rx>=previous.wan.rx&&s.wan.tx>=previous.wan.tx){down=8.0*(s.wan.rx-previous.wan.rx)/dt/1e6;up=8.0*(s.wan.tx-previous.wan.tx)/dt/1e6;}}
+ if(s.uplink?.active==previous.uplink?.active&&s.wan.counter_source==previous.wan.counter_source&&s.wan.rx>=previous.wan.rx&&s.wan.tx>=previous.wan.tx){down=8.0*(s.wan.rx-previous.wan.rx)/dt/1e6;up=8.0*(s.wan.tx-previous.wan.tx)/dt/1e6;}}
  let ping=s.vpn_ping||{},m=s.modem||{},pingFresh=fresh(ping.uptime,s.uptime,25),modemFresh=fresh(m.timestamp,now,75)&&m.online;
  let latency=s.vpn.connected&&pingFresh&&ping.state=='ok'?ping.avg_ms:null;
  let signal=modemFresh&&m.connected&&match(m.network||'',/LTE|4G/)?m.rsrp:null;if(signal!=null&&(signal>0||signal< -160))signal=null;
@@ -100,9 +100,9 @@ while(true){let started=+(split(readfile('/proc/uptime')||'0',' ')[0]);let s=bus
  details(972,'VPN / IPsec',[
  ['连接 / 分流',(s.vpn.connected?'已连接':'未连接')+' / '+(s.vpn.route?'就绪':'检查')],['隧道地址',s.vpn.ip||'未分配'],['已连接时长',duration(s.vpn.age)],['本 SA 收 / 发',pair(s.vpn.rx,s.vpn.tx)],
  ['ESP 加密',cipher],['换钥剩余',duration(s.telemetry.rekey)],['MTU / 累计错误',vpn.mtu+' / '+((vpn.rx_errors||0)+(vpn.tx_errors||0))],['探测 / 丢包',fmt(latency,1,'ms')+' / '+fmt(loss,0,'%')]],C.purple);
- details(1442,'蜂窝 / F30A Pro',[
- ['运营商',modemFresh?(m.operator||'未知'):'数据过期'],['网络 / 信号格',modemFresh?(m.network+' / '+m.bars+'格'):'未知'],['LTE RSRP',fmt(signal,0,' dBm')],['RSSI',fmt(modemFresh?m.rssi:null,0,' dBm')],
- ['蜂窝连接',modemFresh?(m.connected?'已连接':'未连接'):'未知'],['连接时长',modemFresh?duration(m.connection_uptime):'未知'],['上网棒运行',modemFresh?duration(m.uptime):'未知'],['累计收 / 发',modemFresh?pair(m.rx,m.tx):'未知']],C.cyan);
+ details(1442,'蜂窝 / '+(m.transport=='QMI'?'DJI QMI':'F30A Pro'),[
+ ['运营商',modemFresh?(m.operator||'未知'):'数据过期'],['网络 / 信号格',modemFresh?((m.network||'未知')+' / '+(m.bars==null?'未知':m.bars+'格')):'未知'],['RSRP / RSRQ',fmt(signal,0,'')+' / '+fmt(modemFresh?m.rsrq:null,0,'')],['RSSI / SINR',fmt(modemFresh?m.rssi:null,0,'')+' / '+fmt(modemFresh?m.snr:null,1,'')],
+ ['蜂窝连接',modemFresh&&m.connected!=null?(m.connected?'已连接':'未连接'):'未知'],['连接时长',modemFresh?duration(m.connection_uptime):'未知'],['上网棒运行',modemFresh?duration(m.uptime):'未知'],['累计收 / 发',modemFresh?pair(m.rx,m.tx):'未知']],C.cyan);
  panel(32,884,916,142,'热点与设备',s.wifi.clients+' 台无线在线');
  text(54,936,'SSID '+s.wifi.ssid+'   /   '+s.wifi.band+' · '+s.wifi.width+'MHz',C.white,20,C.panel,850);
  let peers=[];for(let p in s.peers||[])if(p.wireless)push(peers,p.ip);text(54,974,length(peers)?join('   /   ',peers):'没有已确认在线的无线设备',C.muted,20,C.panel,850);

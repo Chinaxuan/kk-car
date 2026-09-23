@@ -67,7 +67,7 @@ function record(probe, counters, boot, ram, disk) {
     let rx=null, tx=null, dt=mono-(s.previous?.uptime || mono);
     if (s.boot==boot && dt>0 && dt<30 && now-s.previous.timestamp-dt<5 && now-s.previous.timestamp-dt> -5) {
         let old=s.previous.counters;
-        if (old.mode==counters.mode && counters.rx>=old.rx && counters.tx>=old.tx) {
+        if (old.mode==counters.mode && old.source==counters.source && counters.rx>=old.rx && counters.tx>=old.tx) {
             rx=(counters.rx-old.rx)*8/dt/1e6; tx=(counters.tx-old.tx)*8/dt/1e6;
         }
     }
