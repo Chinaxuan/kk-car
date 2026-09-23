@@ -1,13 +1,21 @@
 'use strict';
 import { readfile, writefile, rename, mkdir, chmod } from 'fs';
 const path='/etc/kk-car/private/notify.json';
-const kinds=['vpn_up','vpn_down','boot','shutdown','abnormal_boot','latency','loss','client_join','client_leave','uplink','signal','power','temperature','recovery'];
+const kinds=['vpn_up','vpn_down','boot','shutdown','abnormal_boot','latency','loss','client_join','client_leave','uplink','signal','power','temperature','recovery','sms_received'];
 function defaults() {
-    let events={}; for(let k in kinds) events[k]=k!='client_leave';
+    let events={}; for(let k in kinds) events[k]=k!='client_leave' && k!='sms_received';
     return {enabled:false,revision:0,events,latency_ms:300,loss_percent:50,hold_seconds:30,cooldown_seconds:300,signal_dbm:-115,temperature_c:80,
         destinations:[{id:'primary',name:'飞书机器人',enabled:false,url:''},{id:'second',name:'备用群 1',enabled:false,url:''},{id:'third',name:'备用群 2',enabled:false,url:''}]};
 }
-function read_config() { try {return json(readfile(path)) || defaults();} catch(e) {return defaults();} }
+function read_config() {
+    try {
+        let saved=json(readfile(path)) || defaults(), base=defaults();
+        // Existing installations predate the SMS event. Preserve every saved
+        // setting while adding an explicit, off-by-default privacy switch.
+        saved.events={...base.events,...(saved.events || {})};
+        return saved;
+    } catch(e) {return defaults();}
+}
 function valid_url(s) {return type(s)=='string' && !!match(s,/^https:\/\/open\.feishu\.cn\/open-apis\/bot\/v2\/hook\/[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/);}
 function public_config(c) {
     let out={...c,destinations:[]};

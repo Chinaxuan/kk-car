@@ -5,7 +5,7 @@
 var get=rpc.declare({object:'kkcar',method:'notify_get',expect:{}});
 var save=rpc.declare({object:'kkcar',method:'notify_save',params:['settings'],expect:{}});
 var test=rpc.declare({object:'kkcar',method:'notify_test',expect:{}});
-var events=[['vpn_up','VPN 上线'],['vpn_down','VPN 下线'],['boot','正常开机'],['shutdown','正常关机 / 重启'],['abnormal_boot','异常断电后启动'],['client_join','设备接入'],['client_leave','设备离线'],['uplink','有线 / 4G 出口变化'],['latency','VPN 延迟过高'],['loss','VPN 持续丢包'],['signal','蜂窝信号偏弱'],['power','树莓派欠压'],['temperature','处理器高温'],['recovery','异常恢复通知']];
+var events=[['vpn_up','VPN 上线'],['vpn_down','VPN 下线'],['boot','正常开机'],['shutdown','正常关机 / 重启'],['abnormal_boot','异常断电后启动'],['client_join','设备接入'],['client_leave','设备离线'],['uplink','有线 / 4G 出口变化'],['latency','VPN 延迟过高'],['loss','VPN 持续丢包'],['signal','蜂窝信号偏弱'],['power','树莓派欠压'],['temperature','处理器高温'],['recovery','异常恢复通知'],['sms_received','DJI 新短信正文']];
 var limits=[['latency_ms','延迟阈值 · ms',50,5000],['loss_percent','丢包阈值 · %',1,100],['hold_seconds','异常持续 · 秒',10,600],['cooldown_seconds','同类间隔 · 秒',60,86400],['signal_dbm','弱信号阈值 · dBm',-140,-60],['temperature_c','高温阈值 · °C',50,95]];
 function check(id,text,on) {var input=E('input',{type:'checkbox',id:id});input.checked=!!on;return {input:input,node:E('label',{'class':'kk-check',for:id},[input,E('span',{},text)])};}
 function section(title,nodes){return E('section',{'class':'kk-section'},[E('div',{'class':'kk-section-head'},E('h2',{},title))].concat(nodes));}
@@ -39,7 +39,7 @@ return view.extend({
             E('div',{'class':'kk-push-toolbar'},[this.master.node,E('div',{'class':'kk-actions'},[this.saveButton,this.testButton])]),
             E('div',{'class':'kk-push-grid'},[
                 E('div',{},[section('通知事件',[E('div',{'class':'kk-push-events'},eventNodes)]),section('告警阈值',[E('div',{'class':'kk-push-limits'},thresholdNodes),E('p',{'class':'kk-footnote'},'延迟、丢包、高温需持续达到阈值；弱信号至少持续 60 秒。恢复采用回落区间，减少边缘反复提醒。')])]),
-                section('飞书机器人地址',destinations.concat([E('p',{'class':'kk-footnote'},'三个地址独立启停，开启的地址接收相同事件。留空保留，勾选清除后保存才删除。总开关关闭时，包括测试在内都不发送。')]))
+                section('飞书机器人地址',destinations.concat([E('p',{'class':'kk-footnote'},'三个地址独立启停，开启的地址接收相同事件。短信正文可能含验证码，只会发到已启用地址；历史短信不会补发。留空保留，勾选清除后保存才删除。')]))
             ])
         ]);
         var root=E('div',{'class':'kk-app kk-studio kk-push'},[

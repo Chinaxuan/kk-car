@@ -61,6 +61,7 @@
 | `kk-car-vpn-ping` | VPN 探测与历史保存 |
 | `kk-car-auto-check` | 每 10 分钟执行六项网络检查，与手动检查互斥 |
 | `kk-car-notify` | 事件推送、限频队列与开关机通知 |
+| `kk-car-dji-sms-forward` | DJI 新短信轮询、飞书正文转发、SD 卡公钥加密归档 |
 
 首次部署需要按依赖启用相应服务。备份清单应覆盖 `/etc/kk-car/`、对应 init.d 与启动链接、热插拔文件、nftables、strongSwan 行为配置、LuCI 前端/菜单和 rpcd 后台/ACL。
 
@@ -71,6 +72,12 @@
 上传 `notify-config.uc`、`notify-engine.uc`、`notify-worker.uc`、`notify-watch.sh` 和 `init.d/kk-car-notify`，同时更新 rpcd 后台、ACL、LuCI 菜单及前端 `notifications.js/css` 和首页入口。先放齐模块，再刷新 rpcd，避免导入缺失影响原页面。设置 `notify-watch.sh` 与 init.d 服务为 0755，启用并启动 `kk-car-notify`。源代码默认关闭推送；在设备页面配置自己的地址后启用。不需要重载 network、firewall 或 VPN。
 
 服务启动优先级 99，正常关机优先级 10；`shutdown` 与普通服务 `stop/restart` 区分，维护服务不会伪造关机通知。保留私密配置权限与启动链接。参见 [推送说明](NOTIFICATIONS.md)。
+
+## DJI 长短信、飞书转发与加密备份
+
+增量部署 `dji-sms.uc`、`dji-sms-forward.uc`、`dji-sms-forward-watch.sh`、`init.d/kk-car-dji-sms-forward`，同时更新 `notify-config.uc`、`kkdji.uc` 与 DJI/通知页面。短信串口依赖 `socat`、`flock`；加密归档另需 `openssl-util` 和 `sha256sum`。在可信电脑上生成 CMS 接收证书与私钥，只把公开证书放到设备 `/etc/kk-car/private/sms-archive-recipient.pem`；私钥留在离线安全位置。创建 `/etc/kk-car/private/sms-archive/` 并设 0700；服务脚本、init.d 设 0755。先启动服务建立已有短信基线，再到飞书页面启用「DJI 新短信正文」，避免旧验证码批量发送。证书未配置时归档会报错，不能把转发成功当作备份成功。
+
+本服务不改 `network`、Wi-Fi、DHCP、VPN；不会自动删除 SIM 或模块短信。当前短信脚本会在操作时将读取、写入和接收仓选为 SIM `SM`；部署到其他 SIM 前先用 `storage_probe` 确认支持，再读回三个仓位置和容量。SIM 容量独立于 SD 卡，满仓时需先验证加密备份可解密，再由管理员明确决定是否删除旧短信。更换存储仓时服务会把该仓已有短信作为历史基线，不会补发。当前设备已有一次真实新短信归档和飞书成功回复；新设备仍应重新做端到端验收。
 
 
 ## HDMI 本地状态屏

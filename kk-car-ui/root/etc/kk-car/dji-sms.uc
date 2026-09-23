@@ -213,10 +213,26 @@ function decode_pdu(pdu, include_text) {
     }
     let udl = byte(hex, pos++), ud = substr(hex, pos * 2);
     if (udl == null) return null;
-    let data = {from:address || '',time:sent_time,text:null,unsupported:false};
-    if (!include_text) return data;
+    let data = {from:address || '',time:sent_time,text:null,unsupported:false,concat:null};
     let header = (fo & 0x40) ? (byte(ud, 0) || 0) + 1 : 0;
-    if (header > 140) return null;
+    if (header > 140 || (fo & 0x40 && (header < 2 || length(ud) < header * 2))) return null;
+    // 3GPP TS 23.040: IEI 00 is an 8-bit concatenation reference; IEI 08
+    // carries a 16-bit reference. Keep these fields even for a list request,
+    // which deliberately does not disclose message text.
+    for (let p = 1; p < header;) {
+        let iei = byte(ud, p++), size = byte(ud, p++);
+        if (iei == null || size == null || p + size > header) return null;
+        let bits = iei == 0 && size == 3 ? 8 : iei == 8 && size == 4 ? 16 : 0;
+        if (bits) {
+            let ref = bits == 8 ? byte(ud, p) : (byte(ud, p) << 8) | byte(ud, p + 1);
+            let total = byte(ud, p + (bits == 8 ? 1 : 2));
+            let part = byte(ud, p + (bits == 8 ? 2 : 3));
+            if (total < 2 || total > 20 || part < 1 || part > total || data.concat) return null;
+            data.concat = {bits,ref,total,part};
+        }
+        p += size;
+    }
+    if (!include_text) return data;
     let coding = dcs & 12;
     if (coding == 8) {
         if (udl < header || length(ud) < udl * 2) return null;
@@ -231,10 +247,11 @@ function decode_pdu(pdu, include_text) {
     return data;
 }
 function parse_storage(raw) {
-    let m = match(raw || '', /\+CPMS:\s*"(ME|SM|MT)",([0-9]+),([0-9]+)/);
+    let m = match(raw || '', /\+CPMS:\s*"(ME|SM|MT)",([0-9]+),([0-9]+),"(ME|SM|MT)",([0-9]+),([0-9]+),"(ME|SM|MT)",([0-9]+),([0-9]+)/);
     if (!m) return error('PARSE', '无法读取短信存储状态');
     let used = +m[2], capacity = +m[3];
-    return {ok:true,storage:m[1],used,capacity,total:capacity,full:capacity > 0 && used >= capacity,timestamp:time()};
+    return {ok:true,storage:m[1],used,capacity,total:capacity,full:capacity > 0 && used >= capacity,
+        write_storage:m[4],receive_storage:m[7],receive_used:+m[8],receive_capacity:+m[9],timestamp:time()};
 }
 function parse_list(raw, storage) {
     let lines = split(raw || '', /\r?\n/), messages = [];
@@ -243,10 +260,33 @@ function parse_list(raw, storage) {
         if (!m) continue;
         let pdu = trim(lines[++i] || ''), decoded = decode_pdu(pdu, false);
         if (!decoded) return error('PARSE', '短信目录格式无法识别');
-        push(messages, {index:+m[1],status:['未读','已读','待发','已发'][+m[2]],from:decoded.from,time:decoded.time,storage,unsupported:decoded.unsupported});
+        push(messages, {index:+m[1],status:['未读','已读','待发','已发'][+m[2]],from:decoded.from,time:decoded.time,storage,unsupported:decoded.unsupported,concat:decoded.concat});
         if (length(messages) > 255) return error('PARSE', '短信目录数量异常');
     }
-    return {ok:true,storage,messages,count:length(messages)};
+    let groups = [];
+    for (let message in messages) {
+        let c = message.concat, found = null;
+        if (c) for (let group in groups) {
+            // Reused references and sender collisions must not combine unrelated
+            // texts. Day-boundary messages may stay separate rather than risk it.
+            if (group.concat && group.from == message.from &&
+                group.time_day == substr(message.time, 0, 10) &&
+                group.concat.bits == c.bits && group.concat.ref == c.ref &&
+                group.concat.total == c.total && !group.parts[c.part - 1]) { found = group; break; }
+        }
+        if (!found) {
+            found = {index:message.index,status:message.status,from:message.from,time:message.time,
+                time_day:substr(message.time,0,10),storage,concat:c,parts:c ? [] : [message.index]};
+            push(groups, found);
+        }
+        if (c) found.parts[c.part - 1] = message.index;
+        if (message.status == '未读') found.status = '未读';
+    }
+    for (let group in groups) {
+        group.complete = !group.concat || length(filter(group.parts,p=>p != null)) == group.concat.total;
+        delete group.time_day;
+    }
+    return {ok:true,storage,messages,groups,count:length(messages),conversation_count:length(groups)};
 }
 function parse_read(raw, index, storage) {
     let lines = split(raw || '', /\r?\n/);
@@ -256,7 +296,7 @@ function parse_read(raw, index, storage) {
         let decoded = decode_pdu(trim(lines[i + 1] || ''), true);
         if (!decoded) return error('PARSE', '短信内容格式无法识别');
         return {ok:true,message:{index,status:['未读','已读','待发','已发'][+m[1]],from:decoded.from,time:decoded.time,
-            text:decoded.text,storage,unsupported:decoded.unsupported}};
+            text:decoded.text,storage,unsupported:decoded.unsupported,concat:decoded.concat}};
     }
     return error('PARSE', '未找到该短信');
 }
@@ -282,9 +322,66 @@ function load_request(path) {
     catch (e) { return null; }
 }
 function perform(session, action, param) {
+    if (action == 'storage_probe') {
+        let response=at(session,'AT+CPMS=?',5);
+        if (!response.ok) return response;
+        let m=match(response.data,/\+CPMS:\s*\(([^)]*)\),\s*\(([^)]*)\),\s*\(([^)]*)\)/);
+        let cnmi=at(session,'AT+CNMI?',5);
+        let route=cnmi.ok ? match(cnmi.data,/\+CNMI:\s*[0-9]+,([0-3]),/) : null;
+        return m ? {ok:true,sim_read:!!match(m[1],/"SM"/),
+            sim_write:!!match(m[2],/"SM"/),sim_receive:!!match(m[3],/"SM"/),
+            incoming_mode:route ? +route[1] : null} :
+            error('PARSE','模块未返回短信存储能力');
+    }
+    if (action == 'voice_probe') {
+        // Read-only capability check. Never dial, answer, hang up, or change
+        // the persistent USB/IMS configuration from this endpoint.
+        let usb=at(session,'AT+QCFG="usbcfg"',5);
+        let ims=at(session,'AT+QCFG="ims"',5);
+        let calls=at(session,'AT+CLCC',5);
+        let voice=usb.ok ? match(usb.data,/\+QCFG:\s*"usbcfg",[^\r\n]*,([01])\r?\n/) : null;
+        let ims_value=ims.ok ? match(ims.data,/\+QCFG:\s*"ims",([0-2])/) : null;
+        let audio=false;
+        for (let entry in glob('/sys/bus/usb/devices/*:*')) {
+            let parent=replace(entry,/:[0-9]+\.[0-9]+$/,'');
+            if (trim(readfile(parent+'/idVendor') || '')=='2c7c' &&
+                trim(readfile(parent+'/idProduct') || '')=='0125' &&
+                trim(readfile(entry+'/bInterfaceClass') || '')=='01') audio=true;
+        }
+        return {ok:true,usb_voice_enabled:voice ? voice[1]=='1' : null,
+            ims_setting:ims_value ? +ims_value[1] : null,
+            call_query_accepted:calls.ok,audio_usb_present:audio,
+            ready:false,reason:'通话需运营商 IMS 注册及双向音频；只读检测不等于可用'};
+    }
     let format = at(session, 'AT+CMGF?', 5);
     if (!format.ok) return format;
     if (!match(format.data, /\+CMGF:\s*0\r?\n/)) return error('MODE', '模块当前不在 PDU 短信模式');
+    if (action == 'storage_select_sim' || action == 'storage_select_me') {
+        let target = action == 'storage_select_sim' ? 'SM' : 'ME';
+        let changed = at(session, 'AT+CPMS="' + target + '","' + target + '","' + target + '"', 8);
+        if (!changed.ok) return changed;
+        let selected = at(session, 'AT+CPMS?', 5);
+        if (!selected.ok) return selected;
+        let state = parse_storage(selected.data);
+        return state.ok && state.storage == target && state.write_storage == target &&
+            state.receive_storage == target && state.capacity > 0 ? state :
+            error('STORAGE', '短信存储未切换到指定位置');
+    }
+    let storage = at(session, 'AT+CPMS?', 5);
+    if (!storage.ok) return storage;
+    let state = parse_storage(storage.data);
+    if (!state.ok) return state;
+    if (state.storage != 'SM' || state.write_storage != 'SM' || state.receive_storage != 'SM') {
+        let changed = at(session, 'AT+CPMS="SM","SM","SM"', 8);
+        if (!changed.ok) return error('STORAGE', 'SIM 短信仓无法启用');
+        let selected = at(session, 'AT+CPMS?', 5);
+        if (!selected.ok) return selected;
+        state = parse_storage(selected.data);
+        if (!state.ok || state.storage != 'SM' || state.write_storage != 'SM' ||
+            state.receive_storage != 'SM' || state.capacity < 1)
+            return error('STORAGE', 'SIM 短信仓未正确启用');
+    }
+    if (action == 'storage') return state;
     if (action == 'send') {
         let request = load_request(param), submit = request ? encode_submit(request.to, request.text) : null;
         if (!submit) return error('INPUT', '手机号或短信内容不符合要求');
@@ -295,10 +392,6 @@ function perform(session, action, param) {
         let ref = match(sent.data, /\+CMGS:\s*([0-9]+)/);
         return ref ? {ok:true,reference:+ref[1]} : error('SEND_UNKNOWN', '模块未返回短信编号，请勿立即重试');
     }
-    let storage = at(session, 'AT+CPMS?', 5);
-    if (!storage.ok) return storage;
-    let state = parse_storage(storage.data);
-    if (!state.ok || action == 'storage') return state;
     if (action == 'list') {
         let result = at(session, 'AT+CMGL=4', 10);
         return result.ok ? parse_list(result.data, state.storage) : result;
@@ -317,7 +410,7 @@ function perform(session, action, param) {
 }
 
 let action = ARGV[0] || '', param = ARGV[1] || '', result = null;
-if (!match(action, /^(storage|list|read|send|delete)$/)) result = error('INPUT', '不支持的短信操作');
+if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|voice_probe)$/)) result = error('INPUT', '不支持的短信操作');
 else if (getenv('KK_CAR_DJI_SMS_LOCKED') != '1') {
     // The read-only AT probes use flock on this same file. Re-exec under that
     // lock so the lock is held for the full serial session and cleaned by the

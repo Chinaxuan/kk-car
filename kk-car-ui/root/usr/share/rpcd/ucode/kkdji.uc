@@ -60,6 +60,7 @@ function state(auto_refresh) {
     let storage=filejson('/tmp/kk-car-dji-sms-storage.json');
     let uplink=filejson('/tmp/kk-car-uplink.json');
     let job=filejson('/tmp/kk-car-dji-job.json');
+    let sms_forward=filejson('/tmp/kk-car-sms-forward-status.json');
     let available=modem_available(modem);
     if (!fresh(info,600)) info={};
     if (!fresh(storage,600)) storage={};
@@ -99,6 +100,9 @@ function state(auto_refresh) {
         sms:{storage:storage.storage || null,used:value(storage.used),
             capacity:value(storage.total),full:storage.full == true,
             updated_at:storage.timestamp || null},
+        sms_forward:{enabled:sms_forward.enabled == true,initialized:sms_forward.initialized == true,
+            pending:+(sms_forward.pending || 0),last_success:sms_forward.last_success || null,
+            error:sms_forward.error || null},
         gps:{supported:type(info.gps_enabled) == 'bool',enabled:info.gps_enabled == true,
             fix:false,lat:null,lon:null,speed_kmh:null,updated_at:null},
         job
@@ -126,6 +130,10 @@ return {'kkdji': {
     sms_list:{call:function() {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'短信功能不可用'};
         let result=call_sms('list',null); save_storage(result); return result;
+    }},
+    voice_probe:{call:function() {
+        if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
+        return call_sms('voice_probe',null);
     }},
     sms_read:{args:{index:''},call:function(req) {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'短信功能不可用'};
