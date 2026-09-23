@@ -1,0 +1,65 @@
+.kk-app.kk-studio.kk-dji{max-width:1480px;min-height:calc(100vh - 35px);padding:20px 24px;margin-bottom:0;--radio:oklch(82% .105 185)}
+.kk-dji .kk-header{padding:0 0 14px;margin:0;border-bottom:1px solid var(--line)}
+.kk-dji .kk-brand p{display:block;margin-top:2px;color:var(--muted);font-size:11px}
+.kk-dji .kk-monogram{background:oklch(29% .07 187);color:var(--radio)}
+.kk-dji h1{font-size:24px;letter-spacing:-.035em}
+.kk-dji .kk-header-links{font-size:12px}
+.kk-dji .kk-header-links a{white-space:nowrap}
+.kk-dji .kk-notice{margin:13px 0 0;padding:8px 11px}
+.kk-dji-hero{margin-top:16px;padding:18px 20px 0;border:1px solid oklch(39% .037 211);border-radius:11px;background:linear-gradient(115deg,oklch(26% .044 214),oklch(23% .029 258) 62%);overflow:hidden}
+.kk-dji-hero-title{display:flex;justify-content:space-between;align-items:start;gap:16px}
+.kk-dji-eyebrow{font-size:10px;letter-spacing:.16em;font-weight:750;color:var(--radio);margin:0 0 2px}
+.kk-dji-hero-title strong{display:block;font-size:26px;line-height:1.2;letter-spacing:-.04em;font-weight:750;color:var(--ink)}
+.kk-dji-hero-title strong[data-tone=good]{color:var(--green)}
+.kk-dji-hero-title strong[data-tone=warning]{color:var(--warn)}
+.kk-dji-hero-title p{font-size:12px;color:var(--muted);margin:5px 0 0}
+.kk-dji-hero-title .kk-button{font-size:12px;min-height:34px}
+.kk-dji-hero-title .kk-button{flex:0 0 auto;white-space:nowrap}
+.kk-dji-phase{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin-top:17px;border-top:1px solid oklch(40% .035 229)}
+.kk-dji-phase>div{min-width:0;padding:12px 14px 13px;border-right:1px solid oklch(40% .035 229)}
+.kk-dji-phase>div:first-child{padding-left:0}
+.kk-dji-phase>div:last-child{border-right:0}
+.kk-dji-phase span{display:block;color:var(--muted);font-size:11px;margin-bottom:1px}
+.kk-dji-phase strong{display:block;font-size:15px;font-weight:680;overflow-wrap:anywhere}
+.kk-dji-phase>div:nth-child(1) strong,.kk-dji-phase>div:nth-child(2) strong{color:var(--radio)}
+.kk-dji-phase>div:nth-child(3) strong{color:var(--green)}
+.kk-dji-grid{display:grid;grid-template-columns:minmax(0,1.1fr) repeat(2,minmax(0,1fr));gap:14px;margin-top:14px;align-items:start}
+.kk-dji-card{min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:15px 17px 16px}
+.kk-dji-card-head{margin-bottom:10px}
+.kk-dji-card-head h2{font-size:15px;font-weight:720;line-height:1.25;color:var(--ink)!important}
+.kk-dji-card-head p{color:var(--muted);font-size:11px;line-height:1.5;margin-top:4px}
+.kk-dji-signals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kk-dji-signals>div{min-width:0;min-height:85px;padding:10px 12px;border:1px solid oklch(35% .034 236);border-radius:8px;background:oklch(21% .027 247)}
+.kk-dji-signals span{display:block;font-size:10px;letter-spacing:.1em;color:var(--muted)}
+.kk-dji-signals strong{display:block;margin:2px 0 0;color:var(--radio);font-size:22px;line-height:1.2;font-weight:730;letter-spacing:-.04em;white-space:nowrap}
+.kk-dji-signals small{display:block;margin-top:3px;font-size:10px;color:var(--muted)}
+.kk-dji-signals>div:nth-child(2) strong{color:oklch(81% .09 248)}
+.kk-dji-signals>div:nth-child(3) strong{color:var(--green)}
+.kk-dji-signals>div:nth-child(4) strong{color:oklch(82% .105 82)}
+.kk-dji-rows{display:flex;flex-direction:column;gap:0}
+.kk-dji-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-height:27px;padding:4px 0;border-bottom:1px solid oklch(32% .025 255);font-size:11px}
+.kk-dji-row:last-child{border-bottom:0}
+.kk-dji-row span{flex:none;color:var(--muted)}
+.kk-dji-row strong{text-align:right;min-width:0;font-weight:630;color:var(--ink);overflow-wrap:anywhere}
+.kk-dji-row[id^=kk-dji]{color:var(--radio)}
+.kk-dji-note{margin:9px 0 0!important;font-size:11px;line-height:1.55;color:var(--muted);max-width:none!important}
+.kk-dji-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px}
+.kk-dji-actions .kk-button{min-height:34px;font-size:11px}
+.kk-dji-actions span{font-size:11px}
+.kk-dji-sms-list{margin-top:9px;font-size:11px;color:var(--muted)}
+.kk-dji-full{color:var(--warn);font-size:11px;font-weight:720}
+.kk-dji-sms-item{padding:8px 0;border-top:1px solid var(--line)}
+.kk-dji-sms-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.kk-dji-sms-meta strong{color:var(--ink)}
+.kk-dji-sms-meta .kk-button{margin-left:auto;min-height:27px;padding:3px 7px;font-size:10px}
+.kk-dji-sms-body{white-space:pre-wrap;overflow-wrap:anywhere;background:oklch(19% .024 255);border:1px solid var(--line);border-radius:6px;padding:9px;margin-top:7px;color:var(--ink)}
+.kk-dji-sms-form{display:flex;flex-direction:column;gap:5px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.kk-dji-sms-form>label{font-size:11px;color:var(--muted)}
+.kk-app.kk-studio.kk-dji .kk-dji-sms-form input,.kk-app.kk-studio.kk-dji .kk-dji-sms-form textarea{font:inherit;font-size:12px;line-height:1.4;resize:vertical;color:var(--ink);background:oklch(20% .023 255);border:1px solid oklch(42% .025 255);border-radius:6px;padding:8px 10px;box-shadow:none;width:100%;margin:0}
+.kk-app.kk-studio.kk-dji .kk-dji-sms-form input{height:34px}
+.kk-dji-sms-form input::placeholder,.kk-dji-sms-form textarea::placeholder{color:oklch(65% .023 255)}
+.kk-dji-sms-form .kk-dji-actions{margin-top:2px;justify-content:space-between}
+.kk-dji-sms-form .kk-dji-actions span{max-width:230px;line-height:1.35}
+.kk-dji .kk-button:disabled{cursor:not-allowed}
+@media(max-width:1100px){.kk-dji-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.kk-app.kk-studio.kk-dji{padding:13px;min-height:100vh;border-radius:0}.kk-dji .kk-header{align-items:flex-start;gap:9px;flex-wrap:wrap}.kk-dji .kk-header-links{width:100%;justify-content:space-between;gap:12px}.kk-dji .kk-header-links>span{display:block}.kk-dji h1{font-size:21px}.kk-dji-hero{padding:15px 15px 0}.kk-dji-hero-title strong{font-size:21px}.kk-dji-hero-title .kk-button{min-height:38px;padding:6px 10px;font-size:11px}.kk-dji-phase{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px}.kk-dji-phase>div:nth-child(2){border-right:0}.kk-dji-phase>div:nth-child(n+3){border-top:1px solid oklch(40% .035 229)}.kk-dji-phase>div:nth-child(3){padding-left:0}.kk-dji-grid{grid-template-columns:1fr;gap:10px;margin-top:10px}.kk-dji-card{padding:14px 15px}.kk-dji .kk-button{min-height:42px;font-size:12px}.kk-dji-signals>div{min-height:80px}.kk-dji-sms-meta .kk-button{min-height:36px}.kk-app.kk-studio.kk-dji .kk-dji-sms-form input,.kk-app.kk-studio.kk-dji .kk-dji-sms-form textarea{font-size:16px}}

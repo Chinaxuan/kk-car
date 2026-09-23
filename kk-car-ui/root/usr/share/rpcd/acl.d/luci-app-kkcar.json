@@ -7,6 +7,11 @@
           "status",
           "history",
           "notify_get"
+        ],
+        "kkdji": [
+          "status",
+          "sms_list",
+          "sms_read"
         ]
       }
     },
@@ -21,6 +26,11 @@
           "port_confirm",
           "notify_save",
           "notify_test"
+        ],
+        "kkdji": [
+          "action",
+          "sms_send",
+          "sms_delete"
         ]
       }
     }

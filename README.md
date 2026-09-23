@@ -2,9 +2,9 @@
 
 把闲置的树莓派 3B+ 变成车载路由器：USB 4G 上网、Wi-Fi 热点、回公司 VPN，再用一页中文面板查看和管理整条网络。
 
-本仓库保存 **截至 2026-09-23 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
+本仓库保存 **截至 2026-09-24 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
 
-[使用说明](docs/USAGE.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
+[使用说明](docs/USAGE.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
 
 ## 它能做什么
 
@@ -17,6 +17,7 @@
 | 有线 / 4G 选网 | 网口可切换 LAN 或 DHCP WAN；有线探测稳定后优先，失效后回到 4G |
 | 热点设置 | 修改名称、密码，选择 5 GHz 或 2.4 GHz，均为 20 MHz；修改后限时确认，未确认自动恢复 |
 | 上网棒状态 | 兼容 F30A ADB 与 DJI 一代 QMI；只读采集运营商、SIM 状态、RSRP/RSRQ/SINR 与接口流量，未知保持留空 |
+| DJI 独立控制页 | 显示频段、固件、基带温度、连接与短信仓；按用户操作刷新、重连、查看或发送/删除单条短信 |
 | 六项网络检查 | 本机每 10 分钟自动检查国内出口、VPN 出口、公司服务、国外 DNS 和 ChatGPT / Gemini 地区信号，也可手动检查 |
 | 飞书推送 | VPN、开关机、设备接入、出口切换与异常恢复通知；三个地址独立启停，事件开关、可调阈值、重试去重 |
 | HDMI 本地显示 | 中文高密度只读状态屏，双趋势图、32 项详情、设备和上次检查结果；支持 720p/1080p 布局，真实输出模式需另行配置 |

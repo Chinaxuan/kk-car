@@ -114,3 +114,11 @@
 同时更新 `uplink-model.uc`、`uplink-policy.uc`、`uplink-step.uc`、`uplink-watch.sh` 及 RPC/历史调用方；新模型不能漏装。检查完整 nft 候选后启用覆盖 eth/wwan/usb 的防泄漏规则，再改 logical WAN 为 QMI。`modem-qmi-read.sh` 与 `modem-poll.sh` 应可执行；状态采集兼容原 F30A。只更新面板通常无需重启网络；首次安装协议包的情况见 [DJI QMI](DJI-QMI.md)。
 
 手动替换前端资源后，LuCI 的资源版本仍可能沿用包数据库时间。本次更新只刷新 `/lib/apk/db/installed` 的修改时间、校验文件内容哈希不变，使正常页面刷新加载新资源；没有改变已安装软件包记录。
+
+## DJI 独立控制页增量部署
+
+先安装并核对 `root/etc/kk-car/dji-at-status.sh`、`dji-sms.uc` 和 `dji-control.sh`，再放 `root/usr/share/rpcd/ucode/kkdji.uc`、ACL、LuCI 菜单和前端 `dji.js`/`dji.css`。脚本中除 `dji-sms.uc` 外的两个 `.sh` 设为 0755；rpcd ucode 与前端 0644。依赖设备已有的 `ucode`、`socat`、`flock`、QMI 和 LuCI/rpcd ucode。部署前将现有菜单与 ACL 复制到设备私有备份；不要把真实设备配置或短信带入仓库。
+
+增量更新仅需重新加载 rpcd，再用已登录会话打开 `/cgi-bin/luci/admin/kkcar_dji`。如果菜单缓存未刷新，检查 LuCI 资源版本并重新载入页面。把新增脚本、RPC、ACL、菜单、前端资源加入设备 `/etc/sysupgrade.conf`，以便系统升级后保留。**这一页的安装不要求重启 `network`、Wi-Fi、DHCP、VPN 或树莓派。**
+
+验收顺序是：先检查原首页、Wi-Fi、VPN 与当前出口；再用 `ubus call kkdji status` 查 QMI、AT 和短信仓统计；最后用浏览器检查新页面的实机数据。实际短信目录会影响未读标志，因此仅在管理员主动点击时读取；发送、删除与重新连接均需要真实业务意图和可恢复网络条件，不属于部署时的自动健康检查。定位天线未验证时不启用 GNSS。操作解释见 [DJI 模块控制](DJI-CONTROL.md)。
