@@ -20,7 +20,7 @@ function clock(value) { var n=Number(value); return n>0 && isFinite(n) ? new Dat
 function ago(value) { var n=Number(value); if(!(n>0))return '尚未读取'; var s=Math.max(0,Math.floor(Date.now()/1000-n)); return s<60?s+' 秒前':s<3600?Math.floor(s/60)+' 分钟前':Math.floor(s/3600)+' 小时前'; }
 function duration(value) { var n=Number(value); if(!isFinite(n) || n<0 || value==null)return '—'; return n>=3600?Math.floor(n/3600)+' 小时 '+Math.floor(n%3600/60)+' 分钟':Math.floor(n/60)+' 分 '+Math.floor(n%60)+' 秒'; }
 function row(label,id){return E('div',{'class':'kk-dji-row'},[E('span',{},label),E('strong',{id:id},'—')]);}
-function card(title,desc,body){return E('section',{'class':'kk-dji-card'},[E('div',{'class':'kk-dji-card-head'},[E('h2',{},title),desc?E('p',{},desc):''])].concat(body));}
+function card(title,desc,body,extra){return E('section',{'class':'kk-dji-card'+(extra?' '+extra:'')},[E('div',{'class':'kk-dji-card-head'},[E('h2',{},title),desc?E('p',{},desc):''])].concat(body));}
 function button(label,handler,extra){return E('button',{type:'button','class':'kk-button '+(extra || ''),click:handler},label);}
 function simLabel(value){return ({ready:'可用',absent:'未插入 SIM',pin_required:'需要 PIN',puk_required:'需要 PUK',blocked:'已锁定'})[value] || '未检测';}
 function registerLabel(value){return ({registered:'已注册',searching:'正在搜索',not_registered:'未注册','not-registered':'未注册',denied:'注册被拒'})[value] || '未检测';}
@@ -37,6 +37,12 @@ return view.extend({
         this.refreshButton=button('刷新状态',function(){self.refresh(true);});
         this.reconnectButton=button('重连 DJI 数据网络',function(){self.reconnect();},'primary');
         this.smsListButton=button('读取短信列表',function(){self.readSmsList();});
+        this.smsSearch=E('input',{type:'search','class':'kk-dji-sms-search',placeholder:'搜索号码、时间或状态',autocomplete:'off',input:function(){self.renderSmsItems();}});
+        this.smsDetailMeta=E('div',{'class':'kk-dji-sms-detail-meta'},'选择左侧短信查看正文');
+        this.smsDetailBody=E('div',{'class':'kk-dji-sms-detail-body','aria-live':'polite'},'正文只在你点击短信后读取，不保存在浏览器。');
+        this.smsClearButton=button('清除当前内容',function(){self.clearSmsDetail();});
+        this.smsDeleteButton=button('删除这条短信',function(){self.deleteSelectedSms();},'danger');
+        this.smsDeleteButton.disabled=true;
         this.gpsStartButton=button('启动定位',function(){self.perform('gps_start','已请求启动定位，稍后查看定位状态。');});
         this.gpsStopButton=button('停止定位',function(){self.perform('gps_stop','已请求停止定位。');});
         this.to=E('input',{id:'kk-dji-sms-to',type:'tel',inputmode:'tel',autocomplete:'off',maxlength:20,placeholder:'接收号码'});
@@ -47,6 +53,7 @@ return view.extend({
             E('div',{'class':'kk-dji-actions'},[E('span',{'class':'kk-muted'},'单条 UCS2 最多 70 字，不支持 emoji；发送可能产生费用。'),E('button',{type:'submit','class':'kk-button primary'},'发送短信')])
         ]);
         this.smsListArea=E('div',{'class':'kk-dji-sms-list','aria-live':'polite'},'尚未读取短信。');
+        this.smsItems=[];this.selectedSmsIndex=null;
         this.root=E('div',{'class':'kk-app kk-studio kk-dji'},[
             E('header',{'class':'kk-header'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'DJ'),E('div',{},[E('h1',{},'DJI 4G 模块'),E('p',{},'蜂窝线路 · 信号、连接与模块控制')])]),
@@ -85,16 +92,30 @@ return view.extend({
                     E('div',{'class':'kk-dji-actions'},[this.reconnectButton]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-maintenance-note'},'设备操作会按模块实际能力开放。')
                 ]),
-                card('短信','仅手动读取单条正文；页面不会自动发送短信。',[
+                card('短信中心','参考 VoHive 的列表与详情操作，短信仍只存放在模块内。',[
                     E('div',{'class':'kk-dji-actions'},[this.smsListButton,E('span',{id:'kk-dji-sms-count','class':'kk-muted'},'尚未读取')]),
                     E('p',{'class':'kk-dji-note'},'读取列表可能把未读短信标为已读。不会自动删除短信。'),
-                    this.smsListArea,this.smsForm,
+                    E('div',{'class':'kk-dji-sms-workspace'},[
+                        E('div',{'class':'kk-dji-sms-inbox'},[this.smsSearch,this.smsListArea]),
+                        E('div',{'class':'kk-dji-sms-detail'},[
+                            E('div',{'class':'kk-dji-sms-detail-head'},[E('h3',{},'短信详情'),E('div',{'class':'kk-dji-actions'},[this.smsClearButton,this.smsDeleteButton])]),
+                            this.smsDetailMeta,this.smsDetailBody,this.smsForm
+                        ])
+                    ]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-sms-note'},'等待检测短信能力。')
-                ]),
+                ],'kk-dji-sms-card'),
                 card('定位','定位功能取决于模块固件和天线，首次锁定可能需要一段时间。',[
                     E('div',{'class':'kk-dji-rows'},[row('GPS 状态','kk-dji-gps-state'),row('定位结果','kk-dji-gps-fix'),row('经纬度','kk-dji-gps-coords'),row('速度','kk-dji-gps-speed'),row('更新时间','kk-dji-gps-time')]),
                     E('div',{'class':'kk-dji-actions'},[this.gpsStartButton,this.gpsStopButton]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-gps-note'},'尚未检测定位能力。')
+                ]),
+                card('VoHive 能力对照','按这只模块和车载路由用途核对，不把未经验证的功能伪装成可用按钮。',[
+                    E('div',{'class':'kk-dji-rows'},[
+                        row('设备、网络与信号','kk-dji-parity-device'),row('短信目录与详情','kk-dji-parity-sms'),
+                        row('网络重连','kk-dji-parity-reconnect'),row('飞书通知','kk-dji-parity-notify'),
+                        row('eSIM / 多卡','kk-dji-parity-esim'),row('代理池 / VoWiFi','kk-dji-parity-proxy')
+                    ]),
+                    E('p',{'class':'kk-dji-note'},'VoHive 是运行在 Linux 主机上的软件；此页运行在树莓派，不需要电脑常驻。')
                 ]),
                 card('使用说明','当前控制的是插在树莓派上的 DJI 模块。',[
                     E('p',{'class':'kk-dji-note'},'公网出口、VPN 与分流状态请看网络面板。短信和位置仅在当前管理会话中显示，不保存在浏览器。'),
@@ -175,6 +196,12 @@ return view.extend({
         this.gpsStopButton.hidden=!gpsControl || caps.gps_stop!==true || !gpsEnabled;
         this.gpsStartButton.disabled=this.gpsStopButton.disabled=!gpsControl || this.operating===true;
         this.el('kk-dji-gps-note').textContent=!gpsSupported?'暂未检测到可用的定位命令。':!gpsControl?'定位命令可响应，但天线和实机定位尚未验收，暂不开放开关。':gps.fix===true?'定位数据只在当前页面展示，未启用轨迹记录。':gpsEnabled?'正在等待卫星定位；车内遮挡会影响首次锁定。':'需要时可手动启动定位。';
+        this.set('kk-dji-parity-device',available?'已接入':'模块未连通');
+        this.set('kk-dji-parity-sms',smsReadAvailable?'已接入 · 点击单条读取':'当前不可用');
+        this.set('kk-dji-parity-reconnect',caps.reconnect===true?'已接入':'当前不可用');
+        this.set('kk-dji-parity-notify','系统告警已接入 · 短信不转发');
+        this.set('kk-dji-parity-esim','当前未识别 eSIM 能力');
+        this.set('kk-dji-parity-proxy','车载场景未启用');
     },
     perform:function(kind,message){
         var self=this;
@@ -194,46 +221,68 @@ return view.extend({
         if(this.smsLoading)return;
         this.smsLoading=true;this.smsListButton.disabled=true;this.smsListArea.textContent='正在读取短信目录…';
         return smsList().then(function(reply){
-            if(reply.ok===false)throw Error(reply.error || '读取失败');
+            if(!reply || reply.ok!==true || !Array.isArray(reply.messages))throw Error((reply && reply.error) || '模块未返回短信目录');
             var messages=Array.isArray(reply.messages)?reply.messages:[];
+            self.clearSmsDetail();self.smsItems=messages;
             self.el('kk-dji-sms-count').textContent=messages.length+' 条';
-            if(!messages.length){self.smsListArea.textContent='SIM 卡内没有短信。';return;}
-            self.smsListArea.replaceChildren.apply(self.smsListArea,messages.map(function(item){
-                var index=Number(item.index), safeIndex=Number.isInteger(index)&&index>=0&&index<=255;
-                var read=button('读取正文',function(){self.readSms(index,read);});read.disabled=!safeIndex;
-                var remove=self.capabilities.sms_delete===true?button('删除',function(){self.deleteSms(index,remove);},'danger'):null;
-                if(remove)remove.disabled=!safeIndex;
-                var meta=[E('strong',{},shown(item.from || item.number,'未知号码')),E('span',{},shown(item.time,'时间未知')),E('span',{},shown(item.status,'未读')),read];
-                if(remove)meta.push(remove);
-                return E('div',{'class':'kk-dji-sms-item'},[
-                    E('div',{'class':'kk-dji-sms-meta'},meta),
-                    E('div',{'class':'kk-dji-sms-body',hidden:true})
-                ]);
-            }));
+            self.renderSmsItems();
         }).catch(function(err){self.smsListArea.textContent='短信目录读取失败：'+(err.message || '未知错误');}).finally(function(){self.smsLoading=false;self.smsListButton.disabled=false;});
     },
-    readSms:function(index,buttonNode){
-        var self=this,body=buttonNode.parentNode.nextSibling;
-        if(!body.hidden){body.hidden=true;body.replaceChildren();buttonNode.textContent='读取正文';return;}
-        buttonNode.disabled=true;body.hidden=false;body.textContent='正在读取…';
-        return smsRead(index).then(function(reply){
-            if(reply.ok===false)throw Error(reply.error || '读取失败');
-            body.textContent=String((reply.message || {}).text || '空短信').slice(0,4096);
-            buttonNode.textContent='收起并清除正文';
-        }).catch(function(err){body.textContent='读取失败：'+(err.message || '未知错误');}).finally(function(){buttonNode.disabled=false;});
+    renderSmsItems:function(){
+        var self=this,query=(this.smsSearch.value || '').trim().toLowerCase();
+        var messages=this.smsItems.filter(function(item){
+            return !query || [item.from,item.number,item.time,item.status].some(function(v){return String(v || '').toLowerCase().indexOf(query)>=0;});
+        });
+        if(!messages.length){this.smsListArea.textContent=this.smsItems.length?'没有匹配的短信。':'模块存储中没有短信。';return;}
+        this.smsListArea.replaceChildren.apply(this.smsListArea,messages.map(function(item){
+            var index=Number(item.index),safe=Number.isInteger(index)&&index>=0&&index<=255;
+            var select=E('button',{type:'button','class':'kk-dji-sms-item'+(index===self.selectedSmsIndex?' selected':''),
+                click:function(){self.readSms(index);}},[
+                E('span',{'class':'kk-dji-sms-item-top'},[E('strong',{},shown(item.from || item.number,'未知号码')),E('small',{},shown(item.status,'状态未知'))]),
+                E('span',{'class':'kk-dji-sms-item-bottom'},[E('span',{},shown(item.time,'时间未知')),E('span',{},'查看正文 →')])
+            ]);
+            select.disabled=!safe;
+            return select;
+        }));
     },
-    deleteSms:function(index,buttonNode){
+    clearSmsDetail:function(){
+        this.smsRequestId=(this.smsRequestId || 0)+1;
+        this.selectedSmsIndex=null;this.smsReading=false;
+        this.smsDetailMeta.textContent='选择左侧短信查看正文';
+        this.smsDetailBody.textContent='正文只在你点击短信后读取，不保存在浏览器。';
+        this.smsDeleteButton.disabled=true;
+        this.smsListArea.querySelectorAll('.kk-dji-sms-item.selected').forEach(function(el){el.classList.remove('selected');});
+    },
+    readSms:function(index){
+        var self=this,item=this.smsItems.find(function(message){return Number(message.index)===index;});
+        if(!item || this.smsReading)return;
+        this.clearSmsDetail();this.selectedSmsIndex=index;this.smsReading=true;
+        var requestId=this.smsRequestId;
+        this.smsDetailMeta.textContent=shown(item.from || item.number,'未知号码')+' · '+shown(item.time,'时间未知')+' · '+shown(item.status,'状态未知');
+        this.smsDetailBody.textContent='正在读取第 '+index+' 条短信…';
+        this.renderSmsItems();
+        return smsRead(String(index)).then(function(reply){
+            if(!reply || reply.ok!==true || !reply.message)throw Error((reply && reply.error) || '模块未返回短信详情');
+            if(reply.message.unsupported || typeof reply.message.text!=='string')throw Error('这条短信的编码暂不支持显示');
+            if(self.smsRequestId!==requestId || self.selectedSmsIndex!==index)return;
+            self.smsDetailBody.textContent=reply.message.text || '这是一条空短信。';
+            self.smsDeleteButton.disabled=self.capabilities.sms_delete!==true;
+        }).catch(function(err){if(self.smsRequestId===requestId && self.selectedSmsIndex===index)self.smsDetailBody.textContent='读取失败：'+(err.message || '未知错误');})
+            .finally(function(){if(self.smsRequestId===requestId)self.smsReading=false;});
+    },
+    deleteSelectedSms:function(){
         var self=this;
         if(this.capabilities.sms_delete!==true)return;
+        var index=this.selectedSmsIndex;
+        if(!Number.isInteger(index)||index<0||index>255)return;
         if(!window.confirm('确认永久删除第 '+index+' 条短信？删除后无法恢复。'))return;
-        buttonNode.disabled=true;
-        return smsDelete(index).then(function(reply){
-            if(reply.ok===false)throw Error(reply.error || '删除失败');
-            buttonNode.closest('.kk-dji-sms-item').remove();
-            self.el('kk-dji-sms-count').textContent='已删除 1 条 · 存储状态待刷新';
+        this.smsDeleteButton.disabled=true;
+        return smsDelete(String(index)).then(function(reply){
+            if(!reply || reply.ok!==true)throw Error((reply && reply.error) || '模块未确认删除');
+            self.clearSmsDetail();
             self.notify('短信已从模块删除。');
-            return self.refresh(false);
-        }).catch(function(err){self.notify(err.message || '删除短信失败',true);buttonNode.disabled=false;});
+            return self.readSmsList().then(function(){return self.refresh(false);});
+        }).catch(function(err){self.notify(err.message || '删除短信失败',true);self.smsDeleteButton.disabled=false;});
     },
     sendSms:function(){
         var self=this,to=this.to.value.trim(),message=this.text.value;

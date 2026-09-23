@@ -12,7 +12,7 @@
 
 ## DJI 4G 独立控制页
 
-`/cgi-bin/luci/admin/kkcar_dji` 以同一 OpenWrt 管理员权限提供 DJI 一代 QMI 模块状态。`kkdji.uc` 合并既有 QMI 缓存与经动态 USB 接口发现的 AT 只读数据；模块温度使用 `AT+QTEMP` 第一值，SIM 锁状态使用 `AT+CPIN?`，邻区只输出数量与最强 RSRP，短信仓占用由 `AT+CPMS?` 查询。刷新不会重启网络，重连仅针对 QMI `wan` 逻辑接口；短信目录、正文、发送及单条删除必须由用户在页面主动操作。短信 AT 回复和请求仅短暂保存在设备私有 `/tmp`，不纳入历史、推送或公共备份。
+`/cgi-bin/luci/admin/kkcar_dji` 以同一 OpenWrt 管理员权限提供 DJI 一代 QMI 模块状态。`kkdji.uc` 合并既有 QMI 缓存与经动态 USB 接口发现的 AT 只读数据；模块温度使用 `AT+QTEMP` 第一值，SIM 锁状态使用 `AT+CPIN?`，邻区只输出数量与最强 RSRP，短信仓占用由 `AT+CPMS?` 查询。刷新不会重启网络，重连仅针对 QMI `wan` 逻辑接口。短信中心在树莓派上提供列表搜索与单条详情，关闭详情清除页面正文；发送及单条删除必须由用户主动确认。短信 AT 回复和请求仅短暂保存在设备私有 `/tmp`，不纳入历史、推送或公共备份。VoHive 是运行在 Linux 主机上的独立程序，不会安装在 DJI 模块内部；这里参考其信息架构，仍使用原生 LuCI 和已有路由控制服务。
 
 GNSS 状态命令可用，但外壳天线和定位尚未实测，页面不开放定位按钮；eSIM 管理未获支持证据，也不开放。部署时先放齐 `dji-at-status.sh`、`dji-sms.uc`、`dji-control.sh`，再安装 RPC、菜单、ACL 与 `dji.js`/`dji.css`，只刷新 rpcd，不重启 network。完整边界见公共仓库 `docs/DJI-CONTROL.md`。
 
