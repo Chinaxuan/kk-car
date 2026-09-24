@@ -13,9 +13,9 @@ bd912307dfd5564b8d53a259c16ca96c68cac010a2fc9ee070050912a09915e1  docs/NETWORK-R
 1180c4ce0ced8f1d420947720862c827a5382aa981f2eb3fb25fa97b2ccdb06c  docs/NOTIFICATIONS.md
 591cbd5bbba701c909a0e476f7e89f3bce04ff36ed9ce686198c75686011c876  docs/USAGE.md
 81e220a2026daf0df5ef47b67f21eed36fad570f3a9737956a9a8bbf3511fe11  docs/VALIDATION.md
-1ce6a62e258d7b6900f97e37b1b540d5ce022c1ac13823da38662d9022f6cbdc  docs/VOICE-CALLS.md
+9a8ae85e5fcd0506c0adf8ba25a3f3801ffb1a7bc1c103b35f837ec33049782b  docs/VOICE-CALLS.md
 2744e4500a9a765b282c5d05c667dfa5ace2dd4371b3cc059908cd413e743d09  docs/packages-reference.txt
-af58f79fd5865d936af8dbc6ca9375c12316c99a8f32195cfaf18446725b4c5c  kk-car-ui/README.md
+b39de8a4e9543fa1b84e8695b173a5d251d181c4bb62c47515ae75ee28135498  kk-car-ui/README.md
 0ae810cdef850b5e3229a088e7ac79beeb4d87f1b5258a4ea8b799c4bc5eab83  kk-car-ui/install-ethernet.uc
 405c18b24c585fff40f83c78ef5e18b098fb6537561bc70eae9e3aaae296f1d7  kk-car-ui/install-vpn-management.uc
 70f4e89bd1f0640ad634935d25f154ed2239b5eab94bdf4c13ec18c651a3dd9f  kk-car-ui/install-wifi-address.uc
@@ -83,12 +83,12 @@ f7299391491923e8c133d2146d8e6a5f87ca99d44e19e705664eb46e51dce65b  kk-car-ui/root
 b3a173d2322d55138a9e1294bbdf2f00fe81f4a70abf1ec9f09251467d6dd24b  kk-car-ui/root/usr/share/rpcd/ucode/kkcar.uc
 2907338ae9ab271499341f525cb6ac4dbd42b1b4589d98b056de9dadff81acf2  kk-car-ui/root/usr/share/rpcd/ucode/kkdji.uc
 88d91debd2b9cffa12c477804f8ce8c516a08d478361c14600640f33e3b6d943  kk-car-ui/root/www/luci-static/resources/view/kkcar/dji-console-v2.css
-52b6f3e645c27868edb4ac4084912839abf83bfcdcb0423f04c204f82ac32599  kk-car-ui/root/www/luci-static/resources/view/kkcar/dji-console-v2.js
+17aa6a605d66bce5cf83a447b4cff07ac385df38d6b27f8332c38baac68c32e6  kk-car-ui/root/www/luci-static/resources/view/kkcar/dji-console-v2.js
 0237aadec510d66ff6e2b3d38dd43940029e59dade1a6717457343cf3317d391  kk-car-ui/root/www/luci-static/resources/view/kkcar/notifications.css
 f6e52a26f9163917d113cc388d20ba577e016764088be14ba29ed950a01c8221  kk-car-ui/root/www/luci-static/resources/view/kkcar/notifications.js
 7bfed28cee9e50e7ffe37e7933ae614a6b6ecfd63e08841fb0d35c89396f3f16  kk-car-ui/root/www/luci-static/resources/view/kkcar/overview.css
 658316952de4a53a25759939e29587597146f184c31f61df142059fb3dc1f5a5  kk-car-ui/root/www/luci-static/resources/view/kkcar/overview.js
-3cbf831e8ca0962362b2b7cc8516eb7de1b0294861ed22d70faf0b94ac39494e  kk-car-ui/root/www/luci-static/resources/view/kkcar/voice-worklet.js
+61e61bd933fedfccea88372041d32f9d9c7bfc8a66a3f8f9eb2515f294a497e0  kk-car-ui/root/www/luci-static/resources/view/kkcar/voice-worklet.js
 f94d254058b6f0f0bac526549d84579d7eb4db9a32e91349c6e65db806e37082  kk-car-ui/tests/ai-region.py
 20fff616152c2645424bd4bab7ec5a1a9f7be708ca7e4d260c59eddd423658c7  kk-car-ui/tests/auto-check.py
 fc798c5afa0064c5a30d339d21cac2a78af2f7d3edddac790d68235988ebfcd1  kk-car-ui/tests/dji-phonebook.sh

@@ -172,6 +172,7 @@ return view.extend({
                 card('网页电话','本机已完成一次双向声音短测；长期和移动中的通话稳定性仍需观察。',[
                     E('div',{'class':'kk-dji-call-state'},[E('strong',{id:'kk-dji-call-title'},'尚未验证双向音频'),E('span',{id:'kk-dji-call-subtitle'},'网页拨号暂不开放')]),
                     E('div',{'class':'kk-dji-phone-controls'},[this.callNumber,this.callDialButton,this.callAnswerButton,this.callHangupButton,this.callAudioButton,this.voiceProbeButton,this.httpsPhoneButton]),this.voiceStatus,
+                    E('p',{'class':'kk-dji-note',id:'kk-dji-audio-quality'},'通话音频缓冲：待连接'),
                     E('p',{'class':'kk-dji-note'},'请从 HTTPS 管理页使用，并允许浏览器访问麦克风。一次 15–30 秒双向通话已通过；长期稳定性尚未验收，请勿用于紧急联络。')
                 ],'kk-dji-phone-card','kk-dji-phone-section'),
                 card('定位','定位功能取决于模块固件和天线，首次锁定可能需要一段时间。',[
@@ -576,7 +577,12 @@ return view.extend({
                     ws.onerror=function(){if(!opened){clearTimeout(timer);reject(Error('无法连接语音网关；请检查 HTTPS 证书和服务状态'));}};
                     ws.onclose=function(){if(opened && self.audioSocket===ws){self.closePhoneAudio();self.notify('网页音频已断开；如果通话仍在进行，请点击“连接网页音频”。',true);}};
                     ws.onmessage=function(event){if(event.data instanceof ArrayBuffer && self.audioNode)self.audioNode.port.postMessage({down:event.data},[event.data]);};
-                    self.audioNode.port.onmessage=function(event){if(ws.readyState===WebSocket.OPEN && ws.bufferedAmount<32000)ws.send(event.data);};
+                    self.audioNode.port.onmessage=function(event){
+                        if(event.data && event.data.quality){
+                            var q=event.data.quality;
+                            self.set('kk-dji-audio-quality','下行缓冲 '+q.queuedMs+' ms · 断流 '+q.underruns+' 次 · 积压丢帧 '+q.dropped+' 帧');
+                        }else if(event.data instanceof ArrayBuffer && ws.readyState===WebSocket.OPEN && ws.bufferedAmount<32000)ws.send(event.data);
+                    };
                 });
             }).catch(function(error){self.closePhoneAudio();throw error;});
     },
@@ -587,6 +593,7 @@ return view.extend({
         this.audioStream=null;
         if(this.audioContext)this.audioContext.close().catch(function(){});
         this.audioContext=null;this.audioNode=null;this.audioSource=null;
+        this.set('kk-dji-audio-quality','通话音频缓冲：未连接');
         this.updatePhoneButtons();
     },
     phoneDial:function(){
