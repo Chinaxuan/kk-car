@@ -14,6 +14,7 @@
           "sms_read",
           "voice_probe",
           "call_status",
+          "phone_data",
           "gps_probe",
           "traffic_status"
         ]
@@ -40,6 +41,8 @@
           "call_dial",
           "call_answer",
           "call_hangup",
+          "phone_contact_save",
+          "phone_contact_delete",
           "voice_ticket"
         ]
       }

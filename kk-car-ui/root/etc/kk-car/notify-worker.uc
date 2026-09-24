@@ -3,6 +3,7 @@ import {readfile,writefile,rename,chmod,mkdir,unlink,popen} from 'fs';
 import {connect} from 'ubus';
 import {read_config} from '/etc/kk-car/notify-config.uc';
 import {step} from '/etc/kk-car/notify-engine.uc';
+import {observe} from '/etc/kk-car/dji-phonebook.uc';
 function read(path) {try{return json(readfile(path));}catch(e){return null;}}
 function write(path,obj) {if(!writefile(path+'.new',sprintf('%J',obj)))return false;chmod(path+'.new',0600);return rename(path+'.new',path);}
 function event_time(at) {let d=localtime(at);return sprintf('%02d-%02d %02d:%02d:%02d',d.mon,d.mday,d.hour,d.min,d.sec);}
@@ -27,11 +28,12 @@ try {
         if(request && request.revision<=c.revision) {unlink('/tmp/kk-car-notify-test.json');if(request.revision==c.revision) {enqueue('test','测试推送：KK-Car 飞书通知已接通');s.retry_at=0;}}
         let bus=connect(), d=bus.call('kkcar','status');
         if(d && d.timestamp) {
-            // The modem call query omits caller numbers. Only state changes
-            // enter the Feishu queue; no AT output or contacts are logged.
-            if(c.events?.incoming_call || c.events?.missed_call) {
+            // Caller numbers go only to the private phonebook. Feishu receives
+            // state changes without numbers, AT replies, or contacts.
+            {
                 let call=bus.call('kkdji','call_status');
                 if(call?.ok) {
+                    observe(call);
                     let answer_file='/tmp/kk-car-voice-answered';
                     let answered=+(readfile(answer_file) || '0');
                     if(answered && (answered>time() || time()-answered>120)) {unlink(answer_file);answered=0;}

@@ -134,4 +134,6 @@
 
 增量更新仅需重新加载 rpcd 与短信/流量后台服务，再用已登录会话打开 `/cgi-bin/luci/admin/kkcar_dji`。rpcd 重启可能使旧 LuCI 会话失效，重新登录即可。如果菜单缓存未刷新，清除 LuCI 菜单缓存再打开页面。当前前端采用 `dji-console-v2` 资源名，避免旧浏览器资源缓存。把版本化的 JS/CSS 路径加入设备 `/etc/sysupgrade.conf`，替换旧的 `dji-console` 条目；`/etc/kk-car/` 原已整体保留。**这一页的安装不要求重启 `network`、Wi-Fi、DHCP、VPN 或树莓派。**
 
+左侧导航、通话记录与网络详情迭代需先放 `dji-phonebook.uc`（0600）、新版 `dji-at-status.sh`（0755）和 `dji-sms.uc`，再更新 `kkdji.uc`、ACL、`notify-worker.uc` 与前端资源。`notify-worker.uc` 需要导入 phonebook 模块；放齐文件后重启 `rpcd` 与 `kk-car-notify` 即可，不重启网络。首次通话记录文件由服务在 `/etc/kk-car/private/dji-phonebook.json` 自动创建，目录应为 0700、文件 0600；迁移时只通过私密加密备份转移此文件，绝不加入公开仓库。小区 ID/TAC/PCI/EARFCN 只来自 `/tmp/kk-car-dji-at.json` 当前采样，不能纳入历史或公开截图。
+
 验收顺序是：先检查原首页、Wi-Fi、VPN 与当前出口；再用 `ubus call kkdji status`、`ubus call kkdji traffic_status` 查 QMI、AT、短信仓和设备流量；最后用浏览器检查新页面的实机数据及短信目录自动读取。新增的 `call_status` 和 `gps_probe` 是受 LuCI 登录权限限制的只读 RPC；GPS 启停经原 `action` 白名单执行，不重启网络。目录读取可能改变未读标志；正文仍要点击会话才读取。每天查询依保存的运营商、号码、指令和时间运行；部署当天若已经手动查过，应先记录当天已查询，避免立刻重复发送。发送、删除与重新连接需真实业务意图。定位天线未验证时可以只读检查；若测试启动 GNSS，结束后应停止并读回关闭状态。操作解释见 [DJI 模块控制](DJI-CONTROL.md)。

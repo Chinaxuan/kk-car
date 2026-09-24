@@ -3,6 +3,7 @@ import { readfile, writefile, popen, access, mkdir, rmdir, chmod, unlink, rename
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 import { read_cellular } from '/etc/kk-car/uplink-model.uc';
+import { get_data,seed_outgoing,save_contact,delete_contact } from '/etc/kk-car/dji-phonebook.uc';
 
 function filejson(path) {
     try { return json(readfile(path) || '{}'); } catch (e) { return {}; }
@@ -87,6 +88,10 @@ function state(auto_refresh) {
             operator:available ? (modem.operator || null) : null,
             technology:available ? (info.technology || modem.network || null) : null,
             band:info.band || null,channel:info.channel || null,
+            duplex:info.duplex || null,mcc:info.mcc || null,mnc:info.mnc || null,
+            cell_id:info.cell_id || null,tac:info.tac || null,pci:value(info.pci),
+            earfcn:value(info.earfcn),ul_bandwidth_mhz:value(info.ul_bandwidth_mhz),
+            dl_bandwidth_mhz:value(info.dl_bandwidth_mhz),
             rsrp:available ? value(modem.rsrp) : null,
             rsrq:available ? value(modem.rsrq) : null,
             sinr:available ? value(info.sinr_db) : null,
@@ -177,11 +182,20 @@ return {'kkdji': {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
         return call_sms('call_status',null);
     }},
+    phone_data:{call:function(){return get_data();}},
+    phone_contact_save:{args:{name:'',number:''},call:function(req){
+        return save_contact(req.args.name,req.args.number);
+    }},
+    phone_contact_delete:{args:{number:''},call:function(req){
+        return delete_contact(req.args.number);
+    }},
     call_dial:{args:{number:''},call:function(req) {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
         let number=req.args.number;
         if (type(number)!='string' || !match(number,/^\+?[0-9]{3,15}$/)) return {ok:false,error:'号码格式不正确'};
-        return call_sms('call_dial',number);
+        let result=call_sms('call_dial',number);
+        if (result.ok) seed_outgoing(number);
+        return result;
     }},
     call_answer:{call:function() {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};

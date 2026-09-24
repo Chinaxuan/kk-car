@@ -9,6 +9,7 @@ b=run('mktemp -d /tmp/kk-notify-test.XXXXXX').strip()
 try:
  for n in ['notify-config.uc','notify-engine.uc']:
   put(b+'/'+n,(root/'kk-car-ui/root/etc/kk-car'/n).read_text())
+ put(b+'/phonebook.uc','function observe(call){return true;} export {observe};')
  test=r'''
 import {step} from 'BASE/notify-engine.uc';
 import {defaults,validate_config,public_config,valid_url} from 'BASE/notify-config.uc';
@@ -53,7 +54,7 @@ printf('PASS %d notification engine/config assertions\n',count);
 '''.replace('BASE',b).replace("ok(!index(sprintf('%J',input),'00000000-0000')>=0,'placeholder');","ok(index(sprintf('%J',input),'00000000-0000')<0,'secret absent from serialized response');")
  put(b+'/test.uc',test)
  print(run('ucode '+b+'/test.uc').strip())
- worker=(root/'kk-car-ui/root/etc/kk-car/notify-worker.uc').read_text().replace('/etc/kk-car/notify-',b+'/notify-')
+ worker=(root/'kk-car-ui/root/etc/kk-car/notify-worker.uc').read_text().replace('/etc/kk-car/notify-',b+'/notify-').replace('/etc/kk-car/dji-phonebook.uc',b+'/phonebook.uc')
  put(b+'/notify-worker.uc',worker)
  print(run('ucode -c -o '+b+'/worker.ucb '+b+'/notify-worker.uc && echo "PASS worker compilation"').strip())
  # Exercise the whole worker with fake observations and an in-process HTTP stub.
@@ -69,6 +70,7 @@ printf('PASS %d notification engine/config assertions\n',count);
  put(b+'/call.json',json.dumps({'ok':True,'state':'idle','direction':None,'count':0}))
  original=(root/'kk-car-ui/root/etc/kk-car/notify-worker.uc').read_text()
  worker=original.replace("from 'ubus'", "from '"+b+"/bus.uc'").replace("from '/etc/kk-car/notify-config.uc'", "from '"+b+"/worker-config.uc'").replace("from '/etc/kk-car/notify-engine.uc'", "from '"+b+"/notify-engine.uc'")
+ worker=worker.replace("from '/etc/kk-car/dji-phonebook.uc'", "from '"+b+"/phonebook.uc'")
  worker=worker.replace('/tmp/kk-car-',b+'/tmp/kk-car-').replace('/etc/kk-car/private',b+'/private')
  start=worker.index('function run(cmd)')
  end=worker.index('let lock=',start)

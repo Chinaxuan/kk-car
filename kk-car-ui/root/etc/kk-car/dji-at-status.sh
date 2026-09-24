@@ -82,6 +82,18 @@ function number_json(s, lo, hi) {
     gsub(/[[:space:]]/, "", s)
     return s ~ /^-?[0-9]+([.][0-9]+)?$/ && s + 0 >= lo && s + 0 <= hi ? s : "null"
 }
+function clean_digits(s, minlen, maxlen) {
+    gsub(/["[:space:]]/, "", s)
+    return s ~ /^[0-9]+$/ && length(s) >= minlen && length(s) <= maxlen ? s : ""
+}
+function clean_hex(s, minlen, maxlen) {
+    gsub(/["[:space:]]/, "", s)
+    return s ~ /^[0-9A-Fa-f]+$/ && length(s) >= minlen && length(s) <= maxlen ? toupper(s) : ""
+}
+function bandwidth(s) {
+    gsub(/[[:space:]]/, "", s)
+    return s == "0" ? "1.4" : s == "1" ? "3" : s == "2" ? "5" : s == "3" ? "10" : s == "4" ? "15" : s == "5" ? "20" : "null"
+}
 /^Revision:[[:space:]]*/ {
     firmware = $0
     sub(/^Revision:[[:space:]]*/, "", firmware)
@@ -111,6 +123,17 @@ function number_json(s, lo, hi) {
         rsrq = number_json(cell[15], -35, 5)
         rssi = number_json(cell[16], -130, -20)
         sinr = number_json(cell[17], -30, 50)
+        duplex = cell[4]
+        gsub(/["[:space:]]/, "", duplex)
+        if (duplex != "FDD" && duplex != "TDD") duplex = ""
+        mcc = clean_digits(cell[5], 3, 3)
+        mnc = clean_digits(cell[6], 2, 3)
+        cell_id = clean_hex(cell[7], 1, 8)
+        pci = number_json(cell[8], 0, 503)
+        earfcn = number_json(cell[9], 0, 262143)
+        ul_bandwidth_mhz = bandwidth(cell[11])
+        dl_bandwidth_mhz = bandwidth(cell[12])
+        tac = clean_hex(cell[13], 1, 4)
     }
 }
 /^\+QENG:[[:space:]]*"neighbourcell (intra|inter)","LTE",/ {
@@ -159,7 +182,7 @@ END {
     if (sinr == "") sinr = "null"
     if (gps_enabled == "") gps_enabled = "null"
     neighbours = intra_count + inter_count > 0 ? sprintf("{\"intra_count\":%d,\"inter_count\":%d,\"best_rsrp_dbm\":%s}", intra_count, inter_count, best_neighbour_rsrp) : "null"
-    printf "{\"timestamp\":%d,\"firmware\":%s,\"technology\":%s,\"band\":%s,\"registration\":%s,\"module_temperature_c\":%s,\"gps_enabled\":%s,\"rsrp_dbm\":%s,\"rsrq_db\":%s,\"rssi_dbm\":%s,\"sinr_db\":%s,\"sim_pin_state\":%s,\"neighbours\":%s}\n", now, string_json(firmware), string_json(technology), string_json(band), string_json(registration), module_temp, gps_enabled, rsrp, rsrq, rssi, sinr, string_json(pin_state), neighbours
+    printf "{\"timestamp\":%d,\"firmware\":%s,\"technology\":%s,\"band\":%s,\"registration\":%s,\"module_temperature_c\":%s,\"gps_enabled\":%s,\"rsrp_dbm\":%s,\"rsrq_db\":%s,\"rssi_dbm\":%s,\"sinr_db\":%s,\"sim_pin_state\":%s,\"neighbours\":%s,\"duplex\":%s,\"mcc\":%s,\"mnc\":%s,\"cell_id\":%s,\"tac\":%s,\"pci\":%s,\"earfcn\":%s,\"ul_bandwidth_mhz\":%s,\"dl_bandwidth_mhz\":%s}\n", now, string_json(firmware), string_json(technology), string_json(band), string_json(registration), module_temp, gps_enabled, rsrp, rsrq, rssi, sinr, string_json(pin_state), neighbours, string_json(duplex), string_json(mcc), string_json(mnc), string_json(cell_id), string_json(tac), pci==""?"null":pci, earfcn==""?"null":earfcn, ul_bandwidth_mhz==""?"null":ul_bandwidth_mhz, dl_bandwidth_mhz==""?"null":dl_bandwidth_mhz
 }')
 parse_rc=$?
 wait "$active" 2>/dev/null

@@ -324,7 +324,7 @@ function load_request(path) {
     catch (e) { return null; }
 }
 function call_status(raw) {
-    let state='idle',direction=null,count=0;
+    let state='idle',direction=null,count=0,number=null;
     for (let line in split(raw || '',/\r?\n/)) {
         let call=match(line,/^\+CLCC:\s*[0-9]+,([01]),([0-5]),([0-2]),[01]/);
         if (!call) continue;
@@ -336,9 +336,11 @@ function call_status(raw) {
         if (state=='idle' || +call[2]>=4) {
             state=names[+call[2]];
             direction=call[1]=='1'?'incoming':'outgoing';
+            let numbered=match(line,/^\+CLCC:[^\r\n]*?,"(\+?[0-9]{3,15})"/);
+            number=numbered ? numbered[1] : null;
         }
     }
-    return {ok:true,state,direction,count,timestamp:time()};
+    return {ok:true,state,direction,count,number,timestamp:time()};
 }
 function voice_ready() {
     return system('/etc/kk-car/dji-voice-health.sh prepared >/dev/null 2>&1') == 0;
