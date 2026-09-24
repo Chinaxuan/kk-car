@@ -60,12 +60,13 @@ printf('PASS %d notification engine/config assertions\n',count);
  # All state/config/queue writes stay in the temporary directory; no Webhook request.
  run('mkdir -p '+b+'/tmp '+b+'/private')
  put(b+'/worker-config.uc',"import {readfile} from 'fs'; function read_config(){return json(readfile('"+b+"/config.json'));} export {read_config};")
- put(b+'/bus.uc',"import {readfile} from 'fs'; function connect(){return {call:function(object,method){if(object=='kkcar')return json(readfile('"+b+"/sample.json'));return {clients:{}};}};} export {connect};")
+ put(b+'/bus.uc',"import {readfile} from 'fs'; function connect(){return {call:function(object,method){if(object=='kkcar')return json(readfile('"+b+"/sample.json'));if(object=='kkdji')return json(readfile('"+b+"/call.json'));return {clients:{}};}};} export {connect};")
  config=json.loads(run('ucode -e '+shlex.quote("import {defaults} from '"+b+"/notify-config.uc'; printf('%J',defaults());")))
  config['enabled']=True;config['revision']=1
  config['destinations'][0].update(enabled=True,url='https://open.feishu.cn/open-apis/bot/v2/hook/00000000-0000-0000-0000-000000000000')
  put(b+'/config.json',json.dumps(config))
  put(b+'/sample.json',json.dumps({'timestamp':1,'vpn':{'connected':True},'uplink':{'active':'cellular'},'peers':[],'power':{'known':True,'undervoltage':False},'temperature':50}))
+ put(b+'/call.json',json.dumps({'ok':True,'state':'idle','direction':None,'count':0}))
  original=(root/'kk-car-ui/root/etc/kk-car/notify-worker.uc').read_text()
  worker=original.replace("from 'ubus'", "from '"+b+"/bus.uc'").replace("from '/etc/kk-car/notify-config.uc'", "from '"+b+"/worker-config.uc'").replace("from '/etc/kk-car/notify-engine.uc'", "from '"+b+"/notify-engine.uc'")
  worker=worker.replace('/tmp/kk-car-',b+'/tmp/kk-car-').replace('/etc/kk-car/private',b+'/private')
@@ -98,5 +99,18 @@ printf('PASS %d notification engine/config assertions\n',count);
  out=execute('shutdown');assert out['deliveries']['primary']['ok'] and '正常关机' in out['log'][-1]['text'],out
  marker=json.loads(run('cat '+b+'/private/notify-boot.json'));assert marker['clean']
  assert execute()['queued']==0
+ # Ring detection must distinguish an unanswered call from a short call
+ # answered between worker samples. Neither fixture contains caller data.
+ ring={'ok':True,'state':'来电振铃','direction':'incoming','count':1}
+ idle={'ok':True,'state':'idle','direction':None,'count':0}
+ put(b+'/call.json',json.dumps(ring));out=execute()
+ assert any('正在来电' in e['text'] for e in out['log']),out
+ put(b+'/call.json',json.dumps(idle));out=execute()
+ missed=sum('未接来电' in e['text'] for e in out['log']);assert missed==1,out
+ put(b+'/call.json',json.dumps(ring));execute()
+ put(b+'/tmp/kk-car-voice-answered',run('date +%s').strip())
+ put(b+'/call.json',json.dumps(idle));out=execute()
+ assert sum('未接来电' in e['text'] for e in out['log'])==missed,out
+ assert run('test ! -e '+b+'/tmp/kk-car-voice-answered && echo yes').strip()=='yes'
  print('PASS worker integration: successful delivery, Feishu business error, queued retry, revision race, disabled master, shutdown and service restart')
 finally:run('rm -rf '+shlex.quote(b))

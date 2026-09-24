@@ -4,7 +4,7 @@
 
 本仓库保存 **截至 2026-09-24 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
 
-[使用说明](docs/USAGE.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
+[使用说明](docs/USAGE.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
 
 ## 它能做什么
 
@@ -17,9 +17,9 @@
 | 有线 / 4G 选网 | 网口可切换 LAN 或 DHCP WAN；有线探测稳定后优先，失效后回到 4G |
 | 热点设置 | 修改名称、密码，选择 5 GHz 或 2.4 GHz，均为 20 MHz；修改后限时确认，未确认自动恢复 |
 | 上网棒状态 | 兼容 F30A ADB 与 DJI 一代 QMI；只读采集运营商、SIM 状态、RSRP/RSRQ/SINR 与接口流量，未知保持留空 |
-| DJI 独立控制页 | 四项信号阈值、频段、固件、温度和连接；今日/月度流量与短信校正；短信自动加载、合并/回复与加密备份；只读电话状态和手动 GNSS 定位 |
+| DJI 独立控制页 | 四项信号阈值、频段、固件、温度和连接；今日/月度流量与短信校正；短信自动加载、合并/回复与加密备份；手动 GNSS 定位；试验性网页电话控制，双向通话尚未验收 |
 | 六项网络检查 | 本机每 10 分钟自动检查国内出口、VPN 出口、公司服务、国外 DNS 和 ChatGPT / Gemini 地区信号，也可手动检查 |
-| 飞书推送 | VPN、开关机、设备接入、出口切换与异常恢复通知；可单独启用 DJI 新短信正文，三个地址独立启停 |
+| 飞书推送 | VPN、开关机、设备接入、出口切换与异常恢复通知；DJI 来电/未接提醒与新短信正文可分别启停，三个地址独立控制 |
 | HDMI 本地显示 | 中文高密度只读状态屏，双趋势图、32 项详情、设备和上次检查结果；支持 720p/1080p 布局，真实输出模式需另行配置 |
 | IPv6 状态 | 检查内核开关、地址与路由；当前部署采用 IPv4，IPv6 已关闭 |
 

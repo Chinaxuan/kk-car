@@ -36,7 +36,11 @@
           "sms_send",
           "sms_delete",
           "traffic_save",
-          "traffic_query"
+          "traffic_query",
+          "call_dial",
+          "call_answer",
+          "call_hangup",
+          "voice_ticket"
         ]
       }
     }

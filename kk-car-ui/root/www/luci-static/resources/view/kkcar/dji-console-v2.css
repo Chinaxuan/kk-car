@@ -123,3 +123,6 @@
 .kk-dji .kk-button:focus-visible,.kk-dji input:focus-visible,.kk-dji select:focus-visible{outline:2px solid #81e7db;outline-offset:2px}
 @media(max-width:1100px){.kk-dji-traffic-controls{grid-template-columns:repeat(3,minmax(0,1fr))}.kk-dji-traffic-controls .kk-dji-check{padding:0 0 8px}}
 @media(max-width:700px){.kk-dji-traffic-highlights{grid-template-columns:1fr 1fr}.kk-dji-traffic-highlights>div:first-child{grid-column:1/-1}.kk-dji-traffic-highlights strong{font-size:23px}.kk-dji-traffic-card .kk-dji-rows{grid-template-columns:1fr}.kk-dji-traffic-controls{grid-template-columns:1fr 1fr}.kk-dji-traffic-controls label:first-child{grid-column:1/-1}.kk-dji-call-state{align-items:start;flex-direction:column}.kk-dji-call-state span{text-align:left}}
+.kk-dji-phone-controls{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin:.7rem 0}
+.kk-dji-phone-controls input{min-width:11rem;max-width:16rem;flex:1 1 11rem;background:#101d2b;color:#f4f8ff;border:1px solid #33495f;border-radius:.55rem;padding:.62rem .78rem;font:inherit}
+.kk-dji-phone-controls input:focus{outline:2px solid #4ecfc0;outline-offset:1px}

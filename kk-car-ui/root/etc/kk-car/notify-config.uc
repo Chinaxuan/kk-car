@@ -1,7 +1,7 @@
 'use strict';
 import { readfile, writefile, rename, mkdir, chmod } from 'fs';
 const path='/etc/kk-car/private/notify.json';
-const kinds=['vpn_up','vpn_down','boot','shutdown','abnormal_boot','latency','loss','client_join','client_leave','uplink','signal','power','temperature','recovery','sms_received'];
+const kinds=['vpn_up','vpn_down','boot','shutdown','abnormal_boot','latency','loss','client_join','client_leave','uplink','signal','power','temperature','recovery','sms_received','incoming_call','missed_call'];
 function defaults() {
     let events={}; for(let k in kinds) events[k]=k!='client_leave' && k!='sms_received';
     return {enabled:false,revision:0,events,latency_ms:300,loss_percent:50,hold_seconds:30,cooldown_seconds:300,signal_dbm:-115,temperature_c:80,
@@ -10,8 +10,8 @@ function defaults() {
 function read_config() {
     try {
         let saved=json(readfile(path)) || defaults(), base=defaults();
-        // Existing installations predate the SMS event. Preserve every saved
-        // setting while adding an explicit, off-by-default privacy switch.
+        // Preserve existing switches and destinations when new event kinds
+        // are added. SMS contents remain opt-in.
         saved.events={...base.events,...(saved.events || {})};
         return saved;
     } catch(e) {return defaults();}

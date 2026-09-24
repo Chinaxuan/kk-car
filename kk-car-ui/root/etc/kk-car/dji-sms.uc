@@ -72,7 +72,7 @@ function session_start(tty) {
     }
     chmod(OUT, 0600); chmod(FIFO, 0600);
     // Paths are fixed except tty, which is selected from validated sysfs entries.
-    let command = 'sh -c \'socat - ' + tty + ',raw,echo=0,b115200 < ' + FIFO +
+    let command = 'sh -c \'socat - ' + tty + ',raw,echo=0,b115200,hupcl=0 < ' + FIFO +
         ' > ' + OUT + ' 2>/dev/null & echo $! > ' + PID + '\'';
     if (system(command) != 0) { clean(); return error('IO', '无法打开模块串口'); }
     // Linux O_RDWR on a FIFO opens immediately, including if socat has died.
@@ -340,6 +340,9 @@ function call_status(raw) {
     }
     return {ok:true,state,direction,count,timestamp:time()};
 }
+function voice_ready() {
+    return system('/etc/kk-car/dji-voice-health.sh prepared >/dev/null 2>&1') == 0;
+}
 function perform(session, action, param) {
     if (action == 'storage_probe') {
         let response=at(session,'AT+CPMS=?',5);
@@ -373,11 +376,105 @@ function perform(session, action, param) {
             ims_setting:ims_value ? +ims_value[1] : null,
             call_query_accepted:calls.ok,audio_usb_present:audio,
             call_state:current.state,call_direction:current.direction,active_calls:current.count,
-            ready:false,reason:'通话需运营商 IMS 注册及双向音频；只读检测不等于可用'};
+            ready:voice_ready() && audio && ims_value && ims_value[1]=='1',
+            route_ready:system('/etc/kk-car/dji-voice-health.sh active >/dev/null 2>&1') == 0,
+            reason:'USB 声卡和模块驱动已准备；接通后启动音频路由，双方语音仍需实测'};
     }
     if (action == 'call_status') {
         let calls=at(session,'AT+CLCC',5);
-        return calls.ok ? call_status(calls.data) : error('CALL_STATUS','通话状态暂不可读');
+        if (!calls.ok) return error('CALL_STATUS','通话状态暂不可读');
+        let current=call_status(calls.data);
+        let active=stat('/tmp/kk-car-voice-ready')?.type=='file';
+        if (!current.count) {
+            if (active) system('/etc/kk-car/dji-voice-route.sh stop >/dev/null 2>&1');
+            unlink('/tmp/kk-car-voice-outgoing-pending');
+        }
+        else if (current.state=='通话中' && current.direction=='outgoing' &&
+                 stat('/tmp/kk-car-voice-outgoing-pending')?.type=='file' && !active) {
+            if (system('/etc/kk-car/dji-voice-route.sh start >/dev/null 2>&1')==0)
+                unlink('/tmp/kk-car-voice-outgoing-pending');
+        }
+        current.audio_ready=stat('/tmp/kk-car-voice-ready')?.type=='file';
+        return current;
+    }
+    if (action == 'call_diag') {
+        // Read only. Never expose caller IDs, IMSI, or raw modem output.
+        let cause=at(session,'AT+CEER',5);
+        let reg=at(session,'AT+CIREG?',5);
+        let ims=at(session,'AT+QCFG="ims"',5);
+        let volte=at(session,'AT+QCFG="volte_disable"',5);
+        let contexts=at(session,'AT+CGDCONT?',5);
+        let active=at(session,'AT+CGACT?',5);
+        let mbn=at(session,'AT+QMBNCFG="List"',5);
+        let c=cause.ok ? match(cause.data,/\+CEER:\s*([0-9]+),\s*(-?[0-9]+)/) : null;
+        let r=reg.ok ? match(reg.data,/\+CIREG:\s*([0-9]+),\s*([0-9]+)(?:,\s*([0-9]+))?/) : null;
+        let i=ims.ok ? match(ims.data,/\+QCFG:\s*"ims",([0-2]),([01])/) : null;
+        let v=volte.ok ? match(replace(volte.data,/volte\/disable/,'volte_disable'),
+            /\+QCFG[:=]\s*"volte_disable",([01])/) : null;
+        let pdn=contexts.ok ? match(contexts.data,/\+CGDCONT:\s*([0-9]+),"[^"]+","[Ii][Mm][Ss]"/) : null;
+        let pdn_active=null;
+        if (pdn && active.ok) for (let line in split(active.data,/\r?\n/)) {
+            let item=match(line,/^\+CGACT:\s*([0-9]+),([01])/);
+            if (item && +item[1]==+pdn[1]) pdn_active=item[2]=='1';
+        }
+        let profile=null;
+        if (mbn.ok) for (let line in split(mbn.data,/\r?\n/)) {
+            let item=match(line,/^\+QMBNCFG:\s*"List",[0-9]+,[01],1,"([A-Za-z0-9_.-]{1,80})"/);
+            if (item) profile=item[1];
+        }
+        return {ok:true,release_cause:c ? [+c[1],+c[2]] : null,
+            ims_registration:r ? [+r[1],+r[2],r[3]==null?null:+r[3]] : null,
+            ims_setting:i ? +i[1] : null,volte_capable:i ? i[2]=='1' : null,
+            volte_disabled:v ? v[1]=='1' : null,ims_pdn_cid:pdn ? +pdn[1] : null,
+            ims_pdn_active:pdn_active,
+            mbn_profile:profile};
+    }
+    if (action == 'call_dial' || action == 'call_answer' || action == 'call_hangup') {
+        if (!voice_ready()) return error('AUDIO_NOT_READY','模块双向音频路由尚未就绪');
+        let current=at(session,'AT+CLCC',5);
+        if (!current.ok) return error('CALL_STATUS','无法确认当前电话状态');
+        let status=call_status(current.data);
+        if (action == 'call_dial') {
+            if (!match(param,/^\+?[0-9]{3,15}$/)) return error('NUMBER','电话号码格式不正确');
+            if (status.count) return error('CALL_BUSY','已有通话，不能重复拨号');
+            let result=at(session,'ATD'+param+';',12);
+            if (!result.ok) return error('DIAL_FAILED','模块未接受拨号');
+            writefile('/tmp/kk-car-voice-outgoing-pending','1');
+            return {ok:true,accepted:true};
+        }
+        if (action == 'call_answer') {
+            if (status.direction!='incoming' || status.count<1) return error('NO_INCOMING','当前没有待接来电');
+            let result=at(session,'ATA',12);
+            if (!result.ok) return error('ANSWER_FAILED','模块未接受接听');
+            let connected=false;
+            for (let n=0; n<30; n++) {
+                let latest=at(session,'AT+CLCC',3);
+                if (latest.ok && call_status(latest.data).state=='通话中') { connected=true; break; }
+                sleep(0.1);
+            }
+            if (!connected) return error('ANSWER_FAILED','模块未确认通话接通');
+            // The notifier may sample ringing and idle without seeing the
+            // short active interval. Keep a number-free answer marker until
+            // it classifies the end of this call.
+            writefile('/tmp/kk-car-voice-answered','' + time());
+            chmod('/tmp/kk-car-voice-answered',0600);
+            if (system('/etc/kk-car/dji-voice-route.sh start >/dev/null 2>&1')!=0) {
+                at(session,'ATH',5);
+                return error('AUDIO_FAILED','已接通，但模块音频路由启动失败，已尝试挂断');
+            }
+            return {ok:true,accepted:true};
+        }
+        if (!status.count) {
+            if (stat('/tmp/kk-car-voice-ready')?.type=='file')
+                system('/etc/kk-car/dji-voice-route.sh stop >/dev/null 2>&1');
+            return {ok:true,accepted:false};
+        }
+        let result=at(session,'ATH',12);
+        if (result.ok) {
+            unlink('/tmp/kk-car-voice-outgoing-pending');
+            system('/etc/kk-car/dji-voice-route.sh stop >/dev/null 2>&1');
+        }
+        return result.ok ? {ok:true,accepted:true} : error('HANGUP_FAILED','模块未接受挂断');
     }
     if (action == 'gps_probe' || action == 'gps_start' || action == 'gps_stop') {
         let state=at(session,'AT+QGPS?',5);
@@ -474,7 +571,7 @@ function perform(session, action, param) {
 }
 
 let action = ARGV[0] || '', param = ARGV[1] || '', result = null;
-if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|voice_probe|call_status|gps_probe|gps_start|gps_stop)$/)) result = error('INPUT', '不支持的模块操作');
+if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|voice_probe|call_status|call_diag|call_dial|call_answer|call_hangup|gps_probe|gps_start|gps_stop)$/)) result = error('INPUT', '不支持的模块操作');
 else if (getenv('KK_CAR_DJI_SMS_LOCKED') != '1') {
     // The read-only AT probes use flock on this same file. Re-exec under that
     // lock so the lock is held for the full serial session and cleaned by the
@@ -483,7 +580,8 @@ else if (getenv('KK_CAR_DJI_SMS_LOCKED') != '1') {
     let safe_script = TEST ? match(script, /^\/tmp\/[A-Za-z0-9_./-]+\.uc$/) : true;
     let safe_param = action == 'send' ?
         (TEST ? match(param, /^\/tmp\/[A-Za-z0-9_./-]+$/) : param == '/tmp/kk-car-dji-sms-request-lock/request.json') :
-        (action == 'read' || action == 'delete' ? match(param, /^(0|[1-9][0-9]{0,2})$/) : param == '');
+        (action == 'read' || action == 'delete' ? match(param, /^(0|[1-9][0-9]{0,2})$/) :
+         action == 'call_dial' ? match(param,/^\+?[0-9]{3,15}$/) : param == '');
     if (!safe_script || !safe_param) result = error('INPUT', '操作参数无效');
     else {
         let p = popen('KK_CAR_DJI_SMS_LOCKED=1 flock -n ' + LOCK + ' ucode ' + script +

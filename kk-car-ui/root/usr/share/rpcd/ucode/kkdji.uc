@@ -177,6 +177,33 @@ return {'kkdji': {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
         return call_sms('call_status',null);
     }},
+    call_dial:{args:{number:''},call:function(req) {
+        if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
+        let number=req.args.number;
+        if (type(number)!='string' || !match(number,/^\+?[0-9]{3,15}$/)) return {ok:false,error:'号码格式不正确'};
+        return call_sms('call_dial',number);
+    }},
+    call_answer:{call:function() {
+        if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
+        return call_sms('call_answer',null);
+    }},
+    call_hangup:{call:function() {
+        if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
+        return call_sms('call_hangup',null);
+    }},
+    voice_ticket:{call:function() {
+        if (system('/etc/kk-car/dji-voice-health.sh >/dev/null 2>&1')!=0)
+            return {ok:false,error:'模块音频路由未就绪'};
+        let random=popen('head -c 32 /dev/urandom | hexdump -v -e \'1/1 "%02x"\'');
+        let token=random ? trim(random.read('all') || '') : '';
+        if (random) random.close();
+        if (!match(token,/^[0-9a-f]{64}$/)) return {ok:false,error:'无法创建音频会话'};
+        let path='/tmp/kk-car-voice-ticket.json';
+        if (!writefile(path,sprintf('%J',{token,expires:time()+30})))
+            return {ok:false,error:'无法创建音频会话'};
+        chmod(path,0600);
+        return {ok:true,token,expires:time()+30};
+    }},
     gps_probe:{call:function() {
         if (!state(false).capabilities.gps) return {ok:false,error:'定位接口当前不可用'};
         return call_sms('gps_probe',null);

@@ -12,6 +12,10 @@ var smsSend = rpc.declare({object:'kkdji',method:'sms_send',params:['to','text']
 var smsDelete = rpc.declare({object:'kkdji',method:'sms_delete',params:['index'],expect:{}});
 var voiceProbe = rpc.declare({object:'kkdji',method:'voice_probe',expect:{}});
 var callStatus = rpc.declare({object:'kkdji',method:'call_status',expect:{}});
+var callDial = rpc.declare({object:'kkdji',method:'call_dial',params:['number'],expect:{}});
+var callAnswer = rpc.declare({object:'kkdji',method:'call_answer',expect:{}});
+var callHangup = rpc.declare({object:'kkdji',method:'call_hangup',expect:{}});
+var voiceTicket = rpc.declare({object:'kkdji',method:'voice_ticket',expect:{}});
 var gpsProbe = rpc.declare({object:'kkdji',method:'gps_probe',expect:{}});
 var trafficStatus = rpc.declare({object:'kkdji',method:'traffic_status',expect:{}});
 var trafficSave = rpc.declare({object:'kkdji',method:'traffic_save',params:['operator','recipient','command','daily','hour'],expect:{}});
@@ -50,6 +54,14 @@ return view.extend({
         this.smsListButton=button('刷新短信',function(){self.readSmsList();});
         this.voiceProbeButton=button('检测电话能力',function(){self.checkVoice();});
         this.voiceStatus=E('p',{'class':'kk-dji-note','aria-live':'polite'},'尚未检测电话接口与音频。检测只读，不会拨号或重启模块。');
+        this.callNumber=E('input',{type:'tel',inputmode:'tel',autocomplete:'off',maxlength:16,placeholder:'输入要拨打的号码','aria-label':'拨打号码'});
+        this.callDialButton=button('拨号',function(){self.phoneDial();},'primary');
+        this.callAnswerButton=button('接听',function(){self.phoneAnswer();},'primary');
+        this.callHangupButton=button('挂断',function(){self.phoneHangup();},'danger');
+        this.httpsPhoneButton=button('用 HTTPS 打开电话',function(){window.location.href='https://'+window.location.host+window.location.pathname;});
+        this.httpsPhoneButton.hidden=window.isSecureContext===true;
+        this.callDialButton.disabled=this.callAnswerButton.disabled=this.callHangupButton.disabled=true;
+        this.voiceReady=false;this.voiceBusy=false;this.currentCall=null;this.audioSocket=null;
         this.trafficOperator=E('select',{'aria-label':'运营商',change:function(){self.trafficPreset();}},[
             E('option',{value:'CT'},'中国电信'),E('option',{value:'CMCC'},'中国移动'),E('option',{value:'CU'},'中国联通')]);
         this.trafficRecipient=E('input',{type:'text',inputmode:'numeric',maxlength:6,'aria-label':'短信查询号码'});
@@ -143,10 +155,10 @@ return view.extend({
                     ]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-sms-note'},'等待检测短信能力。')
                 ],'kk-dji-sms-card'),
-                card('网页电话','当前模块通话条件检查与接听方案。',[
+                card('网页电话','通话控制与浏览器音频处于实机测试阶段；接通后的稳定性和双向声音尚未通过验收。',[
                     E('div',{'class':'kk-dji-call-state'},[E('strong',{id:'kk-dji-call-title'},'尚未验证双向音频'),E('span',{id:'kk-dji-call-subtitle'},'网页拨号暂不开放')]),
-                    E('div',{'class':'kk-dji-actions'},[this.voiceProbeButton]),this.voiceStatus,
-                    E('p',{'class':'kk-dji-note'},'未来可在设备具备通话控制和 USB 双向音频后，以浏览器响铃通知来电、点击接听/挂断；浏览器麦克风需要 HTTPS 和授权。')
+                    E('div',{'class':'kk-dji-phone-controls'},[this.callNumber,this.callDialButton,this.callAnswerButton,this.callHangupButton,this.voiceProbeButton,this.httpsPhoneButton]),this.voiceStatus,
+                    E('p',{'class':'kk-dji-note'},'请从 HTTPS 管理页使用，并允许浏览器访问麦克风。当前实测通话会在约 12 秒后中断，请勿把它当作可靠电话使用。')
                 ],'kk-dji-phone-card'),
                 card('定位','定位功能取决于模块固件和天线，首次锁定可能需要一段时间。',[
                     E('div',{'class':'kk-dji-rows'},[row('GPS 状态','kk-dji-gps-state'),row('定位结果','kk-dji-gps-fix'),row('经纬度','kk-dji-gps-coords'),row('速度','kk-dji-gps-speed'),row('更新时间','kk-dji-gps-time')]),
@@ -170,10 +182,11 @@ return view.extend({
         this.paint(data);
         poll.add(function(){return self.refresh(false);},5);
         poll.add(function(){return self.readSmsList(true);},30);
-        poll.add(function(){return self.readCallState();},20);
+        poll.add(function(){return self.readCallState();},3);
         poll.add(function(){return self.readGps(false);},30);
         Promise.resolve().then(function(){return self.readSmsList(true);});
         Promise.resolve().then(function(){return self.readCallState();});
+        Promise.resolve().then(function(){return self.checkVoice();});
         Promise.resolve().then(function(){return self.readGps(false);});
         return this.root;
     },
@@ -265,7 +278,7 @@ return view.extend({
         this.set('kk-dji-parity-notify',forward.enabled?'系统告警与新短信转发已接入':'系统告警已接入 · 短信转发未开启');
         this.set('kk-dji-parity-esim','当前未识别 eSIM 能力');
         this.set('kk-dji-parity-proxy','车载场景未启用');
-        this.set('kk-dji-parity-voice',this.voiceResult?.ready===true?'已验证':this.voiceResult?'控制与音频未齐备':'待检测');
+        this.set('kk-dji-parity-voice',this.voiceResult?.ready===true?'硬件就绪 · 通话待验收':this.voiceResult?'控制与音频未齐备':'待检测');
     },
     trafficPreset:function(){
         var preset={CT:['10001','108'],CMCC:['10086','CXYL'],CU:['10010','CXLLJ']}[this.trafficOperator.value];
@@ -352,9 +365,16 @@ return view.extend({
         this.callLoading=true;
         return callStatus().then(function(reply){
             if(!reply || reply.ok!==true)return;
+            self.currentCall=reply;
             var active=reply.count>0;
-            self.set('kk-dji-call-title',active?reply.state:self.voiceResult?'暂缺 USB 双向音频':'电话线路空闲');
-            self.set('kk-dji-call-subtitle',active?(reply.direction==='incoming'?'模块收到来电；目前网页不能接听':'模块存在通话；目前网页没有音频'):'自动检查于 '+ago(reply.timestamp));
+            self.set('kk-dji-call-title',active?reply.state:'电话线路空闲');
+            self.set('kk-dji-call-subtitle',active?(reply.direction==='incoming'?'SIM 收到来电':'SIM 电话正在处理'):'自动检查于 '+ago(reply.timestamp));
+            self.updatePhoneButtons();
+            if(active && reply.direction==='outgoing' && reply.state==='通话中' && reply.audio_ready===true && !self.audioSocket && !self.voiceBusy){
+                self.openPhoneAudio().then(function(){self.notify('电话已接通，浏览器音频已连接。');})
+                    .catch(function(error){self.notify(error.message || '通话音频连接失败',true);});
+            }
+            if(!active && self.audioSocket && Date.now()-(self.callStartAt || 0)>10000)self.closePhoneAudio();
         }).catch(function(){}).finally(function(){self.callLoading=false;});
     },
     checkVoice:function(){
@@ -362,16 +382,91 @@ return view.extend({
         return voiceProbe().then(function(result){
             if(!result || result.ok!==true)throw Error(result && result.error || '检测失败');
             self.voiceResult=result;
-            self.set('kk-dji-call-title',result.active_calls>0?result.call_state:result.audio_usb_present && result.usb_voice_enabled?'音频条件待验证':'暂缺 USB 双向音频');
-            self.set('kk-dji-call-subtitle','拨号与接听需模块音频、网关及 HTTPS 管理入口');
+            self.voiceReady=result.ready===true;
+            self.set('kk-dji-call-title',result.active_calls>0?result.call_state:result.ready?'电话硬件就绪':'通话条件待验证');
+            self.set('kk-dji-call-subtitle',result.ready?'接通后自动启动音频路由':'请检查模块音频资源');
             self.voiceStatus.textContent='语音 USB 位：'+(result.usb_voice_enabled===true?'开':result.usb_voice_enabled===false?'关':'未知')+
                 ' · IMS 配置：'+(result.ims_setting==null?'未知':result.ims_setting)+
                 ' · USB 声卡：'+(result.audio_usb_present?'已枚举':'未枚举')+
                 ' · 通话查询：'+(result.call_query_accepted?'有响应':'无响应')+
-                '。当前没有可用的双向音频路径，暂不开放拨号。';
-            self.set('kk-dji-parity-voice',result.ready===true?'已验证':'通话与音频条件不足');
+                (result.route_ready?' · 正在传输通话音频。':result.ready?' · 接通后启动音频路由。':' · 模块音频资源未就绪。');
+            self.set('kk-dji-parity-voice',result.ready===true?'通话硬件已就绪；待双方实测':'通话与音频条件不足');
+            self.updatePhoneButtons();
         }).catch(function(error){self.voiceStatus.textContent='电话能力检测失败：'+(error.message || '未知错误');})
             .finally(function(){self.voiceProbeButton.disabled=false;});
+    },
+    updatePhoneButtons:function(){
+        var state=this.currentCall || {}, usable=this.voiceReady && window.isSecureContext===true && !this.voiceBusy;
+        this.callDialButton.disabled=!usable || state.count>0;
+        this.callAnswerButton.disabled=!usable || state.direction!=='incoming' || state.count<1;
+        this.callHangupButton.disabled=!this.voiceReady || state.count<1;
+    },
+    openPhoneAudio:function(){
+        var self=this;
+        if(this.audioSocket && this.audioSocket.readyState===WebSocket.OPEN)return Promise.resolve();
+        if(!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.AudioWorkletNode)
+            return Promise.reject(Error('浏览器需要可信 HTTPS、麦克风权限和 AudioWorklet。'));
+        return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})
+            .then(function(stream){
+                self.audioStream=stream;
+                self.audioContext=new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+                return self.audioContext.audioWorklet.addModule(L.resource('view/kkcar/voice-worklet.js')).then(function(){
+                    self.audioNode=new AudioWorkletNode(self.audioContext,'kkcar-voice');
+                    self.audioSource=self.audioContext.createMediaStreamSource(stream);
+                    self.audioSource.connect(self.audioNode);self.audioNode.connect(self.audioContext.destination);
+                    return self.audioContext.resume();
+                });
+            }).then(function(){return voiceTicket();}).then(function(ticket){
+                if(!ticket || ticket.ok!==true)throw Error(ticket && ticket.error || '无法创建通话音频会话');
+                var local=window.location.hostname==='localhost' || window.location.hostname==='127.0.0.1';
+                var address=local?'localhost:18887':window.location.hostname+':8443';
+                return new Promise(function(resolve,reject){
+                    var ws=new WebSocket((local?'ws':'wss')+'://'+address+'/audio?ticket='+encodeURIComponent(ticket.token));
+                    var opened=false,timer=setTimeout(function(){if(!opened){ws.close();reject(Error('语音网关连接超时'));}},8000);
+                    ws.binaryType='arraybuffer';self.audioSocket=ws;
+                    ws.onopen=function(){opened=true;clearTimeout(timer);resolve();};
+                    ws.onerror=function(){if(!opened){clearTimeout(timer);reject(Error('无法连接语音网关；请检查 HTTPS 证书和服务状态'));}};
+                    ws.onclose=function(){if(opened && self.audioSocket===ws){self.closePhoneAudio();self.notify('通话音频已断开，请检查模块语音路由。',true);}};
+                    ws.onmessage=function(event){if(event.data instanceof ArrayBuffer && self.audioNode)self.audioNode.port.postMessage({down:event.data},[event.data]);};
+                    self.audioNode.port.onmessage=function(event){if(ws.readyState===WebSocket.OPEN && ws.bufferedAmount<32000)ws.send(event.data);};
+                });
+            }).catch(function(error){self.closePhoneAudio();throw error;});
+    },
+    closePhoneAudio:function(){
+        var socket=this.audioSocket;this.audioSocket=null;
+        if(socket && socket.readyState<=WebSocket.OPEN)socket.close();
+        if(this.audioStream)this.audioStream.getTracks().forEach(function(track){track.stop();});
+        this.audioStream=null;
+        if(this.audioContext)this.audioContext.close().catch(function(){});
+        this.audioContext=null;this.audioNode=null;this.audioSource=null;
+    },
+    phoneDial:function(){
+        var self=this,number=(this.callNumber.value || '').trim();
+        if(!/^\+?[0-9]{3,15}$/.test(number)){this.notify('请输入有效电话号码。',true);return;}
+        if(this.voiceBusy)return;
+        this.voiceBusy=true;this.updatePhoneButtons();
+        return callDial(number).then(function(reply){
+            if(!reply || reply.ok!==true)throw Error(reply && reply.error || '拨号失败');
+            self.callStartAt=Date.now();self.notify('已交给 SIM 拨号；对方接通后自动连接音频。');return self.readCallState();
+        }).catch(function(error){self.closePhoneAudio();self.notify(error.message || '拨号失败',true);})
+            .finally(function(){self.voiceBusy=false;self.updatePhoneButtons();});
+    },
+    phoneAnswer:function(){
+        var self=this;if(this.voiceBusy)return;
+        this.voiceBusy=true;this.updatePhoneButtons();
+        return callAnswer().then(function(reply){
+            if(!reply || reply.ok!==true)throw Error(reply && reply.error || '接听失败');
+            self.callStartAt=Date.now();return self.openPhoneAudio();
+        }).then(function(){
+            self.notify('模块已接听，网页音频已连接；请确认通话是否保持、双方能否听见。');return self.readCallState();
+        }).catch(function(error){self.closePhoneAudio();self.notify(error.message || '接听失败',true);})
+            .finally(function(){self.voiceBusy=false;self.updatePhoneButtons();});
+    },
+    phoneHangup:function(){
+        var self=this;
+        return callHangup().then(function(reply){if(!reply || reply.ok!==true)throw Error(reply && reply.error || '挂断失败');self.notify('通话已结束。');})
+            .catch(function(error){self.notify(error.message || '挂断失败',true);})
+            .finally(function(){self.closePhoneAudio();self.readCallState();});
     },
     readSmsList:function(background){
         var self=this;

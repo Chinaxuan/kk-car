@@ -65,7 +65,7 @@ send_queries() {
 }
 # The FIFO holds no reply data on disk. The watchdog also bounds an ongoing
 # stream of unsolicited modem messages, which socat -T alone cannot do.
-send_queries | socat -T 3 - "$port",raw,echo=0,b115200 > "$reply_pipe" 2>/dev/null & active=$!
+send_queries | socat -T 3 - "$port",raw,echo=0,b115200,hupcl=0 > "$reply_pipe" 2>/dev/null & active=$!
 (
     delay=
     trap '[ -z "$delay" ] || kill "$delay" 2>/dev/null; exit 0' TERM INT

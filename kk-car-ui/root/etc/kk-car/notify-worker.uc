@@ -27,6 +27,25 @@ try {
         if(request && request.revision<=c.revision) {unlink('/tmp/kk-car-notify-test.json');if(request.revision==c.revision) {enqueue('test','测试推送：KK-Car 飞书通知已接通');s.retry_at=0;}}
         let bus=connect(), d=bus.call('kkcar','status');
         if(d && d.timestamp) {
+            // The modem call query omits caller numbers. Only state changes
+            // enter the Feishu queue; no AT output or contacts are logged.
+            if(c.events?.incoming_call || c.events?.missed_call) {
+                let call=bus.call('kkdji','call_status');
+                if(call?.ok) {
+                    let answer_file='/tmp/kk-car-voice-answered';
+                    let answered=+(readfile(answer_file) || '0');
+                    if(answered && (answered>time() || time()-answered>120)) {unlink(answer_file);answered=0;}
+                    let ringing=call.direction=='incoming' &&
+                        (call.state=='来电振铃' || call.state=='来电等待');
+                    let active=call.count>0 && call.state=='通话中';
+                    if(ringing && !s.call?.ringing && !s.call?.active)
+                        enqueue('incoming_call','DJI SIM 正在来电，请打开 KK-Car 管理页查看');
+                    if(!ringing && !active && s.call?.ringing && !answered)
+                        enqueue('missed_call','DJI SIM 有未接来电');
+                    if(!ringing && !active && answered)unlink(answer_file);
+                    s.call={ringing,active,at:time()};
+                }
+            }
             let ap=bus.call('hostapd.phy0-ap0','get_clients'), clients=null;
             if(ap && type(ap.clients)=='object') {
                 clients={};let names={};for(let p in d.peers || []) names[lc(p.mac)]=substr(replace(p.name || '设备',/[[:cntrl:]]/g,''),0,48);
