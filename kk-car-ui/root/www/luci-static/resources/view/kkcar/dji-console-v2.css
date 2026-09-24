@@ -126,3 +126,15 @@
 .kk-dji-phone-controls{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin:.7rem 0}
 .kk-dji-phone-controls input{min-width:11rem;max-width:16rem;flex:1 1 11rem;background:#101d2b;color:#f4f8ff;border:1px solid #33495f;border-radius:.55rem;padding:.62rem .78rem;font:inherit}
 .kk-dji-phone-controls input:focus{outline:2px solid #4ecfc0;outline-offset:1px}
+
+/* Keep the main tasks reachable without hiding the live network data. */
+.kk-dji-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:12px}
+.kk-dji-shortcuts a{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;min-height:48px;padding:9px 13px;border:1px solid #375266;border-radius:9px;background:#192b3a;color:#b9ccda!important;text-decoration:none!important;transition:background .15s,border-color .15s}
+.kk-dji-shortcuts a:hover{background:#213b49;border-color:#5d9ca5}
+.kk-dji-shortcuts a:focus-visible{outline:2px solid #81e7db;outline-offset:2px}
+.kk-dji-shortcuts span{font-size:11px;white-space:nowrap}
+.kk-dji-shortcuts strong{min-width:0;color:#a9e9de;font-size:13px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kk-dji-shortcuts strong[data-tone=poor],.kk-dji-shortcuts strong[data-tone=active]{color:#f0b783}
+.kk-dji-card[id]{scroll-margin-top:16px}
+@media(max-width:900px){.kk-dji-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.kk-dji-shortcuts a{padding:8px 10px;min-height:45px}.kk-dji-shortcuts span{font-size:10px}.kk-dji-shortcuts strong{font-size:11px}}

@@ -30,7 +30,7 @@ function clock(value) { var n=Number(value); return n>0 && isFinite(n) ? new Dat
 function ago(value) { var n=Number(value); if(!(n>0))return '尚未读取'; var s=Math.max(0,Math.floor(Date.now()/1000-n)); return s<60?s+' 秒前':s<3600?Math.floor(s/60)+' 分钟前':Math.floor(s/3600)+' 小时前'; }
 function duration(value) { var n=Number(value); if(!isFinite(n) || n<0 || value==null)return '—'; return n>=3600?Math.floor(n/3600)+' 小时 '+Math.floor(n%3600/60)+' 分钟':Math.floor(n/60)+' 分 '+Math.floor(n%60)+' 秒'; }
 function row(label,id){return E('div',{'class':'kk-dji-row'},[E('span',{},label),E('strong',{id:id},'—')]);}
-function card(title,desc,body,extra){return E('section',{'class':'kk-dji-card'+(extra?' '+extra:'')},[E('div',{'class':'kk-dji-card-head'},[E('h2',{},title),desc?E('p',{},desc):''])].concat(body));}
+function card(title,desc,body,extra,id){var attrs={'class':'kk-dji-card'+(extra?' '+extra:'')};if(id)attrs.id=id;return E('section',attrs,[E('div',{'class':'kk-dji-card-head'},[E('h2',{},title),desc?E('p',{},desc):''])].concat(body));}
 function button(label,handler,extra){return E('button',{type:'button','class':'kk-button '+(extra || ''),click:handler},label);}
 function simLabel(value){return ({ready:'可用',absent:'未插入 SIM',pin_required:'需要 PIN',puk_required:'需要 PUK',blocked:'已锁定'})[value] || '未检测';}
 function registerLabel(value){return ({registered:'已注册',searching:'正在搜索',not_registered:'未注册','not-registered':'未注册',denied:'注册被拒'})[value] || '未检测';}
@@ -46,7 +46,7 @@ return view.extend({
     render:function(data){
         var self=this;
         document.title='KK-Car · DJI 4G';
-        ['overview','dji-console-v2'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')}));});
+        ['overview','dji-console-v2'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')+(name==='dji-console-v2'?'?v=20260925-1':'')}));});
         this.notice=E('div',{'class':'kk-notice',role:'status','aria-live':'polite',hidden:true});
         this.summary=E('strong',{id:'kk-dji-summary'},'读取中');
         this.refreshButton=button('刷新状态',function(){self.refresh(true);});
@@ -58,10 +58,12 @@ return view.extend({
         this.callDialButton=button('拨号',function(){self.phoneDial();},'primary');
         this.callAnswerButton=button('接听',function(){self.phoneAnswer();},'primary');
         this.callHangupButton=button('挂断',function(){self.phoneHangup();},'danger');
+        this.callAudioButton=button('连接网页音频',function(){self.reconnectPhoneAudio();});
+        this.callAudioButton.hidden=true;
         this.httpsPhoneButton=button('用 HTTPS 打开电话',function(){window.location.href='https://'+window.location.host+window.location.pathname;});
         this.httpsPhoneButton.hidden=window.isSecureContext===true;
         this.callDialButton.disabled=this.callAnswerButton.disabled=this.callHangupButton.disabled=true;
-        this.voiceReady=false;this.voiceBusy=false;this.currentCall=null;this.audioSocket=null;
+        this.voiceReady=false;this.voiceBusy=false;this.currentCall=null;this.audioSocket=null;this.outgoingAudioPending=false;
         this.trafficOperator=E('select',{'aria-label':'运营商',change:function(){self.trafficPreset();}},[
             E('option',{value:'CT'},'中国电信'),E('option',{value:'CMCC'},'中国移动'),E('option',{value:'CU'},'中国联通')]);
         this.trafficRecipient=E('input',{type:'text',inputmode:'numeric',maxlength:6,'aria-label':'短信查询号码'});
@@ -105,6 +107,12 @@ return view.extend({
                     E('div',{},[E('span',{},'当前上网出口'),E('strong',{id:'kk-dji-uplink'},'—')])
                 ])
             ]),
+            E('nav',{'class':'kk-dji-shortcuts','aria-label':'DJI 功能快捷入口'},[
+                E('a',{href:'#kk-dji-phone-section'},[E('span',{},'网页电话'),E('strong',{id:'kk-dji-shortcut-call'},'检测中')]),
+                E('a',{href:'#kk-dji-sms-section'},[E('span',{},'短信中心'),E('strong',{id:'kk-dji-shortcut-sms'},'读取中')]),
+                E('a',{href:'#kk-dji-signal-section'},[E('span',{},'无线信号'),E('strong',{id:'kk-dji-shortcut-signal'},'读取中')]),
+                E('a',{href:'#kk-dji-traffic-section'},[E('span',{},'套餐剩余'),E('strong',{id:'kk-dji-shortcut-traffic'},'读取中')])
+            ]),
             E('div',{'class':'kk-dji-grid'},[
                 card('无线信号','经验参考阈值；通话和网络稳定性仍要看延迟、丢包与切换。',[
                     E('div',{'class':'kk-dji-signals'},[
@@ -115,7 +123,7 @@ return view.extend({
                     ]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-signal-time'},'尚未读取信号'),
                     E('p',{'class':'kk-dji-note'},'RSRP、RSRQ 和 SINR 优先判断；RSSI 包含干扰与噪声，不能单独代表网速。')
-                ]),
+                ],null,'kk-dji-signal-section'),
                 card('连接详情','有线出口优先时，DJI 可保持在线备用。',[
                     E('div',{'class':'kk-dji-rows'},[
                         row('运营商','kk-dji-operator'),row('网络制式','kk-dji-technology'),row('频段 / 信道','kk-dji-cell'),
@@ -142,7 +150,7 @@ return view.extend({
                     ]),
                     E('div',{'class':'kk-dji-actions'},[this.trafficSaveButton,this.trafficQueryButton]),
                     E('p',{'class':'kk-dji-note'},'默认电信 10001 / 108；移动与联通指令可能因省份和套餐不同，请先核对本卡。短信可能产生费用。运营商已用/剩余是最近回复；估算值再叠加本设备后续流量，不包含其他设备耗用。')
-                ],'kk-dji-traffic-card'),
+                ],'kk-dji-traffic-card','kk-dji-traffic-section'),
                 card('短信中心','原件优先存在 SIM；树莓派连接时加密归档到 SD 卡。',[
                     E('div',{'class':'kk-dji-actions'},[this.smsListButton,E('span',{id:'kk-dji-sms-count','class':'kk-muted'},'尚未读取')]),
                     E('p',{'class':'kk-dji-note'},'打开页面即读取目录，之后定时更新；长短信合并显示。读取详情可能标为已读，不会自动删除。'),
@@ -154,24 +162,24 @@ return view.extend({
                         ])
                     ]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-sms-note'},'等待检测短信能力。')
-                ],'kk-dji-sms-card'),
+                ],'kk-dji-sms-card','kk-dji-sms-section'),
                 card('网页电话','本机已完成一次双向声音短测；长期和移动中的通话稳定性仍需观察。',[
                     E('div',{'class':'kk-dji-call-state'},[E('strong',{id:'kk-dji-call-title'},'尚未验证双向音频'),E('span',{id:'kk-dji-call-subtitle'},'网页拨号暂不开放')]),
-                    E('div',{'class':'kk-dji-phone-controls'},[this.callNumber,this.callDialButton,this.callAnswerButton,this.callHangupButton,this.voiceProbeButton,this.httpsPhoneButton]),this.voiceStatus,
+                    E('div',{'class':'kk-dji-phone-controls'},[this.callNumber,this.callDialButton,this.callAnswerButton,this.callHangupButton,this.callAudioButton,this.voiceProbeButton,this.httpsPhoneButton]),this.voiceStatus,
                     E('p',{'class':'kk-dji-note'},'请从 HTTPS 管理页使用，并允许浏览器访问麦克风。一次 15–30 秒双向通话已通过；长期稳定性尚未验收，请勿用于紧急联络。')
-                ],'kk-dji-phone-card'),
+                ],'kk-dji-phone-card','kk-dji-phone-section'),
                 card('定位','定位功能取决于模块固件和天线，首次锁定可能需要一段时间。',[
                     E('div',{'class':'kk-dji-rows'},[row('GPS 状态','kk-dji-gps-state'),row('定位结果','kk-dji-gps-fix'),row('经纬度','kk-dji-gps-coords'),row('速度','kk-dji-gps-speed'),row('更新时间','kk-dji-gps-time')]),
                     E('div',{'class':'kk-dji-actions'},[this.gpsStartButton,this.gpsStopButton,this.gpsProbeButton]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-gps-note'},'尚未检测定位能力。')
                 ]),
-                card('VoHive 能力对照','按这只模块和车载路由用途核对，不把未经验证的功能伪装成可用按钮。',[
+                card('功能状态','按这台模块的实测结果显示，未验证的功能暂不开放。',[
                     E('div',{'class':'kk-dji-rows'},[
                         row('设备、网络与信号','kk-dji-parity-device'),row('短信目录与详情','kk-dji-parity-sms'),
                         row('网络重连','kk-dji-parity-reconnect'),row('飞书通知','kk-dji-parity-notify'),
                         row('eSIM / 多卡','kk-dji-parity-esim'),row('代理池 / VoWiFi','kk-dji-parity-proxy'),row('SIM 电话 / 音频','kk-dji-parity-voice')
                     ]),
-                    E('p',{'class':'kk-dji-note'},'VoHive 是运行在 Linux 主机上的软件；此页运行在树莓派，不需要电脑常驻。')
+                    E('p',{'class':'kk-dji-note'},'控制服务运行在树莓派上，不需要电脑常驻。')
                 ]),
                 card('使用说明','当前控制的是插在树莓派上的 DJI 模块。',[
                     E('p',{'class':'kk-dji-note'},'公网出口、VPN 与分流状态请看网络面板。短信和位置仅在当前管理会话中显示，不保存在浏览器。'),
@@ -221,6 +229,8 @@ return view.extend({
         this.set('kk-dji-rsrp',metric(rsrp,' dBm'));
         this.set('kk-dji-rsrq',metric(rsrq,' dB'));
         this.set('kk-dji-sinr',metric(sinr,' dB',1));
+        this.set('kk-dji-shortcut-signal',stale?'数据过期':'SINR '+metric(sinr,' dB',1));
+        this.el('kk-dji-shortcut-signal').dataset.tone=stale?'unknown':signalTone(sinr,20,10,3);
         this.set('kk-dji-rssi',metric(rssi,' dBm'));
         [['rsrp',rsrp,-85,-95,-105],['rsrq',rsrq,-10,-15,-20],['sinr',sinr,20,10,3],['rssi',rssi,-70,-80,-90]].forEach(function(item){
             this.el('kk-dji-'+item[0]).dataset.tone=stale?'unknown':signalTone(item[1],item[2],item[3],item[4]);
@@ -254,6 +264,7 @@ return view.extend({
         if(used!=null && capacity!=null){
             this.el('kk-dji-sms-count').textContent=smsPlace+' '+used+' / '+capacity+(Number(used)>=Number(capacity)?' · 已满':'');
             this.el('kk-dji-sms-count').className=Number(used)>=Number(capacity)?'kk-dji-full':'kk-muted';
+            this.set('kk-dji-shortcut-sms',Number(used)>=Number(capacity)?'存储已满':used+' / '+capacity);
         }
         var forward=extra.sms_forward || {};
         this.el('kk-dji-sms-note').textContent=!smsReadAvailable&&!smsSendAvailable?'当前固件或控制服务未开放短信功能。':
@@ -293,6 +304,7 @@ return view.extend({
         }
         var a=t.anchor || null,day=t.day || {},month=t.month || {},total=t.total || {};
         this.set('kk-dji-balance',a?size(t.estimated_remaining):null);
+        this.set('kk-dji-shortcut-traffic',a?size(t.estimated_remaining):'未校正');
         this.set('kk-dji-balance-time',a?'校正于 '+a.time:'尚无可识别的运营商回复');
         this.set('kk-dji-day',t.timestamp?size(Number(day.rx || 0)+Number(day.tx || 0)):null);
         this.set('kk-dji-month',t.timestamp?size(Number(month.rx || 0)+Number(month.tx || 0)):null);
@@ -361,7 +373,7 @@ return view.extend({
     },
     readCallState:function(){
         var self=this;
-        if(!this.capabilities || this.capabilities.sms_read!==true || this.callLoading)return;
+        if(!this.capabilities || this.callLoading)return;
         this.callLoading=true;
         return callStatus().then(function(reply){
             if(!reply || reply.ok!==true)return;
@@ -369,12 +381,17 @@ return view.extend({
             var active=reply.count>0;
             self.set('kk-dji-call-title',active?reply.state:'电话线路空闲');
             self.set('kk-dji-call-subtitle',active?(reply.direction==='incoming'?'SIM 收到来电':'SIM 电话正在处理'):'自动检查于 '+ago(reply.timestamp));
+            self.set('kk-dji-shortcut-call',active?reply.state:'线路空闲');
+            self.el('kk-dji-shortcut-call').dataset.tone=active?'active':'idle';
             self.updatePhoneButtons();
-            if(active && reply.direction==='outgoing' && reply.state==='通话中' && reply.audio_ready===true && !self.audioSocket && !self.voiceBusy){
-                self.openPhoneAudio().then(function(){self.notify('电话已接通，浏览器音频已连接。');})
-                    .catch(function(error){self.notify(error.message || '通话音频连接失败',true);});
+            if(active && self.outgoingAudioPending && reply.direction==='outgoing' && reply.state==='通话中' && reply.audio_ready===true && !self.audioSocket && !self.voiceBusy){
+                self.outgoingAudioPending=false;
+                self.reconnectPhoneAudio();
             }
-            if(!active && self.audioSocket && Date.now()-(self.callStartAt || 0)>10000)self.closePhoneAudio();
+            if(!active){
+                self.outgoingAudioPending=false;
+                if(self.audioSocket && Date.now()-(self.callStartAt || 0)>10000)self.closePhoneAudio();
+            }
         }).catch(function(){}).finally(function(){self.callLoading=false;});
     },
     checkVoice:function(){
@@ -401,6 +418,17 @@ return view.extend({
         this.callAnswerButton.disabled=!usable || state.direction!=='incoming' || state.count<1 ||
             (state.state!=='来电振铃' && state.state!=='来电等待');
         this.callHangupButton.disabled=!this.voiceReady || state.count<1;
+        this.callAudioButton.hidden=!(state.count>0 && state.state==='通话中' && state.audio_ready===true &&
+            (!this.audioSocket || this.audioSocket.readyState!==WebSocket.OPEN));
+        this.callAudioButton.disabled=!usable;
+    },
+    reconnectPhoneAudio:function(){
+        var self=this;
+        if(this.voiceBusy || !this.currentCall || this.currentCall.state!=='通话中' || this.currentCall.audio_ready!==true)return;
+        this.voiceBusy=true;this.updatePhoneButtons();
+        return this.openPhoneAudio().then(function(){self.notify('网页音频已连接，可以继续通话。');})
+            .catch(function(error){self.notify(error.message || '网页音频连接失败',true);})
+            .finally(function(){self.voiceBusy=false;self.updatePhoneButtons();});
     },
     openPhoneAudio:function(){
         var self=this;
@@ -425,9 +453,9 @@ return view.extend({
                     var ws=new WebSocket((local?'ws':'wss')+'://'+address+'/audio?ticket='+encodeURIComponent(ticket.token));
                     var opened=false,timer=setTimeout(function(){if(!opened){ws.close();reject(Error('语音网关连接超时'));}},8000);
                     ws.binaryType='arraybuffer';self.audioSocket=ws;
-                    ws.onopen=function(){opened=true;clearTimeout(timer);resolve();};
+                    ws.onopen=function(){opened=true;clearTimeout(timer);self.updatePhoneButtons();resolve();};
                     ws.onerror=function(){if(!opened){clearTimeout(timer);reject(Error('无法连接语音网关；请检查 HTTPS 证书和服务状态'));}};
-                    ws.onclose=function(){if(opened && self.audioSocket===ws){self.closePhoneAudio();self.notify('通话音频已断开，请检查模块语音路由。',true);}};
+                    ws.onclose=function(){if(opened && self.audioSocket===ws){self.closePhoneAudio();self.notify('网页音频已断开；如果通话仍在进行，请点击“连接网页音频”。',true);}};
                     ws.onmessage=function(event){if(event.data instanceof ArrayBuffer && self.audioNode)self.audioNode.port.postMessage({down:event.data},[event.data]);};
                     self.audioNode.port.onmessage=function(event){if(ws.readyState===WebSocket.OPEN && ws.bufferedAmount<32000)ws.send(event.data);};
                 });
@@ -440,6 +468,7 @@ return view.extend({
         this.audioStream=null;
         if(this.audioContext)this.audioContext.close().catch(function(){});
         this.audioContext=null;this.audioNode=null;this.audioSource=null;
+        this.updatePhoneButtons();
     },
     phoneDial:function(){
         var self=this,number=(this.callNumber.value || '').trim();
@@ -448,7 +477,8 @@ return view.extend({
         this.voiceBusy=true;this.updatePhoneButtons();
         return callDial(number).then(function(reply){
             if(!reply || reply.ok!==true)throw Error(reply && reply.error || '拨号失败');
-            self.callStartAt=Date.now();self.notify('已交给 SIM 拨号；对方接通后自动连接音频。');return self.readCallState();
+            self.callStartAt=Date.now();self.outgoingAudioPending=true;
+            self.notify('已交给 SIM 拨号；对方接通后自动连接音频。');return self.readCallState();
         }).catch(function(error){self.closePhoneAudio();self.notify(error.message || '拨号失败',true);})
             .finally(function(){self.voiceBusy=false;self.updatePhoneButtons();});
     },
@@ -467,7 +497,7 @@ return view.extend({
         var self=this;
         return callHangup().then(function(reply){if(!reply || reply.ok!==true)throw Error(reply && reply.error || '挂断失败');self.notify('通话已结束。');})
             .catch(function(error){self.notify(error.message || '挂断失败',true);})
-            .finally(function(){self.closePhoneAudio();self.readCallState();});
+            .finally(function(){self.outgoingAudioPending=false;self.closePhoneAudio();self.readCallState();});
     },
     readSmsList:function(background){
         var self=this;
@@ -487,6 +517,7 @@ return view.extend({
             });
             var unread=self.smsItems.filter(function(x){return x.status==='未读';}).length;
             self.el('kk-dji-sms-count').textContent=messages.length+' 条短信'+(unread?' · '+unread+' 条未读':'')+' / '+reply.count+' 个存储槽';
+            self.set('kk-dji-shortcut-sms',unread?unread+' 条未读':messages.length+' 条短信');
             self.renderSmsItems();
         }).catch(function(err){if(!background || !self.smsItems.length)self.smsListArea.textContent='短信目录读取失败：'+(err.message || '未知错误');}).finally(function(){self.smsLoading=false;self.smsListButton.disabled=false;});
     },
