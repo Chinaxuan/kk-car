@@ -13,6 +13,8 @@
           "sms_list",
           "sms_read",
           "voice_probe",
+          "call_status",
+          "gps_probe",
           "traffic_status"
         ]
       }

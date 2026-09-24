@@ -90,6 +90,13 @@
 .kk-dji-card-head h2{font-size:16px!important;letter-spacing:-.01em}
 .kk-dji-signals>div{min-height:74px;background:#182330;border-color:#344656}
 .kk-dji-signals strong{font-size:24px}
+.kk-dji-signals>div{min-height:92px}
+.kk-dji-signals small{line-height:1.35;white-space:normal}
+.kk-dji-signals strong[data-tone=good]{color:#79e0bf!important}
+.kk-dji-signals strong[data-tone=usable]{color:#a7cbff!important}
+.kk-dji-signals strong[data-tone=weak]{color:#f0bf75!important}
+.kk-dji-signals strong[data-tone=poor]{color:#f18e8e!important}
+.kk-dji-signals strong[data-tone=unknown]{color:#96a8b8!important}
 .kk-dji-row{border-color:#304051}
 .kk-dji-row strong{font-variant-numeric:tabular-nums}
 .kk-dji-traffic-card{grid-column:1/-1;border-color:#466866;background:linear-gradient(100deg,#1a3038 0%,#1b2939 55%,#1b2634 100%)}

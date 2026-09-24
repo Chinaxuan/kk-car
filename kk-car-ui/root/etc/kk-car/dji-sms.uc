@@ -5,8 +5,10 @@
 import { access, chmod, glob, mkdir, open, popen, readfile, rmdir, stat, unlink, writefile } from 'fs';
 
 const TEST = getenv('KK_CAR_SMS_TEST') == '1';
-const LOCK = '/tmp/kk-car-dji-at.lock';
-const WORK = '/tmp/kk-car-dji-sms';
+const LOCK = TEST ? '/tmp/kk-car-dji-at-test.lock' : '/tmp/kk-car-dji-at.lock';
+const TEST_WORK = getenv('KK_CAR_SMS_TEST_WORK') || '';
+if (TEST && !match(TEST_WORK, /^\/tmp\/kk-car-sms-fixture\.[A-Za-z0-9]+\/work$/)) exit(2);
+const WORK = TEST ? TEST_WORK : '/tmp/kk-car-dji-sms';
 const OUT = WORK + '/response';
 const FIFO = WORK + '/input';
 const PID = WORK + '/pid';
@@ -321,6 +323,23 @@ function load_request(path) {
     try { let value = json(readfile(path) || ''); return type(value) == 'object' ? value : null; }
     catch (e) { return null; }
 }
+function call_status(raw) {
+    let state='idle',direction=null,count=0;
+    for (let line in split(raw || '',/\r?\n/)) {
+        let call=match(line,/^\+CLCC:\s*[0-9]+,([01]),([0-5]),([0-2]),[01]/);
+        if (!call) continue;
+        // This QDC507 firmware reports two active mode=1 data sessions in
+        // CLCC. Count only mode=0 voice calls, never data bearers as calls.
+        if (call[3]!='0') continue;
+        count++;
+        let names=['通话中','保持中','正在拨号','对方振铃','来电振铃','来电等待'];
+        if (state=='idle' || +call[2]>=4) {
+            state=names[+call[2]];
+            direction=call[1]=='1'?'incoming':'outgoing';
+        }
+    }
+    return {ok:true,state,direction,count,timestamp:time()};
+}
 function perform(session, action, param) {
     if (action == 'storage_probe') {
         let response=at(session,'AT+CPMS=?',5);
@@ -348,10 +367,55 @@ function perform(session, action, param) {
                 trim(readfile(parent+'/idProduct') || '')=='0125' &&
                 trim(readfile(entry+'/bInterfaceClass') || '')=='01') audio=true;
         }
+        // CLCC exposes phone numbers; return only the call direction and state.
+        let current=call_status(calls.ok ? calls.data : '');
         return {ok:true,usb_voice_enabled:voice ? voice[1]=='1' : null,
             ims_setting:ims_value ? +ims_value[1] : null,
             call_query_accepted:calls.ok,audio_usb_present:audio,
+            call_state:current.state,call_direction:current.direction,active_calls:current.count,
             ready:false,reason:'通话需运营商 IMS 注册及双向音频；只读检测不等于可用'};
+    }
+    if (action == 'call_status') {
+        let calls=at(session,'AT+CLCC',5);
+        return calls.ok ? call_status(calls.data) : error('CALL_STATUS','通话状态暂不可读');
+    }
+    if (action == 'gps_probe' || action == 'gps_start' || action == 'gps_stop') {
+        let state=at(session,'AT+QGPS?',5);
+        let mode=state.ok ? match(state.data,/\+QGPS:\s*([01])\r?\n/) : null;
+        if (!mode) return error('GPS_UNSUPPORTED','模块未返回定位状态');
+        let enabled=mode[1]=='1';
+        if (action == 'gps_start' && !enabled) {
+            let started=at(session,'AT+QGPS=1',8);
+            if (!started.ok) return error('GPS_START','模块未能启动定位');
+            enabled=true;
+        }
+        if (action == 'gps_stop' && enabled) {
+            let stopped=at(session,'AT+QGPSEND',8);
+            if (!stopped.ok) return error('GPS_STOP','模块未能停止定位');
+            enabled=false;
+        }
+        let result={ok:true,supported:true,enabled,fix:false,lat:null,lon:null,
+            speed_kmh:null,hdop:null,satellites:null,updated_at:time()};
+        if (!enabled) return result;
+        let position=at(session,'AT+QGPSLOC=2',5);
+        if (!position.ok) return result;
+        let line=match(position.data,/\+QGPSLOC:\s*([^\r\n]+)/);
+        if (!line) return result;
+        let fields=split(line[1],',');
+        if (length(fields)!=11) return result;
+        let lat=+fields[1],lon=+fields[2],hdop=+fields[3],fix=+fields[5],
+            speed=+fields[7],satellites=+fields[10];
+        if (!match(fields[1],/^-?[0-9]+\.[0-9]+$/) ||
+            !match(fields[2],/^-?[0-9]+\.[0-9]+$/) ||
+            !match(fields[3],/^[0-9]+(\.[0-9]+)?$/) ||
+            !match(fields[7],/^[0-9]+(\.[0-9]+)?$/) ||
+            !match(fields[10],/^[0-9]+$/) ||
+            lat < -90 || lat > 90 || lon < -180 || lon > 180 ||
+            hdop < 0 || hdop > 100 || speed < 0 || speed > 2000 ||
+            satellites < 0 || satellites > 99 || (fix!=2 && fix!=3)) return result;
+        result.fix=true;result.lat=lat;result.lon=lon;result.hdop=hdop;
+        result.speed_kmh=speed;result.satellites=satellites;
+        return result;
     }
     let format = at(session, 'AT+CMGF?', 5);
     if (!format.ok) return format;
@@ -410,7 +474,7 @@ function perform(session, action, param) {
 }
 
 let action = ARGV[0] || '', param = ARGV[1] || '', result = null;
-if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|voice_probe)$/)) result = error('INPUT', '不支持的短信操作');
+if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|voice_probe|call_status|gps_probe|gps_start|gps_stop)$/)) result = error('INPUT', '不支持的模块操作');
 else if (getenv('KK_CAR_DJI_SMS_LOCKED') != '1') {
     // The read-only AT probes use flock on this same file. Re-exec under that
     // lock so the lock is held for the full serial session and cleaned by the

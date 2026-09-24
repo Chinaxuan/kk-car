@@ -89,7 +89,8 @@ function state(auto_refresh) {
             band:info.band || null,channel:info.channel || null,
             rsrp:available ? value(modem.rsrp) : null,
             rsrq:available ? value(modem.rsrq) : null,
-            sinr:available ? value(modem.snr) : null,
+            sinr:available ? value(info.sinr_db) : null,
+            snr:available ? value(modem.snr) : null,
             rssi:available ? value(modem.rssi) : null,
             neighbours:info.neighbours || {intra_count:null,inter_count:null,best_rsrp_dbm:null}},
         session:{connected:available ? modem.connected == true : false,
@@ -102,7 +103,9 @@ function state(auto_refresh) {
         capabilities:{refresh:available && access('/etc/kk-car/dji-control.sh'),
             reconnect:available && qmi && access('/etc/kk-car/dji-control.sh'),
             sms_read:sms,sms_send:sms,sms_delete:sms,
-            gps:false,gps_start:false,gps_stop:false},
+            gps:available && sms && type(info.gps_enabled) == 'bool',
+            gps_start:available && sms && info.gps_enabled == false,
+            gps_stop:available && sms && info.gps_enabled == true},
         sms:{storage:storage.storage || null,used:value(storage.used),
             capacity:value(storage.total),full:storage.full == true,
             updated_at:storage.timestamp || null},
@@ -115,6 +118,16 @@ function state(auto_refresh) {
     };
 }
 function start_action(kind) {
+    if (kind == 'gps_start' || kind == 'gps_stop') {
+        let s=state(false);
+        if (!s.available || !s.capabilities.gps) return {ok:false,error:'定位接口当前不可用'};
+        let result=call_sms(kind,null);
+        if (result.ok) {
+            // Refresh the cached state; GPS commands never restart the network.
+            system('/etc/kk-car/dji-control.sh refresh </dev/null >/dev/null 2>&1 &');
+        }
+        return result;
+    }
     if (kind != 'refresh' && kind != 'reconnect') return {ok:false,error:'不支持的操作'};
     let s=state(false);
     if (!s.available) return {ok:false,error:'DJI 模块当前不可用'};
@@ -159,6 +172,14 @@ return {'kkdji': {
     voice_probe:{call:function() {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
         return call_sms('voice_probe',null);
+    }},
+    call_status:{call:function() {
+        if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};
+        return call_sms('call_status',null);
+    }},
+    gps_probe:{call:function() {
+        if (!state(false).capabilities.gps) return {ok:false,error:'定位接口当前不可用'};
+        return call_sms('gps_probe',null);
     }},
     sms_read:{args:{index:''},call:function(req) {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'短信功能不可用'};
