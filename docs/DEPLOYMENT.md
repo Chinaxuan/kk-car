@@ -83,7 +83,7 @@
 
 增量更新 `dji-sms.uc`、`dji-at-status.sh`、`notify-config.uc`、`notify-worker.uc`、`notify-watch.sh`、`kkdji.uc`、ACL、DJI 页面、`notifications.js` 和 `voice-worklet.js`。语音运行时脚本为 `dji-voice-*`、`module-voice-*` 及两个 `kk-car-voice-*` init 服务。`voice-gateway/` 需自行编译 Linux arm64 可执行文件；运行时驱动、音频辅助程序、设备 HTTPS 私钥均**不在公开仓库**。只在来源、哈希、模块内核版本和证书信任逐项核对后启用实验服务，细节见 [电话验证与限制](VOICE-CALLS.md)。
 
-配置飞书来电/未接事件与推送地址时，先保存并回读开关；通知服务此后约每 5 秒采样，地址仍只保留在设备私有配置。更新实验电话不需要重启 network、Wi-Fi、DHCP、VPN 或整机。部署后读回原蜂窝 WAN、VPN、Wi-Fi、短信和通知服务，再用真实来电分别验证提醒和声音。当前设备的通话约 12 秒中断、双方无声，因此电话仅为试验功能，不能把硬件检测成功写成通话验收成功。
+配置飞书来电/未接事件与推送地址时，先保存并回读开关；通知服务此后约每 5 秒采样，地址仍只保留在设备私有配置。更新电话组件不需要重启 network、Wi-Fi、DHCP、VPN 或整机。部署后读回原蜂窝 WAN、VPN、Wi-Fi、短信和通知服务，再用真实来电分别验证提醒和声音。2026-09-25 已有一次 15–30 秒、双方有声的网页来电短测；新设备仍须重新实测，不能把硬件检测成功当成通话验收成功。
 
 
 ## HDMI 本地状态屏

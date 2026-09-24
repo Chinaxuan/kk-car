@@ -155,10 +155,10 @@ return view.extend({
                     ]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-sms-note'},'等待检测短信能力。')
                 ],'kk-dji-sms-card'),
-                card('网页电话','通话控制与浏览器音频处于实机测试阶段；接通后的稳定性和双向声音尚未通过验收。',[
+                card('网页电话','本机已完成一次双向声音短测；长期和移动中的通话稳定性仍需观察。',[
                     E('div',{'class':'kk-dji-call-state'},[E('strong',{id:'kk-dji-call-title'},'尚未验证双向音频'),E('span',{id:'kk-dji-call-subtitle'},'网页拨号暂不开放')]),
                     E('div',{'class':'kk-dji-phone-controls'},[this.callNumber,this.callDialButton,this.callAnswerButton,this.callHangupButton,this.voiceProbeButton,this.httpsPhoneButton]),this.voiceStatus,
-                    E('p',{'class':'kk-dji-note'},'请从 HTTPS 管理页使用，并允许浏览器访问麦克风。当前实测通话会在约 12 秒后中断，请勿把它当作可靠电话使用。')
+                    E('p',{'class':'kk-dji-note'},'请从 HTTPS 管理页使用，并允许浏览器访问麦克风。一次 15–30 秒双向通话已通过；长期稳定性尚未验收，请勿用于紧急联络。')
                 ],'kk-dji-phone-card'),
                 card('定位','定位功能取决于模块固件和天线，首次锁定可能需要一段时间。',[
                     E('div',{'class':'kk-dji-rows'},[row('GPS 状态','kk-dji-gps-state'),row('定位结果','kk-dji-gps-fix'),row('经纬度','kk-dji-gps-coords'),row('速度','kk-dji-gps-speed'),row('更新时间','kk-dji-gps-time')]),
@@ -278,7 +278,7 @@ return view.extend({
         this.set('kk-dji-parity-notify',forward.enabled?'系统告警与新短信转发已接入':'系统告警已接入 · 短信转发未开启');
         this.set('kk-dji-parity-esim','当前未识别 eSIM 能力');
         this.set('kk-dji-parity-proxy','车载场景未启用');
-        this.set('kk-dji-parity-voice',this.voiceResult?.ready===true?'硬件就绪 · 通话待验收':this.voiceResult?'控制与音频未齐备':'待检测');
+        this.set('kk-dji-parity-voice',this.voiceResult?.ready===true?'短时双向已通 · 长期待验收':this.voiceResult?'控制与音频未齐备':'待检测');
     },
     trafficPreset:function(){
         var preset={CT:['10001','108'],CMCC:['10086','CXYL'],CU:['10010','CXLLJ']}[this.trafficOperator.value];
@@ -390,7 +390,7 @@ return view.extend({
                 ' · USB 声卡：'+(result.audio_usb_present?'已枚举':'未枚举')+
                 ' · 通话查询：'+(result.call_query_accepted?'有响应':'无响应')+
                 (result.route_ready?' · 正在传输通话音频。':result.ready?' · 接通后启动音频路由。':' · 模块音频资源未就绪。');
-            self.set('kk-dji-parity-voice',result.ready===true?'通话硬件已就绪；待双方实测':'通话与音频条件不足');
+            self.set('kk-dji-parity-voice',result.ready===true?'短时双向已通；长期稳定性待验收':'通话与音频条件不足');
             self.updatePhoneButtons();
         }).catch(function(error){self.voiceStatus.textContent='电话能力检测失败：'+(error.message || '未知错误');})
             .finally(function(){self.voiceProbeButton.disabled=false;});
@@ -398,7 +398,8 @@ return view.extend({
     updatePhoneButtons:function(){
         var state=this.currentCall || {}, usable=this.voiceReady && window.isSecureContext===true && !this.voiceBusy;
         this.callDialButton.disabled=!usable || state.count>0;
-        this.callAnswerButton.disabled=!usable || state.direction!=='incoming' || state.count<1;
+        this.callAnswerButton.disabled=!usable || state.direction!=='incoming' || state.count<1 ||
+            (state.state!=='来电振铃' && state.state!=='来电等待');
         this.callHangupButton.disabled=!this.voiceReady || state.count<1;
     },
     openPhoneAudio:function(){

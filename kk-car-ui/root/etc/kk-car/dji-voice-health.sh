@@ -9,5 +9,17 @@ if [ "${1:-active}" = prepared ]; then
     test "$result" = ready
     exit
 fi
-result=$(adb -d shell 'test "$(cat /sys/class/android_usb/f_audio/audio_enable 2>/dev/null)" = 1 && grep -q "^state: RUNNING" /proc/asound/card0/pcm4p/sub0/status && grep -q "^state: RUNNING" /proc/asound/card0/pcm4c/sub0/status && ps | grep -q "[m]avo-pcm-bridge.armv7 --voice-route-session" && echo ready' 2>/dev/null | tr -d '\r')
+result=$(adb -d shell '
+    file=/run/kkcar-voice-route.pid
+    test -s "$file" || exit 1
+    read pid expected < "$file" || exit 1
+    case "$pid:$expected" in *[!0-9:]*|:*|*:) exit 1;; esac
+    test "$(cut -d " " -f 22 "/proc/$pid/stat" 2>/dev/null)" = "$expected" || exit 1
+    test "$(tr "\000" "\n" < "/proc/$pid/cmdline" 2>/dev/null | sed -n "1p")" = /tmp/kkcar-voice/mavo-pcm-bridge.armv7 || exit 1
+    tr "\000" "\n" < "/proc/$pid/cmdline" 2>/dev/null | grep -qx -- --voice-route-session || exit 1
+    grep -q "VoLTE route session active on hw:0,4" /run/kkcar-voice-route.log || exit 1
+    test "$(cat /sys/class/android_usb/f_audio/audio_enable 2>/dev/null)" = 1 || exit 1
+    grep -q "^state: RUNNING" /proc/asound/card0/pcm4p/sub0/status || exit 1
+    grep -q "^state: RUNNING" /proc/asound/card0/pcm4c/sub0/status || exit 1
+    echo ready' 2>/dev/null | tr -d '\r')
 test "$result" = ready

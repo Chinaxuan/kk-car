@@ -153,20 +153,51 @@ func audio(conn net.Conn, rw *bufio.ReadWriter) {
 		_ = send(8, nil)
 		return
 	}
-	defer func() { _ = speaker.Close(); _ = playback.Process.Kill(); _ = playback.Wait() }()
 	if err := capture.Start(); err != nil {
 		log.Printf("capture start: %v", err)
+		_ = speaker.Close()
+		_ = playback.Process.Kill()
+		_ = playback.Wait()
 		_ = send(8, nil)
 		return
 	}
-	defer func() { _ = capture.Process.Kill(); _ = capture.Wait() }()
-	done := make(chan struct{})
+	// Keep the module's UAC output clock running even while the browser is
+	// opening its microphone or briefly stops sending. MaVo's CoreAudio output
+	// callback does the same: it supplies silence when its uplink queue is empty.
+	uplink := make(chan []byte, 12)
+	stopPlayback := make(chan struct{})
+	playbackDone := make(chan struct{})
 	go func() {
-		defer close(done)
+		defer close(playbackDone)
+		pace := time.NewTicker(20 * time.Millisecond)
+		defer pace.Stop()
+		silence := make([]byte, 320)
+		for {
+			select {
+			case <-stopPlayback:
+				return
+			case <-pace.C:
+				frame := silence
+				select {
+				case frame = <-uplink:
+				default:
+				}
+				if _, err := speaker.Write(frame); err != nil {
+					log.Printf("playback write: %v", err)
+					_ = conn.Close()
+					return
+				}
+			}
+		}
+	}()
+	captureDone := make(chan struct{})
+	go func() {
+		defer close(captureDone)
 		frame := make([]byte, 320)
 		for {
 			if _, err := io.ReadFull(mic, frame); err != nil {
 				log.Printf("capture read: %v", err)
+				_ = conn.Close()
 				return
 			}
 			if send(2, frame) != nil {
@@ -196,13 +227,30 @@ func audio(conn net.Conn, rw *bufio.ReadWriter) {
 			log.Printf("invalid audio frame: opcode=%d bytes=%d", op, len(payload))
 			break
 		}
-		if _, err = speaker.Write(payload); err != nil {
-			log.Printf("playback write: %v", err)
-			break
+		for len(payload) >= 320 {
+			frame := append([]byte(nil), payload[:320]...)
+			select {
+			case uplink <- frame:
+			default:
+				// A delayed browser must not build up seconds of old speech.
+				select {
+				case <-uplink:
+				default:
+				}
+				uplink <- frame
+			}
+			payload = payload[320:]
 		}
 	}
 	_ = conn.Close()
-	<-done
+	close(stopPlayback)
+	_ = speaker.Close()
+	_ = capture.Process.Kill()
+	_ = playback.Process.Kill()
+	_ = capture.Wait()
+	_ = playback.Wait()
+	<-captureDone
+	<-playbackDone
 }
 
 func readFrame(r *bufio.Reader) (byte, []byte, error) {
