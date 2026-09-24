@@ -11,6 +11,9 @@ var smsRead = rpc.declare({object:'kkdji',method:'sms_read',params:['index'],exp
 var smsSend = rpc.declare({object:'kkdji',method:'sms_send',params:['to','text'],expect:{}});
 var smsDelete = rpc.declare({object:'kkdji',method:'sms_delete',params:['index'],expect:{}});
 var voiceProbe = rpc.declare({object:'kkdji',method:'voice_probe',expect:{}});
+var trafficStatus = rpc.declare({object:'kkdji',method:'traffic_status',expect:{}});
+var trafficSave = rpc.declare({object:'kkdji',method:'traffic_save',params:['operator','recipient','command','daily','hour'],expect:{}});
+var trafficQuery = rpc.declare({object:'kkdji',method:'traffic_query',expect:{}});
 
 function own(value, key) { return value && Object.prototype.hasOwnProperty.call(value,key) ? value[key] : null; }
 function first() { for (var i=0;i<arguments.length;i++) if (arguments[i] !== null && arguments[i] !== undefined && arguments[i] !== '') return arguments[i]; return null; }
@@ -28,18 +31,26 @@ function registerLabel(value){return ({registered:'已注册',searching:'正在�
 
 return view.extend({
     handleSaveApply:null,handleSave:null,handleReset:null,
-    load:function(){return getNetwork().then(function(network){return getDji().catch(function(){return null;}).then(function(device){return {network:network,device:device};});});},
+    load:function(){return Promise.all([getNetwork(),getDji().catch(function(){return null;}),trafficStatus().catch(function(){return null;})]).then(function(results){return {network:results[0],device:results[1],traffic:results[2]};});},
     render:function(data){
         var self=this;
         document.title='KK-Car · DJI 4G';
-        ['overview','dji'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')}));});
+        ['overview','dji-console'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')}));});
         this.notice=E('div',{'class':'kk-notice',role:'status','aria-live':'polite',hidden:true});
         this.summary=E('strong',{id:'kk-dji-summary'},'读取中');
         this.refreshButton=button('刷新状态',function(){self.refresh(true);});
         this.reconnectButton=button('重连 DJI 数据网络',function(){self.reconnect();},'primary');
-        this.smsListButton=button('读取短信列表',function(){self.readSmsList();});
+        this.smsListButton=button('刷新短信',function(){self.readSmsList();});
         this.voiceProbeButton=button('检测电话能力',function(){self.checkVoice();});
         this.voiceStatus=E('p',{'class':'kk-dji-note','aria-live':'polite'},'尚未检测电话接口与音频。检测只读，不会拨号或重启模块。');
+        this.trafficOperator=E('select',{'aria-label':'运营商',change:function(){self.trafficPreset();}},[
+            E('option',{value:'CT'},'中国电信'),E('option',{value:'CMCC'},'中国移动'),E('option',{value:'CU'},'中国联通')]);
+        this.trafficRecipient=E('input',{type:'text',inputmode:'numeric',maxlength:6,'aria-label':'短信查询号码'});
+        this.trafficCommand=E('input',{type:'text',maxlength:20,'aria-label':'短信查询指令'});
+        this.trafficDaily=E('input',{type:'checkbox','aria-label':'每天自动查询'});
+        this.trafficHour=E('select',{'aria-label':'每天查询时间'},Array.from({length:24},function(_,i){return E('option',{value:String(i)},String(i).padStart(2,'0')+':00');}));
+        this.trafficSaveButton=button('保存查询设置',function(){self.saveTraffic();});
+        this.trafficQueryButton=button('现在查询并校正',function(){self.queryTraffic();},'primary');
         this.smsSearch=E('input',{type:'search','class':'kk-dji-sms-search',placeholder:'搜索号码、时间或状态',autocomplete:'off',input:function(){self.renderSmsItems();}});
         this.smsDetailMeta=E('div',{'class':'kk-dji-sms-detail-meta'},'选择左侧短信查看正文');
         this.smsDetailBody=E('div',{'class':'kk-dji-sms-detail-body','aria-live':'polite'},'正文只在你点击短信后读取，不保存在浏览器。');
@@ -55,7 +66,7 @@ return view.extend({
             E('label',{for:'kk-dji-sms-text'},'短信内容'),this.text,
             E('div',{'class':'kk-dji-actions'},[E('span',{'class':'kk-muted'},'单条 UCS2 最多 70 字，不支持 emoji；发送可能产生费用。'),E('button',{type:'submit','class':'kk-button primary'},'发送短信')])
         ]);
-        this.smsListArea=E('div',{'class':'kk-dji-sms-list','aria-live':'polite'},'尚未读取短信。');
+        this.smsListArea=E('div',{'class':'kk-dji-sms-list','aria-live':'polite'},'正在自动读取短信…');
         this.smsItems=[];this.selectedSmsIndex=null;
         this.root=E('div',{'class':'kk-app kk-studio kk-dji'},[
             E('header',{'class':'kk-header'},[
@@ -92,13 +103,26 @@ return view.extend({
                 ]),
                 card('模块与维护','重连会短暂中断 DJI 蜂窝连接。',[
                     E('div',{'class':'kk-dji-rows'},[row('模块型号','kk-dji-model'),row('固件版本','kk-dji-firmware'),row('模块温度','kk-dji-temperature'),row('控制接口','kk-dji-control'),row('能力状态','kk-dji-ability')]),
-                    E('div',{'class':'kk-dji-actions'},[this.reconnectButton,this.voiceProbeButton]),
-                    this.voiceStatus,
+                    E('div',{'class':'kk-dji-actions'},[this.reconnectButton]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-maintenance-note'},'设备操作会按模块实际能力开放。')
                 ]),
+                card('套餐与流量','运营商短信校正套餐口径；网卡计数单独累计。',[
+                    E('div',{'class':'kk-dji-traffic-highlights'},[
+                        E('div',{},[E('span',{},'套餐剩余 · 估算'),E('strong',{id:'kk-dji-balance'},'—'),E('small',{id:'kk-dji-balance-time'},'等待运营商回复')]),
+                        E('div',{},[E('span',{},'本月设备收发'),E('strong',{id:'kk-dji-month'},'—'),E('small',{},'接收 + 发送')]),
+                        E('div',{},[E('span',{},'今日设备收发'),E('strong',{id:'kk-dji-day'},'—'),E('small',{},'接收 + 发送')])
+                    ]),
+                    E('div',{'class':'kk-dji-rows'},[row('运营商最近报告已用','kk-dji-carrier-used'),row('运营商最近报告剩余','kk-dji-carrier-left'),row('设备累计接收 / 发送','kk-dji-local-total'),row('校正状态','kk-dji-traffic-state')]),
+                    E('div',{'class':'kk-dji-traffic-controls'},[
+                        E('label',{},['运营商',this.trafficOperator]),E('label',{},['查询号码',this.trafficRecipient]),E('label',{},['短信指令',this.trafficCommand]),
+                        E('label',{'class':'kk-dji-check'},[this.trafficDaily,'每天校正']),E('label',{},['查询时间',this.trafficHour])
+                    ]),
+                    E('div',{'class':'kk-dji-actions'},[this.trafficSaveButton,this.trafficQueryButton]),
+                    E('p',{'class':'kk-dji-note'},'默认电信 10001 / 108；移动与联通指令可能因省份和套餐不同，请先核对本卡。短信可能产生费用。运营商已用/剩余是最近回复；估算值再叠加本设备后续流量，不包含其他设备耗用。')
+                ],'kk-dji-traffic-card'),
                 card('短信中心','原件优先存在 SIM；树莓派连接时加密归档到 SD 卡。',[
                     E('div',{'class':'kk-dji-actions'},[this.smsListButton,E('span',{id:'kk-dji-sms-count','class':'kk-muted'},'尚未读取')]),
-                    E('p',{'class':'kk-dji-note'},'当前使用 SIM 短信仓；长短信在页面合并显示。读取详情可能标为已读，不会自动删除。'),
+                    E('p',{'class':'kk-dji-note'},'打开页面即读取目录，之后定时更新；长短信合并显示。读取详情可能标为已读，不会自动删除。'),
                     E('div',{'class':'kk-dji-sms-workspace'},[
                         E('div',{'class':'kk-dji-sms-inbox'},[this.smsSearch,this.smsListArea]),
                         E('div',{'class':'kk-dji-sms-detail'},[
@@ -108,6 +132,11 @@ return view.extend({
                     ]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-sms-note'},'等待检测短信能力。')
                 ],'kk-dji-sms-card'),
+                card('网页电话','当前模块通话条件检查与接听方案。',[
+                    E('div',{'class':'kk-dji-call-state'},[E('strong',{id:'kk-dji-call-title'},'尚未验证双向音频'),E('span',{id:'kk-dji-call-subtitle'},'网页拨号暂不开放')]),
+                    E('div',{'class':'kk-dji-actions'},[this.voiceProbeButton]),this.voiceStatus,
+                    E('p',{'class':'kk-dji-note'},'未来可在设备具备通话控制和 USB 双向音频后，以浏览器响铃通知来电、点击接听/挂断；浏览器麦克风需要 HTTPS 和授权。')
+                ],'kk-dji-phone-card'),
                 card('定位','定位功能取决于模块固件和天线，首次锁定可能需要一段时间。',[
                     E('div',{'class':'kk-dji-rows'},[row('GPS 状态','kk-dji-gps-state'),row('定位结果','kk-dji-gps-fix'),row('经纬度','kk-dji-gps-coords'),row('速度','kk-dji-gps-speed'),row('更新时间','kk-dji-gps-time')]),
                     E('div',{'class':'kk-dji-actions'},[this.gpsStartButton,this.gpsStopButton]),
@@ -129,6 +158,8 @@ return view.extend({
         ]);
         this.paint(data);
         poll.add(function(){return self.refresh(false);},5);
+        poll.add(function(){return self.readSmsList(true);},60);
+        Promise.resolve().then(function(){return self.readSmsList(true);});
         return this.root;
     },
     el:function(id){return this.root.querySelector('#'+id);},
@@ -148,6 +179,8 @@ return view.extend({
             connected=first(session.connected,modem.connected), active=(base.uplink || {}).active || '',
             rsrp=first(radio.rsrp,modem.rsrp),rsrq=first(radio.rsrq,modem.rsrq),sinr=first(radio.sinr,radio.snr,modem.snr);
         this.device=extra;this.capabilities=caps;this.lastNetwork=base;
+        if(data.traffic)this.lastTraffic=data.traffic;
+        this.paintTraffic(data.traffic || this.lastTraffic);
         this.el('kk-dji-update').textContent=stale?'状态已过期':'更新于 '+ago(stamp);
         this.summary.textContent=!available?'模块未连通':stale?'等候新状态':connected===true?'DJI 蜂窝已连接':'DJI 蜂窝未连接';
         this.summary.dataset.tone=!available||stale?'warning':connected?'good':'neutral';
@@ -212,12 +245,53 @@ return view.extend({
         this.set('kk-dji-parity-proxy','车载场景未启用');
         this.set('kk-dji-parity-voice',this.voiceResult?.ready===true?'已验证':this.voiceResult?'控制与音频未齐备':'待检测');
     },
+    trafficPreset:function(){
+        var preset={CT:['10001','108'],CMCC:['10086','CXYL'],CU:['10010','CXLLJ']}[this.trafficOperator.value];
+        if(preset){this.trafficRecipient.value=preset[0];this.trafficCommand.value=preset[1];}
+    },
+    paintTraffic:function(reply){
+        var t=reply && reply.ok===true ? reply.data || {} : {},c=t.config || {};
+        if(!this.trafficLoaded){
+            this.trafficOperator.value=c.operator || 'CT';this.trafficRecipient.value=c.recipient || '10001';
+            this.trafficCommand.value=c.command || '108';this.trafficDaily.checked=c.daily===true;
+            this.trafficHour.value=String(c.hour==null?9:c.hour);this.trafficLoaded=true;
+        }
+        var a=t.anchor || null,day=t.day || {},month=t.month || {},total=t.total || {};
+        this.set('kk-dji-balance',a?size(t.estimated_remaining):null);
+        this.set('kk-dji-balance-time',a?'校正于 '+a.time:'尚无可识别的运营商回复');
+        this.set('kk-dji-day',t.timestamp?size(Number(day.rx || 0)+Number(day.tx || 0)):null);
+        this.set('kk-dji-month',t.timestamp?size(Number(month.rx || 0)+Number(month.tx || 0)):null);
+        this.set('kk-dji-carrier-used',a?size(a.used_bytes):null);
+        this.set('kk-dji-carrier-left',a?size(a.remaining_bytes):null);
+        this.set('kk-dji-local-total',t.timestamp?size(total.rx)+' / '+size(total.tx):null);
+        this.set('kk-dji-traffic-state',t.parse_error || (t.pending?'等待运营商回复':a?'已按 '+a.package+' 校正':'尚未校正'));
+        this.trafficQueryButton.disabled=!this.capabilities || this.capabilities.sms_send!==true;
+    },
+    saveTraffic:function(){
+        var self=this,operator=this.trafficOperator.value,recipient=this.trafficRecipient.value.trim(),command=this.trafficCommand.value.trim();
+        if(!/^\d{3,6}$/.test(recipient)||!/^[A-Za-z0-9]{1,20}$/.test(command)){this.notify('请检查查询号码和指令。',true);return;}
+        this.trafficSaveButton.disabled=true;
+        return trafficSave(operator,recipient,command,this.trafficDaily.checked,Number(this.trafficHour.value))
+            .then(function(r){if(!r||r.ok!==true)throw Error(r && r.error || '保存失败');self.notify('流量查询设置已保存。');return self.refresh(false);})
+            .catch(function(e){self.notify(e.message || '保存失败',true);})
+            .finally(function(){self.trafficSaveButton.disabled=false;});
+    },
+    queryTraffic:function(){
+        var self=this;
+        if(!window.confirm('向当前保存的运营商号码发送一次流量查询短信？回复到达后自动校正。'))return;
+        this.trafficQueryButton.disabled=true;
+        return trafficQuery().then(function(r){
+            if(!r || r.ok!==true)throw Error(r && r.error || '短信查询失败');
+            self.notify('查询短信已提交；收到可识别的回复后会自动校正。');return self.refresh(false);
+        }).catch(function(e){self.notify(e.message || '查询失败',true);})
+            .finally(function(){self.trafficQueryButton.disabled=false;});
+    },
     perform:function(kind,message){
         var self=this;
         if((kind==='reconnect' && this.capabilities.reconnect!==true) || (kind==='gps_start' && this.capabilities.gps_start!==true) || (kind==='gps_stop' && this.capabilities.gps_stop!==true))return;
         if(this.operating)return;
         this.operating=true;this.reconnectButton.disabled=this.gpsStartButton.disabled=this.gpsStopButton.disabled=true;
-        return djiAction(kind).then(function(reply){if(reply.ok===false)throw Error(reply.error || '操作失败');self.notify(message);return self.refresh(false);}).catch(function(err){self.notify(err.message || '模块操作失败',true);}).finally(function(){self.operating=false;self.paint({network:self.lastNetwork || {},device:self.device || {}});});
+        return djiAction(kind).then(function(reply){if(reply.ok===false)throw Error(reply.error || '操作失败');self.notify(message);return self.refresh(false);}).catch(function(err){self.notify(err.message || '模块操作失败',true);}).finally(function(){self.operating=false;self.paint({network:self.lastNetwork || {},device:self.device || {},traffic:self.lastTraffic});});
     },
     reconnect:function(){
         if(this.capabilities.reconnect!==true)return;
@@ -229,6 +303,8 @@ return view.extend({
         return voiceProbe().then(function(result){
             if(!result || result.ok!==true)throw Error(result && result.error || '检测失败');
             self.voiceResult=result;
+            self.set('kk-dji-call-title',result.audio_usb_present && result.usb_voice_enabled?'音频条件待验证':'暂缺 USB 双向音频');
+            self.set('kk-dji-call-subtitle','拨号与接听需模块音频、网关及 HTTPS 管理入口');
             self.voiceStatus.textContent='语音 USB 位：'+(result.usb_voice_enabled===true?'开':result.usb_voice_enabled===false?'关':'未知')+
                 ' · IMS 配置：'+(result.ims_setting==null?'未知':result.ims_setting)+
                 ' · USB 声卡：'+(result.audio_usb_present?'已枚举':'未枚举')+
@@ -238,18 +314,22 @@ return view.extend({
         }).catch(function(error){self.voiceStatus.textContent='电话能力检测失败：'+(error.message || '未知错误');})
             .finally(function(){self.voiceProbeButton.disabled=false;});
     },
-    readSmsList:function(){
+    readSmsList:function(background){
         var self=this;
         if(!(this.capabilities.sms_read===true || this.capabilities.sms_list===true))return;
         if(this.smsLoading)return;
-        this.smsLoading=true;this.smsListButton.disabled=true;this.smsListArea.textContent='正在读取短信目录…';
+        this.smsLoading=true;this.smsListButton.disabled=true;
+        if(!background || !this.smsItems.length)this.smsListArea.textContent='正在读取短信目录…';
         return smsList().then(function(reply){
             if(!reply || reply.ok!==true || !Array.isArray(reply.messages))throw Error((reply && reply.error) || '模块未返回短信目录');
             var messages=Array.isArray(reply.groups)?reply.groups:reply.messages;
-            self.clearSmsDetail();self.smsItems=messages;
+            var selected=self.smsItems.find(function(x){return Number(x.index)===self.selectedSmsIndex;});
+            var still=selected && messages.some(function(x){return Number(x.index)===self.selectedSmsIndex && x.from===selected.from && x.time===selected.time;});
+            if(!still)self.clearSmsDetail();
+            self.smsItems=messages;
             self.el('kk-dji-sms-count').textContent=messages.length+' 条会话 / '+reply.count+' 个存储槽';
             self.renderSmsItems();
-        }).catch(function(err){self.smsListArea.textContent='短信目录读取失败：'+(err.message || '未知错误');}).finally(function(){self.smsLoading=false;self.smsListButton.disabled=false;});
+        }).catch(function(err){if(!background || !self.smsItems.length)self.smsListArea.textContent='短信目录读取失败：'+(err.message || '未知错误');}).finally(function(){self.smsLoading=false;self.smsListButton.disabled=false;});
     },
     renderSmsItems:function(){
         var self=this,query=(this.smsSearch.value || '').trim().toLowerCase();
@@ -318,7 +398,7 @@ return view.extend({
         if(!window.confirm('确认永久删除这条短信的 '+parts.length+' 个片段？删除后无法恢复。'))return;
         this.smsDeleteButton.disabled=true;
         var removed=0,work=Promise.resolve();
-        parts.forEach(function(part){work=work.then(function(){return smsDelete(String(part)).then(function(reply){if(!reply || reply.ok!==true)throw Error((reply && reply.error) || '模块未确认删除');removed++;});});});
+        parts.sort(function(a,b){return b-a;}).forEach(function(part){work=work.then(function(){return smsDelete(String(part)).then(function(reply){if(!reply || reply.ok!==true)throw Error((reply && reply.error) || '模块未确认删除');removed++;});});});
         return work.then(function(){
             self.clearSmsDetail();
             self.notify('短信已从模块删除。');

@@ -23,6 +23,12 @@ function call_sms(kind, index) {
         return type(result) == 'object' && type(result.ok) == 'bool' ? result : {ok:false,error:'短信服务返回异常'};
     } catch (e) { return {ok:false,error:'短信服务返回异常'}; }
 }
+function call_traffic(kind) {
+    let p=popen('flock /tmp/kk-car-dji-traffic.lock /usr/bin/ucode /etc/kk-car/dji-traffic.uc '+kind+' 2>/dev/null');
+    if (!p) return {ok:false,error:'流量服务暂不可用'};
+    let output=p.read('all'); p.close();
+    try { return json(output || '{}'); } catch(e) { return {ok:false,error:'流量服务返回异常'}; }
+}
 function save_storage(result) {
     if (!result.ok || result.used == null || result.total == null) return;
     let data={timestamp:time(),storage:result.storage || 'ME',used:+result.used,
@@ -126,6 +132,25 @@ function start_action(kind) {
 
 return {'kkdji': {
     status:{call:function() { return state(true); }},
+    traffic_status:{call:function() {
+        let data=filejson('/tmp/kk-car-dji-traffic.json');
+        return data.timestamp ? {ok:true,data} : {ok:false,error:'流量统计尚未采样'};
+    }},
+    traffic_save:{args:{operator:'',recipient:'',command:'',daily:false,hour:9},call:function(req) {
+        let a=req.args;
+        if (a.operator!='CT' && a.operator!='CMCC' && a.operator!='CU') return {ok:false,error:'请选择运营商'};
+        if (type(a.recipient)!='string' || !match(a.recipient,/^[0-9]{3,6}$/) ||
+            type(a.command)!='string' || !match(a.command,/^[A-Za-z0-9]{1,20}$/) ||
+            type(a.daily)!='bool' || type(a.hour)!='int' || a.hour<0 || a.hour>23)
+            return {ok:false,error:'查询号码、指令或时间格式不正确'};
+        let path='/etc/kk-car/private/dji-traffic-config.json', temp=path+'.new';
+        if (!writefile(temp,sprintf('%J',{operator:a.operator,recipient:a.recipient,
+            command:a.command,daily:a.daily,hour:a.hour}))) return {ok:false,error:'无法保存设置'};
+        chmod(temp,0600);
+        if (!rename(temp,path)) return {ok:false,error:'无法保存设置'};
+        return {ok:true};
+    }},
+    traffic_query:{call:function() { return call_traffic('query'); }},
     action:{args:{action:''},call:function(req) {return start_action(req.args.action);}},
     sms_list:{call:function() {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'短信功能不可用'};

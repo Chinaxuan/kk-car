@@ -11,7 +11,9 @@
         "kkdji": [
           "status",
           "sms_list",
-          "sms_read"
+          "sms_read",
+          "voice_probe",
+          "traffic_status"
         ]
       }
     },
@@ -30,7 +32,9 @@
         "kkdji": [
           "action",
           "sms_send",
-          "sms_delete"
+          "sms_delete",
+          "traffic_save",
+          "traffic_query"
         ]
       }
     }

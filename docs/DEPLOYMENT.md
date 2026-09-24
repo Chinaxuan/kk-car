@@ -124,8 +124,8 @@
 
 ## DJI 独立控制页增量部署
 
-先安装并核对 `root/etc/kk-car/dji-at-status.sh`、`dji-sms.uc` 和 `dji-control.sh`，再放 `root/usr/share/rpcd/ucode/kkdji.uc`、ACL、LuCI 菜单和前端 `dji.js`/`dji.css`。脚本中除 `dji-sms.uc` 外的两个 `.sh` 设为 0755；rpcd ucode 与前端 0644。依赖设备已有的 `ucode`、`socat`、`flock`、QMI 和 LuCI/rpcd ucode。部署前将现有菜单与 ACL 复制到设备私有备份；不要把真实设备配置或短信带入仓库。
+先安装并核对 `root/etc/kk-car/dji-at-status.sh`、`dji-sms.uc`、`dji-control.sh`、`dji-traffic.uc` 与 `dji-traffic-parse.uc`，再放 `root/usr/share/rpcd/ucode/kkdji.uc`、ACL、LuCI 菜单和前端 `dji-console.js`/`dji-console.css`。两个可执行 `.sh` 设为 0755；rpcd ucode、流量 ucode 与前端 0644。`dji-sms-forward-watch.sh` 负责约 30 秒一次的流量采样；更新后只重启该服务。依赖设备已有的 `ucode`、`socat`、`flock`、QMI 和 LuCI/rpcd ucode。部署前将现有菜单与 ACL 复制到设备私有备份；不要把真实设备配置、流量校正数字或短信带入仓库。
 
-增量更新仅需重新加载 rpcd，再用已登录会话打开 `/cgi-bin/luci/admin/kkcar_dji`。如果菜单缓存未刷新，检查 LuCI 资源版本并重新载入页面。把新增脚本、RPC、ACL、菜单、前端资源加入设备 `/etc/sysupgrade.conf`，以便系统升级后保留。**这一页的安装不要求重启 `network`、Wi-Fi、DHCP、VPN 或树莓派。**
+增量更新仅需重新加载 rpcd 与短信/流量后台服务，再用已登录会话打开 `/cgi-bin/luci/admin/kkcar_dji`。rpcd 重启可能使旧 LuCI 会话失效，重新登录即可。如果菜单缓存未刷新，清除 LuCI 菜单缓存再打开页面。新前端采用 `dji-console` 资源名，避免旧浏览器资源缓存。把新前端资源加入设备 `/etc/sysupgrade.conf`；`/etc/kk-car/` 原已整体保留。**这一页的安装不要求重启 `network`、Wi-Fi、DHCP、VPN 或树莓派。**
 
-验收顺序是：先检查原首页、Wi-Fi、VPN 与当前出口；再用 `ubus call kkdji status` 查 QMI、AT 和短信仓统计；最后用浏览器检查新页面的实机数据。实际短信目录会影响未读标志，因此仅在管理员主动点击时读取；发送、删除与重新连接均需要真实业务意图和可恢复网络条件，不属于部署时的自动健康检查。定位天线未验证时不启用 GNSS。操作解释见 [DJI 模块控制](DJI-CONTROL.md)。
+验收顺序是：先检查原首页、Wi-Fi、VPN 与当前出口；再用 `ubus call kkdji status`、`ubus call kkdji traffic_status` 查 QMI、AT、短信仓和设备流量；最后用浏览器检查新页面的实机数据及短信目录自动读取。目录读取可能改变未读标志；正文仍要点击会话才读取。每天查询依保存的运营商、号码、指令和时间运行；部署当天若已经手动查过，应先记录当天已查询，避免立刻重复发送。发送、删除与重新连接需真实业务意图。定位天线未验证时不启用 GNSS。操作解释见 [DJI 模块控制](DJI-CONTROL.md)。
