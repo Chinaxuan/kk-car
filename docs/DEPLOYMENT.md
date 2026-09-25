@@ -64,10 +64,13 @@
 | `kk-car-auto-check` | 每 10 分钟执行六项网络检查，与手动检查互斥 |
 | `kk-car-notify` | 事件推送、限频队列与开关机通知 |
 | `kk-car-dji-sms-forward` | DJI 新短信轮询、飞书正文转发、SD 卡公钥加密归档 |
+| `kk-car-epaper` | 2.7 英寸 V2 电子纸状态屏与四个 GPIO 按键；需单独安装 Python/GPIO/SPI 依赖并启用 SPI |
 
 首次部署需要按依赖启用相应服务。备份清单应覆盖 `/etc/kk-car/`、对应 init.d 与启动链接、热插拔文件、nftables、strongSwan 行为配置、LuCI 前端/菜单和 rpcd 后台/ACL。
 
 仓库没有经空白 SD 卡完整重装验证，不能把这些步骤视作已验收的一键安装器。
+
+电子纸 HAT 的软件依赖、`/boot/config.txt` 修改、四键映射及回退步骤见 [电子纸与四键](EPAPER.md)。这是可选的增量设备功能；不能把复制文件当作 SPI 已启用或实体屏幕已验收。
 
 ## 增量部署飞书推送
 
