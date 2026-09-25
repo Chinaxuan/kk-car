@@ -242,3 +242,36 @@ html:has(.kk-studio),body:has(.kk-studio){background:oklch(18% .022 255);color:o
 .kk-app .kk-power>a{margin-left:auto;color:var(--warn);font-weight:700;white-space:nowrap}
 @media(max-width:900px){.kk-app .kk-header:has(.kk-global-nav){flex-wrap:wrap}.kk-app .kk-global-nav{width:100%;overflow-x:auto;scrollbar-width:thin}.kk-app .kk-global-nav>a{min-height:35px}.kk-console .kk-header>.kk-actions{margin-left:auto}}
 @media(max-width:680px){.kk-app .kk-global-nav{order:9;margin-left:0}.kk-app .kk-global-nav>span{display:none}.kk-app .kk-power{flex-wrap:wrap}.kk-app .kk-power>a{margin-left:0}}
+
+/* One vehicle dashboard: live essentials above three independently scaled lanes. */
+.kk-studio .kk-path-link{color:inherit;text-decoration:none;border-radius:7px;padding:4px 6px;margin:-4px -6px;transition:background .15s}
+.kk-studio .kk-path-link:hover,.kk-studio .kk-path-link:focus-visible{background:oklch(32% .04 255);outline:1px solid var(--line)}
+.kk-studio .kk-history-toolbar{display:block;margin:0 0 6px}
+.kk-studio .kk-traffic-numbers{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin:0}
+.kk-studio .kk-traffic-numbers>div.kk-kpi{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;min-height:68px;gap:2px;padding:8px 10px;border:1px solid oklch(37% .035 255);border-radius:8px;background:oklch(27% .03 255);border-top:2px solid var(--accent)}
+.kk-studio .kk-kpi-down{--accent:#60d3ff}.kk-studio .kk-kpi-up{--accent:#ffad73}.kk-studio .kk-kpi-latency{--accent:#d3a6ff}.kk-studio .kk-kpi-loss{--accent:#ff788c}.kk-studio .kk-kpi-signal{--accent:#ade37b}.kk-studio .kk-kpi-sinr{--accent:#80dfc9}.kk-studio .kk-kpi-battery{--accent:#ffd978}.kk-studio .kk-kpi-voltage{--accent:#e8c990}
+.kk-studio .kk-traffic-numbers .kk-kpi-label{font-size:10px;color:oklch(77% .025 255);line-height:1.15;white-space:nowrap}
+.kk-studio .kk-traffic-numbers .kk-kpi-value{display:flex;align-items:baseline;gap:4px;min-width:0;line-height:1.1}
+.kk-studio .kk-traffic-numbers .kk-kpi-value strong{font-size:20px;line-height:1.1;font-weight:750;letter-spacing:-.5px;color:var(--accent);font-variant-numeric:tabular-nums}
+.kk-studio .kk-traffic-numbers .kk-kpi-value strong[data-tone=warning]{color:#ff788c}
+.kk-studio .kk-traffic-numbers .kk-kpi-value small{font-size:10px;color:oklch(74% .025 255)}
+.kk-studio .kk-traffic-numbers .kk-kpi-hint{font-size:9px;color:oklch(69% .025 255);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;line-height:1.2}
+.kk-studio .kk-ping-strip{display:flex;gap:18px;padding:4px 2px;margin:0;border-bottom:0}
+.kk-studio .kk-ping-strip .kk-data-row{display:flex;gap:6px;align-items:baseline;flex-direction:row}
+.kk-studio .kk-ping-strip .kk-data-row[hidden]{display:none}
+.kk-studio .kk-chart-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px 12px;margin:3px 0 5px}
+.kk-studio .kk-chart-heading strong{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.kk-studio .kk-chart-heading .kk-legend-rx{color:#60d3ff}.kk-studio .kk-chart-heading .kk-legend-tx{color:#ffad73}.kk-studio .kk-chart-heading .kk-legend-latency{color:#d3a6ff}.kk-studio .kk-chart-heading .kk-legend-signal{color:#ade37b}.kk-studio .kk-chart-heading .kk-legend-loss{color:#ff788c;font-size:11px}
+.kk-studio .kk-chart-heading .kk-legend-loss:before{content:'';display:inline-block;height:10px;margin-right:5px;vertical-align:-1px;border-left:3px solid currentColor}
+.kk-studio #kk-graph-scale{color:oklch(75% .025 255);font-size:9px}
+.kk-studio .kk-history-ranges{margin-left:auto;order:3}
+.kk-studio .kk-combined-chart{height:178px;min-height:178px}
+.kk-studio .kk-area-rx{fill:#60d3ff;fill-opacity:.1}
+.kk-studio .kk-line-rx{stroke:#60d3ff}.kk-studio .kk-line-tx{stroke:#ffad73}.kk-studio .kk-line-latency{stroke:#d3a6ff}.kk-studio .kk-line-signal{stroke:#ade37b;stroke-width:2.5;stroke-dasharray:none}
+.kk-studio .kk-dot-rx{fill:#60d3ff}.kk-studio .kk-dot-tx{fill:#ffad73}.kk-studio .kk-dot-latency{fill:#d3a6ff}.kk-studio .kk-dot-signal{fill:#ade37b}
+.kk-studio .kk-loss-mark{stroke:#ff788c;stroke-width:3;stroke-linecap:round}
+.kk-studio .kk-grid-line{stroke:oklch(38% .025 255)}
+.kk-studio .kk-axis-label{fill:oklch(78% .025 255);font-size:12px;font-variant-numeric:tabular-nums}
+.kk-studio .kk-chart-cursor{stroke:oklch(85% .02 255);stroke-width:1;stroke-dasharray:3 3}
+@media(max-width:1300px){.kk-studio .kk-traffic-numbers{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:680px){.kk-studio .kk-traffic-numbers{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.kk-studio .kk-traffic-numbers>div.kk-kpi{min-height:60px;padding:6px 9px}.kk-studio .kk-traffic-numbers .kk-kpi-value strong{font-size:20px}.kk-studio .kk-chart-heading .kk-history-ranges{width:100%;margin:2px 0}.kk-studio .kk-chart-heading .kk-history-ranges .kk-button{flex:1;min-width:0;padding:3px 4px;font-size:9px}.kk-studio #kk-graph-scale{font-size:9px}.kk-studio .kk-ping-strip{flex-wrap:wrap;gap:5px 14px}.kk-studio .kk-combined-chart{height:178px;min-height:178px}}
