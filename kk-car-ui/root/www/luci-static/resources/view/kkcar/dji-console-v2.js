@@ -33,6 +33,7 @@ function clock(value) { var n=Number(value); return n>0 && isFinite(n) ? new Dat
 function ago(value) { var n=Number(value); if(!(n>0))return '尚未读取'; var s=Math.max(0,Math.floor(Date.now()/1000-n)); return s<60?s+' 秒前':s<3600?Math.floor(s/60)+' 分钟前':Math.floor(s/3600)+' 小时前'; }
 function duration(value) { var n=Number(value); if(!isFinite(n) || n<0 || value==null)return '—'; return n>=3600?Math.floor(n/3600)+' 小时 '+Math.floor(n%3600/60)+' 分钟':Math.floor(n/60)+' 分 '+Math.floor(n%60)+' 秒'; }
 function row(label,id){return E('div',{'class':'kk-dji-row'},[E('span',{},label),E('strong',{id:id},'—')]);}
+function glance(label,id){return E('div',{'class':'kk-dji-glance'},[E('span',{},label),E('strong',{id:id},'—')]);}
 function card(title,desc,body,extra,id){var attrs={'class':'kk-dji-card'+(extra?' '+extra:'')};if(id)attrs.id=id;return E('section',attrs,[E('div',{'class':'kk-dji-card-head'},[E('h2',{},title),desc?E('p',{},desc):''])].concat(body));}
 function button(label,handler,extra){return E('button',{type:'button','class':'kk-button '+(extra || ''),click:handler},label);}
 function simLabel(value){return ({ready:'可用',absent:'未插入 SIM',pin_required:'需要 PIN',puk_required:'需要 PUK',blocked:'已锁定'})[value] || '未检测';}
@@ -49,7 +50,7 @@ return view.extend({
     render:function(data){
         var self=this;
         document.title='KK-Car · DJI 4G';
-        ['overview','dji-console-v2'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')+'?v=20260925-ui1'}));});
+        ['overview','dji-console-v2'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')+'?v=20260925-ui2'}));});
         this.notice=E('div',{'class':'kk-notice',role:'status','aria-live':'polite',hidden:true});
         this.summary=E('strong',{id:'kk-dji-summary'},'读取中');
         this.refreshButton=button('刷新状态',function(){self.refresh(true);});
@@ -231,6 +232,12 @@ return view.extend({
             E('section',{'class':'kk-dji-overview-block'},[E('span',{},'套餐剩余估算'),E('strong',{id:'kk-dji-overview-balance'},'—'),E('p',{id:'kk-dji-overview-traffic-note'},'等待运营商短信校正'),E('button',{type:'button',click:function(){self.showSection('traffic');}},'查看用量 →')]),
             E('section',{'class':'kk-dji-overview-block'},[E('span',{},'SIM 电话'),E('strong',{id:'kk-dji-overview-call'},'检测中'),E('p',{id:'kk-dji-overview-history'},'通话记录保存在树莓派'),E('button',{type:'button',click:function(){self.showSection('phone');}},'打开电话 →')])
         ]));
+        this.sections.overview.appendChild(E('div',{'class':'kk-dji-overview-telemetry'},[
+            E('section',{'class':'kk-dji-overview-panel'},[E('div',{'class':'kk-dji-overview-panel-head'},[E('h3',{},'实时无线质量'),E('span',{},'越接近良好阈值越稳定')]),E('div',{'class':'kk-dji-glance-grid'},[
+                glance('RSRP · 信号功率','kk-dji-glance-rsrp'),glance('RSRQ · 信号质量','kk-dji-glance-rsrq'),glance('SINR · 抗干扰','kk-dji-glance-sinr'),glance('RSSI · 总接收功率','kk-dji-glance-rssi')])]),
+            E('section',{'class':'kk-dji-overview-panel'},[E('div',{'class':'kk-dji-overview-panel-head'},[E('h3',{},'当前工作小区'),E('span',{},'详细参数由模块实时采集')]),E('div',{'class':'kk-dji-glance-grid'},[
+                glance('网络 / 频段','kk-dji-glance-band'),glance('信道 EARFCN','kk-dji-glance-earfcn'),glance('物理小区 PCI','kk-dji-glance-pci'),glance('上下行带宽','kk-dji-glance-bandwidth')])])
+        ]));
         var cards=Array.from(grid.querySelectorAll('.kk-dji-card'));
         // Card order is deliberate; the phone and SMS workspaces each own one full page.
         var destinations=['network','network','device','traffic','sms','phone','gps','device','device'];
@@ -336,13 +343,17 @@ return view.extend({
         this.set('kk-dji-session',connected===true?'已连接':connected===false?'未连接':'未检测');
         this.set('kk-dji-uplink',active==='ethernet'?'有线 WAN':active==='cellular'?'DJI 4G':active==='none'?'无可用出口':'未检测');
         this.set('kk-dji-rsrp',metric(rsrp,' dBm'));
+        this.set('kk-dji-glance-rsrp',metric(rsrp,' dBm'));
         this.set('kk-dji-overview-sinr',metric(sinr,' dB',1));
         this.set('kk-dji-overview-radio-note',stale?'采样已过期':('RSRP '+metric(rsrp,' dBm')+' · RSRQ '+metric(rsrq,' dB')));
         this.set('kk-dji-rsrq',metric(rsrq,' dB'));
+        this.set('kk-dji-glance-rsrq',metric(rsrq,' dB'));
         this.set('kk-dji-sinr',metric(sinr,' dB',1));
+        this.set('kk-dji-glance-sinr',metric(sinr,' dB',1));
         this.set('kk-dji-shortcut-signal',stale?'数据过期':'SINR '+metric(sinr,' dB',1));
         this.el('kk-dji-shortcut-signal').dataset.tone=stale?'unknown':signalTone(sinr,20,10,3);
         this.set('kk-dji-rssi',metric(rssi,' dBm'));
+        this.set('kk-dji-glance-rssi',metric(rssi,' dBm'));
         [['rsrp',rsrp,-85,-95,-105],['rsrq',rsrq,-10,-15,-20],['sinr',sinr,20,10,3],['rssi',rssi,-70,-80,-90]].forEach(function(item){
             this.el('kk-dji-'+item[0]).dataset.tone=stale?'unknown':signalTone(item[1],item[2],item[3],item[4]);
         },this);
@@ -351,6 +362,10 @@ return view.extend({
         this.set('kk-dji-operator',({'CT':'中国电信','CMCC':'中国移动','CU':'中国联通'})[operator] || operator);
         this.set('kk-dji-technology',first(radio.technology,radio.network,modem.network));
         this.set('kk-dji-cell',[first(radio.band,modem.band),radio.channel].filter(function(v){return v!=null&&v!=='';}).join(' · ') || null);
+        this.set('kk-dji-glance-band',[first(radio.technology,radio.network,modem.network),first(radio.band,modem.band)].filter(function(v){return v!=null&&v!=='';}).join(' · ') || null);
+        this.set('kk-dji-glance-earfcn',radio.earfcn);
+        this.set('kk-dji-glance-pci',radio.pci);
+        this.set('kk-dji-glance-bandwidth',radio.ul_bandwidth_mhz==null&&radio.dl_bandwidth_mhz==null?null:(radio.ul_bandwidth_mhz==null?'—':radio.ul_bandwidth_mhz)+' / '+(radio.dl_bandwidth_mhz==null?'—':radio.dl_bandwidth_mhz)+' MHz');
         this.set('kk-dji-duplex',radio.duplex);
         this.set('kk-dji-mcc',radio.mcc);this.set('kk-dji-mnc',radio.mnc);
         this.set('kk-dji-cell-id',radio.cell_id);this.set('kk-dji-tac',radio.tac);

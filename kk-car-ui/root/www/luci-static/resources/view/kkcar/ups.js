@@ -24,7 +24,7 @@ return view.extend({
     render:function(data){
         document.title='KK-Car · UPS 电源';
         if(!document.getElementById('kk-ups-css'))
-            document.head.appendChild(E('link',{id:'kk-ups-css',rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260925-ui1'}));
+            document.head.appendChild(E('link',{id:'kk-ups-css',rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260925-ui3'}));
         var self=this;
         this.hero=E('div',{'class':'ku-hero-main'});
         this.warnings=E('div',{'class':'ku-warnings'});

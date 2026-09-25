@@ -47,17 +47,18 @@ return view.extend({
                 section('飞书机器人地址',destinations.concat([E('p',{'class':'kk-footnote'},'三个地址独立启停，开启的地址接收相同事件。短信正文可能含验证码，只会发到已启用地址；历史短信不会补发。留空保留，勾选清除后保存才删除。')]))
             ])
         ]);
-        form.addEventListener('input',function(){self.markDirty(true);});
-        form.addEventListener('change',function(){self.markDirty(true);});
+        form.addEventListener('input',function(){self.markDirty(self.signature()!==self.savedSignature);});
+        form.addEventListener('change',function(){self.markDirty(self.signature()!==self.savedSignature);});
         var root=E('div',{'class':'kk-app kk-studio kk-push'},[
             E('header',{'class':'kk-header'},[E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'飞'),E('div',{},[E('h1',{},'飞书推送'),E('p',{'class':'kk-muted'},'事件通知、阈值和机器人地址')])]),E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('a',{href:L.url('admin/kkcar')},'网络总览'),E('a',{href:L.url('admin/kkcar_dji')},'DJI 4G'),E('a',{href:L.url('admin/kkcar_ups')},'UPS 电源'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_notifications')},'飞书推送')])]),
             this.notice,form,section('发送状态',[this.status]),
             E('p',{'class':'kk-footnote'},'突然断电无法即时推送，下次开机补报。断网时通知在内存中保留最多 50 条、1 小时，网络恢复后重试；断电会丢失待发队列。正常关机只做有限时长的发送尝试。'),
             E('p',{'class':'kk-footnote'},'Wi-Fi 按实时关联检测，有线设备按新鲜邻居记录判断；安静设备可能延迟识别。初次启用不逐台通知现有设备。通知不包含公网 IP 或密钥。')
         ]);
-        this.paint(data);poll.add(function(){return get().then(function(d){self.paint(d);}).catch(function(){self.status.textContent='暂时无法读取发送状态，页面内容可能已过期。';});},5);
+        this.savedSignature=this.signature();this.paint(data);poll.add(function(){return get().then(function(d){self.paint(d);}).catch(function(){self.status.textContent='暂时无法读取发送状态，页面内容可能已过期。';});},5);
         return root;
     },
+    signature:function(){var self=this;return JSON.stringify({enabled:this.master.input.checked,events:events.map(function(e){return self.switches[e[0]].checked;}),limits:limits.map(function(l){return self.fields[l[0]].value;}),targets:this.targets.map(function(d){return [d.name.value,d.on.checked,d.clear.checked,!!d.url.value.trim()];})});},
     markDirty:function(dirty){this.dirty=dirty;this.unsaved.textContent=dirty?'有未保存的修改':'设置已保存';this.unsaved.classList.toggle('is-dirty',!!dirty);},
     showMessage:function(message,error){this.notice.hidden=false;this.notice.className='kk-notice'+(error?' error':'');this.notice.textContent=message;},
     perform:function(promise,message){var self=this;this.saveButton.disabled=this.testButton.disabled=true;return promise.then(function(r){if(!r.ok)throw Error(r.error || '操作失败');self.notice.hidden=false;self.notice.className='kk-notice';self.notice.textContent=message;return r;}).catch(function(e){self.notice.hidden=false;self.notice.className='kk-notice error';self.notice.textContent=e.message;return null;}).finally(function(){self.saveButton.disabled=self.testButton.disabled=false;});},
@@ -73,7 +74,7 @@ return view.extend({
             c.destinations.forEach(function(d,i){var actual=saved && saved.destinations[i];if(!actual || actual.id!==d.id || actual.enabled!==d.enabled || (d.name && actual.name!==d.name))consistent=false;});
             if(!consistent){self.showMessage('设置已提交，但读回与页面修改不一致。请刷新后检查。',true);return;}
             self.targets.forEach(function(d,i){d.name.value=saved.destinations[i].name;d.url.value='';d.clear.checked=false;d.configured.textContent=saved.destinations[i].configured?'地址已保存':'尚未配置';d.url.placeholder=saved.destinations[i].configured?'已保存，留空保留原地址':'粘贴飞书 Webhook';});
-            self.markDirty(false);self.paint(data);self.showMessage('推送设置已保存并读回，后台约 10 秒内生效。',false);
+            self.savedSignature=self.signature();self.markDirty(false);self.paint(data);self.showMessage('推送设置已保存并读回，后台约 10 秒内生效。',false);
         }).catch(function(){self.showMessage('设置已提交，但暂时无法读回确认；请刷新检查。',true);});});
     },
     paint:function(data){

@@ -20,6 +20,7 @@ body:has(.ku-shell) .container{max-width:none;width:100%;padding:8px 10px 0}
 .ku-nav-item.active{box-shadow:inset 3px 0 0 #69d6db}
 .ku-main{max-width:none;padding:22px clamp(20px,2.6vw,42px) 26px}
 .ku-header{margin-bottom:17px;align-items:center}
+.ku-shell .ku-header{background:none!important;border:0!important;box-shadow:none!important;padding:0!important}
 .ku-header h1{font-size:25px;margin:4px 0}
 .ku-hero{padding:20px 23px;margin-bottom:16px}
 .ku-battery-value strong{font-size:58px}
@@ -41,4 +42,4 @@ body:has(.ku-shell) .container{max-width:none;width:100%;padding:8px 10px 0}
 .ku-controls:not(.ku-quick-controls){margin-top:22px}
 @media(max-width:1250px){.ku-metrics .ku-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:980px){.ku-shell{display:block}.ku-sidebar{flex-direction:row;align-items:center;padding:10px 16px;gap:16px;border-right:0;border-bottom:1px solid var(--ku-line)}.ku-nav{display:flex;gap:5px;overflow-x:auto}.ku-sidebar-note{display:none}.ku-nav-item{white-space:nowrap;padding:7px 11px}.ku-main{padding:18px}.ku-hero-main{grid-template-columns:1fr}.ku-battery{border-right:0;border-bottom:1px solid #315364;padding:0 0 16px}.ku-metrics{grid-template-columns:1fr 1fr}.ku-metrics .ku-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:700px){body:has(.ku-shell) .container{padding:0}.ku-shell{border:0;border-radius:0}.ku-sidebar{padding:10px 12px}.ku-brand{display:none}.ku-main{padding:16px 12px}.ku-header{display:flex;align-items:flex-start}.ku-header-actions{flex-direction:column;align-items:end;margin:0}.ku-header h1{font-size:21px}.ku-hero{padding:15px}.ku-hero-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.ku-metrics,.ku-settings-grid{grid-template-columns:1fr}.ku-metrics .ku-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ku-controls-title{display:block}.ku-controls-title p{margin-top:4px}}
+@media(max-width:700px){body:has(.ku-shell) .container{padding:0}.ku-shell{border:0;border-radius:0}.ku-sidebar{padding:10px 12px}.ku-brand{display:none}.ku-main{padding:16px 12px}.ku-header{display:block}.ku-header-actions{flex-direction:row;align-items:center;justify-content:space-between;margin-top:10px}.ku-header h1{font-size:21px}.ku-hero{padding:15px}.ku-hero-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.ku-metrics,.ku-settings-grid{grid-template-columns:1fr}.ku-metrics .ku-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ku-controls-title{display:block}.ku-controls-title p{margin-top:4px}}

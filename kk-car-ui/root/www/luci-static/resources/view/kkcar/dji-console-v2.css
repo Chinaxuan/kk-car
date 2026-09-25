@@ -226,3 +226,17 @@ body:has(.kk-dji) .container{max-width:none;width:100%;padding-inline:10px}
 .kk-dji-overview-block>strong{margin-top:6px;font-size:27px}
 .kk-dji-overview-block>p{margin:5px 0 8px;line-height:1.35}
 @media(max-width:760px){body:has(.kk-dji) .container{padding:0}.kk-dji>.kk-header{padding:12px 14px!important}.kk-dji .kk-global-nav{margin-left:0}.kk-dji-overview-block{min-height:145px}}
+
+.kk-dji-overview-telemetry{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.kk-dji-overview-panel{padding:14px 17px;border:1px solid #344a5c;border-radius:10px;background:#182534}
+.kk-dji-overview-panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
+.kk-dji-overview-panel-head h3{margin:0;padding:0;border:0;color:#e4f2f9;font-size:13px;font-weight:750}
+.kk-dji-overview-panel-head span{color:#8fa8bb;font-size:10px}
+.kk-dji-glance-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.kk-dji-glance{min-width:0;padding:9px 10px;border:1px solid #304456;border-radius:7px;background:#1d3041}
+.kk-dji-glance span,.kk-dji-glance strong{display:block;overflow-wrap:anywhere}
+.kk-dji-glance span{color:#9eb4c5;font-size:10px;line-height:1.25}
+.kk-dji-glance strong{margin-top:7px;color:#aee6dd;font-size:17px;line-height:1.2;font-variant-numeric:tabular-nums}
+.kk-dji-overview-panel:last-child .kk-dji-glance strong{color:#bed0f2;font-size:15px}
+@media(max-width:1400px){.kk-dji-overview-telemetry{grid-template-columns:1fr}}
+@media(max-width:620px){.kk-dji-glance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kk-dji-overview-panel-head{display:block}.kk-dji-overview-panel-head span{display:block;margin-top:3px}}
