@@ -9,7 +9,12 @@ function step(config,data,previous) {
         consecutive:0,triggered:!!prior.triggered,status:'monitoring'};
     if (!config.enabled) {state.triggered=false;state.status='disabled';return state;}
     if (!data?.ok) {state.status='read_error';state.triggered=false;return state;}
-    state.battery_mv=data.battery?.millivolts;
+    state.controller_mv=data.battery?.millivolts;
+    let sensor=data.sensors?.battery;
+    state.sensor_mv=sensor?.detected && sensor.conversion_ready && !sensor.overflow &&
+        sensor.bus_mv>=2500 && sensor.bus_mv<=4500 ? sensor.bus_mv : null;
+    state.battery_mv=state.sensor_mv ?? state.controller_mv;
+    state.voltage_source=state.sensor_mv!=null?'battery_sensor':'controller';
     state.external=!!data.input?.external;
     if (state.external) {state.status='external_power';state.triggered=false;return state;}
     if (state.battery_mv==null || state.battery_mv<2500 || state.battery_mv>4500) {

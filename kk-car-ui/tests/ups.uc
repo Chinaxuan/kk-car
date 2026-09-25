@@ -18,6 +18,13 @@ check(!e.should_shutdown && e.triggered,'once only');
 check(step(config,plugged,e).consecutive==0,'external power resets');
 check(step(config,{ok:false},e).consecutive==0,'read error resets');
 check(step({enabled:false,shutdown_mv:3550},low,d).status=='disabled','default off');
+let loaded={ok:true,input:{external:false},battery:{millivolts:3750},
+    sensors:{battery:{detected:true,conversion_ready:true,overflow:false,bus_mv:3450}}};
+let sag=step(config,loaded,{});
+check(sag.consecutive==1 && sag.battery_mv==3450 && sag.voltage_source=='battery_sensor',
+    'loaded battery voltage takes priority');
+loaded.sensors.battery.conversion_ready=false;
+check(step(config,loaded,{}).battery_mv==3750,'unready battery sensor falls back');
 check(!set_option('restart_countdown',20,0,'').ok,'reject unlisted register');
 check(!set_option('protect_mv',2800,0,'修改电池参数').ok,'reject low voltage');
 check(!set_option('auto_start_on_ac',2,0,'').ok,'reject invalid bool');
@@ -32,4 +39,4 @@ check(validRaw(frame),'valid controller frame');
 put16(0x28,65535);check(!validRaw(frame),'reject corrupt firmware version');put16(0x28,10);
 put32(0x24,4294967295);check(!validRaw(frame),'reject corrupt uptime');put32(0x24,3600);
 put16(0x11,65535);check(!validRaw(frame),'reject corrupt protection voltage');
-print('PASS 13 UPS policy, write-validation, and corrupt-frame cases\n');
+print('PASS UPS policy, sensor fallback, write-validation, and corrupt-frame cases\n');

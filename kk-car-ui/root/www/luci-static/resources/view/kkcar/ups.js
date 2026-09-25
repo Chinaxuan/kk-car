@@ -92,9 +92,9 @@ return view.extend({
                     this.controlRow('来电自启','auto_start_on_ac',c.auto_start_on_ac?1:0,0,1,'外部电源恢复后自动启动',false,true),
                     this.controlRow('采样周期','sample_minutes',c.sample_minutes,1,1440,'1–1440 分钟；当前设备为 '+c.sample_minutes+' 分钟',false,false),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'RTC 校时'),E('small',{},'将已校准的系统 UTC 时间写入 UPS 时钟')]),E('button',{'class':'ku-button',type:'button',click:function(){if(window.confirm('确认用树莓派当前系统时间同步 UPS 实时时钟？'))self.perform(syncRtc(),'RTC 已与系统时间同步',true);}},'同步时间')])]),
-                E('section',{'class':'ku-panel'},[E('h3',{},'低电安全关机'),E('p',{'class':'ku-helper'},'默认关闭。启用后，只有外部输入断开且电池电压连续 3 次低于阈值，才会安排 UPS 180 秒后断电，并立即让 OpenWrt 正常关机。'),
+                E('section',{'class':'ku-panel'},[E('h3',{},'低电安全关机'),E('p',{'class':'ku-helper'},'外部输入断开时优先监测电池侧负载电压；连续 3 次低于阈值，才会安排 UPS 180 秒后断电，并让 OpenWrt 正常关机。电量百分比不参与判断。'),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'启用监控'),E('small',{},'断电后持续监测电池电压')]),policyOn]),
-                    E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'关机阈值'),E('small',{},'3300–3900 mV，建议先保持默认 3550 mV')]),policyMv,E('button',{'class':'ku-button',type:'button',click:function(){var mv=Number(policyMv.value);if(!Number.isInteger(mv)){self.message('请输入整数电压',true);return;}if(policyOn.checked&&!p.enabled&&!window.confirm('启用后，当车载外部供电断开且电池持续低电压时，树莓派会自动关机。确定启用？'))return;self.perform(savePolicy(policyOn.checked,mv),'低电保护设置已保存',true);}},'保存策略')]),
+                    E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'关机阈值'),E('small',{},'3300–3900 mV；需按实际电池与负载校准')]),policyMv,E('button',{'class':'ku-button',type:'button',click:function(){var mv=Number(policyMv.value);if(!Number.isInteger(mv)){self.message('请输入整数电压',true);return;}if(policyOn.checked&&!p.enabled&&!window.confirm('启用后，当车载外部供电断开且电池持续低电压时，树莓派会自动关机。确定启用？'))return;self.perform(savePolicy(policyOn.checked,mv),'低电保护设置已保存',true);}},'保存策略')]),
                     E('small',{'class':'ku-watch'},'监控状态：'+watchLabel(d.watch&&d.watch.status)+' · 连续低电样本 '+((d.watch&&d.watch.consecutive)||0)+'/3')])
             ])
         );

@@ -420,6 +420,8 @@ def battery_header(ups):
         return '--', 'POWER --'
     battery = ups.get('battery') or {}
     level = number(battery.get('percent'), '%')
+    if level != '--' and battery.get('percent_calibration_unverified'):
+        level = '~' + level
     sensor = ((ups.get('sensors') or {}).get('battery') or {})
     current = sensor.get('current_ma') if sensor.get('detected') else None
     if isinstance(current, (int, float)) and not isinstance(current, bool):

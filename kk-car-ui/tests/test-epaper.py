@@ -78,6 +78,8 @@ class EpaperTests(unittest.TestCase):
         self.assertEqual(epaper.battery_header(ups), ('85%', 'DISCHARGE'))
         ups['sensors']['battery']['current_ma'] = 480
         self.assertEqual(epaper.battery_header(ups), ('85%', 'CHARGING'))
+        ups['battery']['percent_calibration_unverified'] = True
+        self.assertEqual(epaper.battery_header(ups), ('~85%', 'CHARGING'))
         self.assertEqual(epaper.battery_header({}), ('--', 'POWER --'))
 
     def test_setting_needs_long_confirmation(self):

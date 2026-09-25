@@ -123,8 +123,12 @@ function sample(lite,attempt) {
         auto_start_on_ac:values[0x19-1]==1,
         shutdown_countdown_s:values[0x18-1], restart_countdown_s:values[0x1a-1],
         total_run_s:u32(0x1c), charging_s:u32(0x20), current_run_s:u32(0x24)};
+    // The UPS controller can report a higher voltage than the loaded battery.
+    // Keep the battery-side INA voltage in light samples used by the shutdown watcher.
+    result.sensors={battery:ina219('0x45',0.005)};
     if (!lite) {
-        result.sensors={pi_supply:ina219('0x40',0.00725),battery:ina219('0x45',0.005),rtc:rtc()};
+        result.sensors.pi_supply=ina219('0x40',0.00725);
+        result.sensors.rtc=rtc();
         let uid=bytes('/usr/sbin/i2ctransfer -y 1 w1@0x17 0xf0 r12',12);
         if (uid) {
             let serial='';for (let b in uid) serial+=sprintf('%02X',b);
