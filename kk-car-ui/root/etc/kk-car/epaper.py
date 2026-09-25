@@ -206,7 +206,7 @@ def metrics(page, car, ups, rates, aux=None):
             ('UNREAD SMS', number(unread)), ('SMS STORED', number((aux.get('storage') or {}).get('used'))),
             ('THIS MONTH', size(sum(v for v in ((traffic.get('month') or {}).get(k) for k in ('rx', 'tx')) if isinstance(v, (int, float)))) if traffic.get('month') else '--'), ('EST. USED', size(traffic.get('estimated_used'))),
             ('LAST QUERY', traffic.get('last_query_day') or '--'), ('SMS FORWARD', 'ON' if sms.get('enabled') else 'OFF' if sms else '--'),
-            ('LIVE DOWN', number(rates.get('down'), ' Mbps', 2)), ('LIVE UP', number(rates.get('up'), ' Mbps', 2)),
+            ('AVG DOWN', number(rates.get('down'), ' Mbps', 2)), ('AVG UP', number(rates.get('up'), ' Mbps', 2)),
         )
     if page == 4:
         external = inputs.get('external')

@@ -8,7 +8,7 @@ c25d7d74e87fd8e6752cb8f1e28d2d0625e924199ee1d9bc055e425278b655d8  docs/ARCHITECT
 a51cf0c954c9ed4020e95058679c4672433fd0f871e0f2319fe5f2bbeebfe53a  docs/DJI-BENCHMARK.md
 f27ff80f9c8c78cdd52809fa04b297daf8d304d897c1cb35754ee9d87670ea69  docs/DJI-CONTROL.md
 981f18e9cdd432a4b7f28f2bc58edf1b71314220bee5ed542e53f084a2692709  docs/DJI-QMI.md
-7ba95ca769dbcb9e831e4144cdb7ebc82aeb2baeac69c8928f7ae237d1cfcbdb  docs/EPAPER.md
+3a37033af36f95b87af08a4a8bf10219a99b6eb969b5a7c173a85551128b7a8e  docs/EPAPER.md
 615a35f0efd9f3b904304a6ef19395467cc40ee28f13c8ddce5e43535b0b65b5  docs/HDMI.md
 bd912307dfd5564b8d53a259c16ca96c68cac010a2fc9ee070050912a09915e1  docs/NETWORK-RECOVERY.md
 3d723d0a6b030c3af1504194b79018ebd340f451ff9ef3ab69dab9a5e3ce85be  docs/NOTIFICATIONS.md
@@ -52,7 +52,7 @@ b5f78b3ce2dc8076600fe232b654284730419fef5367353c6e87a1656e18fdfc  kk-car-ui/root
 6b4f83aa8989d58543dac5147fdd2f74708a2e3ab1a9cfc1fe091a6c526ad8d8  kk-car-ui/root/etc/kk-car/dji-voice-prepare.sh
 e1311a2ed4c785b65a83d92b4370db4e9e8bb574f06f54a3ad6c2123c909fb66  kk-car-ui/root/etc/kk-car/dji-voice-route.sh
 d736b29bbf94f2ef134f3a054b975eda52850bc7b77cbe75863a4f137bb43e46  kk-car-ui/root/etc/kk-car/dji-voice-watch.sh
-8fe6b4e2331a3ecf604d849359ea31264e5cf5622e30ea911fa81da704e6cf97  kk-car-ui/root/etc/kk-car/epaper.py
+c4a4dff267742eba2745af79b120920807a0117f7b184d3430c4ad4226014251  kk-car-ui/root/etc/kk-car/epaper.py
 579bc3190d5c5d6edd4dae94d347c9fcaf3b4a65cb4ea1c10657559a3870533d  kk-car-ui/root/etc/kk-car/epaper_lut.py
 a9a701eb18cbd5f786f28f986c16895ffc0d0337e4a9a63131b619d9542e07d4  kk-car-ui/root/etc/kk-car/fonts/Blinker-SemiBold.ttf
 3ae0ef4107cdb72d21f4076575487e7b1c76fdc2d62d451ef223633a3196cb20  kk-car-ui/root/etc/kk-car/fonts/OFL-Blinker.txt
