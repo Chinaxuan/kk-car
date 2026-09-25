@@ -37,5 +37,16 @@
         "luci-app-kkcar"
       ]
     }
+  },
+  "admin/kkcar_ups": {
+    "title": "UPS 电源",
+    "order": 4,
+    "action": {
+      "type": "view",
+      "path": "kkcar/ups"
+    },
+    "depends": {
+      "acl": ["luci-app-kkcar"]
+    }
   }
 }

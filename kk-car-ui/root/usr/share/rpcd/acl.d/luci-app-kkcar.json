@@ -17,6 +17,9 @@
           "phone_data",
           "gps_probe",
           "traffic_status"
+        ],
+        "kkups": [
+          "status"
         ]
       }
     },

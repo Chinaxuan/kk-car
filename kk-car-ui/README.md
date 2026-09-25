@@ -7,8 +7,13 @@
 - [架构与实现](../docs/ARCHITECTURE.md)
 - [验证与限制](../docs/VALIDATION.md)
 - [备份与恢复](../docs/BACKUP.md)
+- [UPS 电源适配](../docs/UPS.md)
 
 `root/` 映射到设备绝对路径；认证资料与实际 UCI 配置不随源码发布。
+
+## EP-0136 UPS 电源页
+
+`/cgi-bin/luci/admin/kkcar_ups` 通过已登录 LuCI 会话展示 52Pi UPS Plus EP-0136 的实时输入、输出、电池、温度及控制器状态。依赖 `/boot/config.txt` 中的 `dtparam=i2c_arm=on` 与 `i2c-tools`；只读采集，不发送关机/重启指令或安装厂商遥测脚本。电量估计和电流/功率的验证边界见 [UPS 说明](../docs/UPS.md)。
 
 DJI 控制页现提供电话、短信、信号与流量的快捷入口。网页声音断开而 SIM 通话仍活动时，可手动重连音频；此恢复路径还需真实通话复测。功能与界面对照见 [DJI 开源对标](../docs/DJI-BENCHMARK.md)。
 
