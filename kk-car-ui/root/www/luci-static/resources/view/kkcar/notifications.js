@@ -50,7 +50,7 @@ return view.extend({
         form.addEventListener('input',function(){self.markDirty(self.signature()!==self.savedSignature);});
         form.addEventListener('change',function(){self.markDirty(self.signature()!==self.savedSignature);});
         var root=E('div',{'class':'kk-app kk-studio kk-push'},[
-            E('header',{'class':'kk-header'},[E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'飞'),E('div',{},[E('h1',{},'飞书推送'),E('p',{'class':'kk-muted'},'事件通知、阈值和机器人地址')])]),E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('a',{href:L.url('admin/kkcar')},'网络总览'),E('a',{href:L.url('admin/kkcar_dji')},'DJI 4G'),E('a',{href:L.url('admin/kkcar_ups')},'UPS 电源'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_notifications')},'飞书推送')])]),
+            E('header',{'class':'kk-header'},[E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'飞'),E('div',{},[E('h1',{},'通知中心'),E('p',{'class':'kk-muted'},'飞书事件、阈值和机器人地址')])]),E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('a',{href:L.url('admin/kkcar')},'行车总览'),E('a',{href:L.url('admin/kkcar_connections')},'连接设置'),E('a',{href:L.url('admin/kkcar_dji')},'蜂窝与通信'),E('a',{href:L.url('admin/kkcar_ups')},'电源与设备'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_notifications')},'通知中心')])]),
             this.notice,form,section('发送状态',[this.status]),
             E('p',{'class':'kk-footnote'},'突然断电无法即时推送，下次开机补报。断网时通知在内存中保留最多 50 条、1 小时，网络恢复后重试；断电会丢失待发队列。正常关机只做有限时长的发送尝试。'),
             E('p',{'class':'kk-footnote'},'Wi-Fi 按实时关联检测，有线设备按新鲜邻居记录判断；安静设备可能延迟识别。初次启用不逐台通知现有设备。通知不包含公网 IP 或密钥。')

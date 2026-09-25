@@ -5,6 +5,7 @@
 
 var getHistory = rpc.declare({object:'kkcar', method:'history', params:['range'], expect:{}});
 var getStatus = rpc.declare({object:'kkcar', method:'status', expect:{}});
+var getUps = rpc.declare({object:'kkups', method:'status', expect:{}});
 var action = rpc.declare({object:'kkcar', method:'action', params:['action'], expect:{}});
 var saveAuto = rpc.declare({object:'kkcar', method:'auto_connect', params:['enabled'], expect:{}});
 var saveWifi = rpc.declare({object:'kkcar', method:'wifi_save', params:['ssid','password','band'], expect:{}});
@@ -40,9 +41,10 @@ return view.extend({
     load:function(){return getStatus();},
     render:function(data){
         var self=this;
+        this.settingsPage=window.location.pathname.endsWith('/kkcar_connections');
         this.previous=null; this.requesting=false; this.historyRange='1h'; this.historyRequest=0; this.historyFetched=0;
-        document.title='KK-Car · 车载网络';
-        if(!document.getElementById('kk-style')) document.head.appendChild(E('link',{id:'kk-style',rel:'stylesheet',href:L.resource('view/kkcar/overview.css')+'?v=20260925-ui1'}));
+        document.title='KK-Car · '+(this.settingsPage?'连接设置':'行车总览');
+        if(!document.getElementById('kk-style')) document.head.appendChild(E('link',{id:'kk-style',rel:'stylesheet',href:L.resource('view/kkcar/overview.css')+'?v=20260925-ui4'}));
         this.root=E('div',{'class':'kk-app'});
         var refresh=button('刷新状态',function(){self.refresh();});
         var diag=button('检查网络',function(){self.perform('diagnose');},'primary');
@@ -70,8 +72,8 @@ return view.extend({
         });
         this.root.append(
             E('div',{'class':'kk-header',role:'banner'},[
-                E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'KK'),E('div',{},[E('h1',{},'车载网络'),E('p',{},'KK-Car · 你的随行网络')])]),
-                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar')},'网络总览'),E('a',{href:L.url('admin/kkcar_dji')},'DJI 4G'),E('a',{href:L.url('admin/kkcar_ups')},'UPS 电源'),E('a',{href:L.url('admin/kkcar_notifications')},'飞书推送'),E('a',{'class':'kk-nav-utility',href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{'class':'kk-nav-utility',href:L.url('admin/logout')},'退出')])
+                E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'KK'),E('div',{},[E('h1',{},this.settingsPage?'连接设置':'行车总览'),E('p',{},'KK-Car · 连接、通信与供电')])]),
+                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{'class':this.settingsPage?'':'active','aria-current':this.settingsPage?null:'page',href:L.url('admin/kkcar')},'行车总览'),E('a',{'class':this.settingsPage?'active':'','aria-current':this.settingsPage?'page':null,href:L.url('admin/kkcar_connections')},'连接设置'),E('a',{href:L.url('admin/kkcar_dji')},'蜂窝与通信'),E('a',{href:L.url('admin/kkcar_ups')},'电源与设备'),E('a',{href:L.url('admin/kkcar_notifications')},'通知中心'),E('a',{'class':'kk-nav-utility',href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{'class':'kk-nav-utility',href:L.url('admin/logout')},'退出')])
             ]),
             E('div',{id:'kk-message','class':'kk-notice',role:'status','aria-live':'polite',hidden:true}),
             E('div',{id:'kk-pending','class':'kk-notice warning',hidden:true},[
@@ -93,7 +95,9 @@ return view.extend({
                     E('span',{'class':'kk-path-arrow','aria-hidden':'true'},'→'),
                     E('div',{'class':'kk-path-node'},[E('span',{'class':'kk-node-label'},'02  公司 VPN'),E('strong',{id:'kk-vpn-status'},'—'),E('span',{id:'kk-vpn-detail'},'')]),
                     E('span',{'class':'kk-path-arrow','aria-hidden':'true'},'→'),
-                    E('div',{'class':'kk-path-node'},[E('span',{'class':'kk-node-label'},'03  热点'),E('strong',{id:'kk-wifi-name'},'—'),E('span',{id:'kk-wifi-detail'},'')])
+                    E('div',{'class':'kk-path-node'},[E('span',{'class':'kk-node-label'},'03  热点'),E('strong',{id:'kk-wifi-name'},'—'),E('span',{id:'kk-wifi-detail'},'')]),
+                    E('span',{'class':'kk-path-arrow','aria-hidden':'true'},'→'),
+                    E('div',{'class':'kk-path-node'},[E('span',{'class':'kk-node-label'},'04  车载供电'),E('strong',{id:'kk-ups-path'},'读取中'),E('span',{id:'kk-ups-detail'},'')])
                 ]),
                 E('div',{'class':'kk-routing'},[E('span',{},'当前分流'),E('strong',{},'国内直连'),E('span',{},'·'),E('strong',{},'国外 / 公司内网走 VPN'),E('span',{'class':'kk-muted'},'VPN 断开时，国外流量暂停')])
             ]),
@@ -108,10 +112,8 @@ return view.extend({
                         E('div',{'class':'kk-history-ranges',role:'group','aria-label':'历史时间范围'},[
                             ['1h','最近 1 小时'],['1d','最近 1 天'],['30d','最近 30 天']
                         ].map(function(item){return E('button',{type:'button','class':'kk-button quiet','data-range':item[0],'aria-pressed':item[0]==='1h'?'true':'false',click:function(){self.historyRange=item[0];self.loadHistory(true);}},item[1]);})),
-                        E('div',{'class':'kk-chart-heading'},[E('strong',{},'上网速度'),E('span',{},'↓ 下载 / ↑ 上传 · Mbps')]),
-                        E('div',{id:'kk-chart','class':'kk-chart kk-history-chart',role:'img','aria-label':'下载和上传历史'}),
-                        E('div',{'class':'kk-chart-heading'},[E('strong',{},[E('span',{'class':'kk-legend-latency'},'VPN 延迟'),E('span',{'class':'kk-legend-signal'},'RSRP 信号')]),E('span',{},'左 ms · 右 dBm')]),
-                        E('div',{id:'kk-latency-chart','class':'kk-chart kk-history-chart',role:'img','aria-label':'VPN 延迟与 LTE RSRP 信号历史，左轴毫秒、右轴 dBm，缺失记录留空'}),
+                        E('div',{'class':'kk-chart-heading'},[E('strong',{},[E('span',{'class':'kk-legend-rx'},'下载'),E('span',{'class':'kk-legend-tx'},'上传'),E('span',{'class':'kk-legend-latency'},'VPN 延迟'),E('span',{'class':'kk-legend-signal'},'RSRP')]),E('span',{},'同一时间轴 · 下方红点为 VPN 无响应')]),
+                        E('div',{id:'kk-chart','class':'kk-chart kk-history-chart kk-combined-chart',role:'img','aria-label':'同一时间轴的下载、上传、VPN 延迟、RSRP 信号和丢包历史'}),
                         E('div',{id:'kk-chart-times','class':'kk-chart-caption'},'正在读取历史…'),
                         E('label',{'class':'kk-footnote',for:'kk-history-cursor'},'在图表上移动或点击查看，亦可拖动下方时间滑块'),
                         E('input',{id:'kk-history-cursor',type:'range',min:0,max:1,value:1,'aria-label':'查看历史时刻',input:function(ev){self.inspectHistory(+ev.target.value);}}),
@@ -204,8 +206,10 @@ return view.extend({
         this.compactLayout();
         this.dashboardLayout();
         this.update(data);
-        this.loadHistory(true);
+        this.refreshUps();
+        if(!this.settingsPage) this.loadHistory(true);
         poll.add(function(){return self.refresh();},5);
+        poll.add(function(){return self.refreshUps();},30);
         return this.root;
     },
     el:function(id){return this.root.querySelector('#'+id);},
@@ -218,18 +222,14 @@ return view.extend({
         function fold(title,nodes,className){return E('details',{'class':'kk-fold '+(className || '')},[E('summary',{},title),E('div',{'class':'kk-fold-body'},nodes)]);}
         var history=find('网络历史'), ping=find('VPN 连通性 · 10.8.8.8');
         history.classList.add('kk-history-section');
-        history.querySelector('.kk-section-head p').textContent='后台持续记录 · 流量与 VPN 延迟';
+        history.querySelector('.kk-section-head p').textContent='速度、VPN 延迟、蜂窝信号与丢包 · 共用时间轴';
         var tools=E('div',{'class':'kk-history-toolbar'},[history.querySelector('.kk-traffic-numbers'),history.querySelector('.kk-history-ranges')]);
         history.querySelector('.kk-section-head').after(tools);
         var pingStrip=E('div',{'class':'kk-ping-strip','aria-label':'VPN 实时检测'});
         Array.from(ping.querySelectorAll('.kk-data-row')).forEach(function(row){pingStrip.append(row);});
         tools.after(pingStrip);
-        var plots=E('div',{'class':'kk-plots'});
-        ['kk-chart','kk-latency-chart'].forEach(function(id){
-            var chart=history.querySelector('#'+id),heading=chart.previousElementSibling;
-            plots.append(E('div',{'class':'kk-plot'},[heading,chart]));
-        });
-        pingStrip.after(plots);
+        var chart=history.querySelector('#kk-chart'),heading=chart.previousElementSibling;
+        pingStrip.after(E('div',{'class':'kk-plots kk-plots-combined'},E('div',{'class':'kk-plot'},[heading,chart])));
         history.querySelector('label[for="kk-history-cursor"]').textContent='拖动查看历史时刻';
         var notes=fold('采样与保存说明',[this.el('kk-history-note')]);
         history.append(E('div',{'class':'kk-history-meta'},[E('span',{id:'kk-history-brief'},'正在读取…'),this.el('kk-ping-time')]),notes);
@@ -255,6 +255,28 @@ return view.extend({
         side.setAttribute('aria-label','网络控制与设置');main.classList.add('kk-dense-main');
     },
     text:function(id,text){this.el(id).textContent=text;},
+    refreshUps:function(){
+        var self=this;
+        return getUps().then(function(d){
+            if(!d || !d.ok) throw new Error('UPS 暂时无法读取');
+            var battery=d.battery || {},input=d.input || {},output=d.output || {},pi=d.sensors && d.sensors.pi_supply || {},watch=d.watch || {};
+            var source=input.external?'外部供电':'电池供电';
+            self.text('kk-ups-path',source);
+            self.text('kk-ups-detail',(Number.isFinite(battery.percent)?battery.percent+'% · ':'')+(Number.isFinite(output.pogo_mv)?(output.pogo_mv/1000).toFixed(2)+' V':'电压未知'));
+            self.text('kk-ups-source',source);
+            self.text('kk-ups-percent',Number.isFinite(battery.percent)?battery.percent+'% · 未校准':'未知');
+            self.text('kk-ups-voltage',Number.isFinite(output.pogo_mv)?(output.pogo_mv/1000).toFixed(2)+' V':'未知');
+            self.text('kk-ups-watts',Number.isFinite(pi.power_mw)?(pi.power_mw/1000).toFixed(1)+' W · 估算':'未知');
+            self.text('kk-ups-temp',Number.isFinite(battery.temperature_c)?battery.temperature_c+' °C':'未知');
+            self.text('kk-ups-watch',watch.enabled?watch.status==='on_battery'?'电池监测中':'已启用 · '+(watch.status || '等待采样'):'未启用');
+            self.tone('kk-ups-source',input.external?'good':'warning');
+            self.tone('kk-ups-voltage',output.pi_undervoltage?'warning':'good');
+        }).catch(function(){
+            self.text('kk-ups-path','状态未读到');self.text('kk-ups-detail','请查看电源页');
+            ['kk-ups-source','kk-ups-percent','kk-ups-voltage','kk-ups-watts','kk-ups-temp','kk-ups-watch'].forEach(function(id){self.text(id,'未读到');});
+            self.tone('kk-ups-source','neutral');self.tone('kk-ups-voltage','neutral');
+        });
+    },
     dashboardLayout:function(){
         var self=this, columns=this.root.querySelector('.kk-columns'),side=this.root.querySelector('.kk-side');
         var history=this.root.querySelector('.kk-history-section');
@@ -281,7 +303,11 @@ return view.extend({
                 ['接口累计错 / 丢','kk-vpn-errors','VPN 虚拟接口累计收发错误 / 丢弃，不等于当前 Ping 丢包率'],['分流路由','kk-route']]),
             group('蜂窝 / 实时状态',[
                 ['运营商','kk-modem-operator'],['网络 / 频段','kk-modem-network'],['RSRP / RSRQ','kk-modem-rsrp'],['信号格 / SINR','kk-modem-bars'],
-                ['蜂窝连接','kk-modem-connected'],['连接时长','kk-modem-duration'],['上网棒运行','kk-modem-uptime'],['累计收 / 发','kk-modem-bytes']])
+                ['蜂窝连接','kk-modem-connected'],['当前上联','kk-uplink-mode'],['采样新鲜度','kk-modem-freshness'],['累计收 / 发','kk-modem-bytes']]),
+            group('供电 / UPS',[
+                ['供电来源','kk-ups-source'],['电池估计','kk-ups-percent','UPS 估算电量；未完成完整充放电校准，不据此估算续航'],
+                ['输出电压','kk-ups-voltage'],['Pi 耗电估算','kk-ups-watts','由 UPS 电流传感器估算，未用外部仪表校准'],
+                ['电池温度','kk-ups-temp'],['低电保护','kk-ups-watch']])
         ]);
         var deviceSection=Array.from(side.querySelectorAll('section')).find(function(s){return s.querySelector('h2')?.textContent==='连接设备';});
         // Expand former disclosure panels into ordinary sections. Keep every live
@@ -311,6 +337,7 @@ return view.extend({
             history.querySelector('#kk-history-note'),this.el('kk-modem-time'),modem.querySelector('.kk-actions'),
             E('p',{'class':'kk-footnote'},'RSRP 越接近 0，信号越强。流量为接口累计，重启可能归零；套餐余量以运营商为准。')
         ]);
+        if(this.settingsPage) notes.querySelector('#kk-history-note').remove();
         var workspace=E('div',{'class':'kk-workspace'},[
             E('main',{'class':'kk-monitor'},[history,instruments,E('div',{'class':'kk-bottom-grid'},[deviceSection,diagnostics])]),
             E('aside',{'class':'kk-controls','aria-label':'网络控制与设置'},[
@@ -327,11 +354,27 @@ return view.extend({
         top.append(E('span',{id:'kk-summary-desc',hidden:true},''));
         columns.replaceWith(workspace);
         this.root.classList.add('kk-console','kk-fullscreen','kk-studio');
+        this.root.classList.add(this.settingsPage?'kk-connection-page':'kk-home-page');
+        if(this.settingsPage){
+            workspace.querySelector('.kk-monitor').hidden=true;
+            top.after(E('div',{'class':'kk-page-intro'},[
+                E('div',{},[E('span',{'class':'kk-eyebrow'},'CONNECTION CONTROL'),E('h2',{},'连接与线路设置'),E('p',{},'VPN、网口和热点在这里统一管理。切换网口或热点后，请在两分钟内返回确认；未确认自动恢复。')]),
+                E('div',{'class':'kk-page-jumps'},[E('a',{href:L.url('admin/kkcar_dji')},'蜂窝信号、电话与短信 →'),E('a',{href:L.url('admin/kkcar_ups')},'UPS 供电与保护 →')])
+            ]));
+        } else {
+            workspace.querySelector('.kk-controls').hidden=true;
+            top.after(E('div',{'class':'kk-home-actions'},[
+                E('a',{href:L.url('admin/kkcar_connections')},'调整 VPN / 网口 / 热点 →'),
+                E('a',{href:L.url('admin/kkcar_dji')},'通信与套餐 →'),
+                E('a',{href:L.url('admin/kkcar_ups')},'供电详情 →'),
+                E('a',{href:L.url('admin/kkcar_notifications')},'通知设置 →')
+            ]));
+        }
     },
     message:function(text,error){var el=this.el('kk-message');el.hidden=false;el.textContent=text;el.className='kk-notice '+(error?'error':'');},
     refresh:function(){
         var self=this;
-        return getStatus().then(function(data){self.update(data);self.loadHistory(false);}).catch(function(){
+        return getStatus().then(function(data){self.update(data);if(!self.settingsPage) self.loadHistory(false);}).catch(function(){
             self.connectionLost=true;
             self.text('kk-refreshed','连接中断 · 数据未更新');
             self.message('暂时无法连接路由器，下面保留的是上次状态。若刚修改热点，请重新连接；页面会自动重试。',true);
@@ -421,8 +464,9 @@ return view.extend({
         this.text('kk-modem-bars',metric(modem.bars,' / 5')+(fresh && modem.snr!=null?' · '+modem.snr.toFixed(1)+' dB':''));
         this.text('kk-modem-rsrp',fresh && /LTE/i.test(modem.network || '')?metric(modem.rsrp,' dBm')+(modem.rsrq!=null?' / '+modem.rsrq+' dB':''):'—');
         this.text('kk-modem-connected',fresh?(modem.connected===true?'已连接':modem.sim_state==='absent'?'未插 SIM':modem.sim_state==='pin_required'?'SIM 待解锁':modem.connected===false?'未连接':'未知'):'状态未更新');
-        this.text('kk-modem-duration',fresh && modem.connection_uptime!=null?duration(modem.connection_uptime):'—');
-        this.text('kk-modem-uptime',fresh && modem.uptime!=null?duration(modem.uptime):'—');
+        this.text('kk-uplink-mode',uplinkName);
+        this.text('kk-modem-freshness',modem.timestamp && d.timestamp>=modem.timestamp?(fresh?'':'过期 · ')+(d.timestamp-modem.timestamp)+' 秒前':'无记录');
+        this.tone('kk-modem-freshness',fresh?'good':'warning');
         this.text('kk-modem-bytes',fresh && modem.rx!=null && modem.tx!=null?bytes(modem.rx)+' / '+bytes(modem.tx):'—');
         var transport=modem.transport || '模块';
         this.text('kk-modem-time',fresh?(modem.model || '蜂窝模块')+' · '+transport+' · '+stamp(modem.timestamp)+(modem.firmware?' · '+modem.firmware:''):modem.timestamp?transport+' 暂未连通或数据已过期 · 最后尝试 '+stamp(modem.timestamp)+'；这不代表蜂窝网络已断开。':'正在等待首次读取上网棒…');
@@ -549,34 +593,50 @@ return view.extend({
     },
     drawHistory:function(){
         var self=this,h=this.historyData, samples=h.points;
-        function draw(id,series,unit,signalAxis){
-            var box=self.el(id), width=signalAxis?548:590,end=42+width;
-            var upper=Math.max(unit==='ms'?10:.1,...samples.flatMap(function(p){return series.filter(function(s){return s[1]!=='signal';}).map(function(s){return p[s[0]] || 0;});}))*1.1;
-            var svg=svgNode('svg',{viewBox:'0 0 640 130',preserveAspectRatio:'none','aria-hidden':'true','data-plot-width':width});
+        var box=this.el('kk-chart'),canvasWidth=Math.max(320,box.clientWidth || 640),width=canvasWidth-96,end=42+width,span=Math.max(1,h.to-h.from);
+        var speedMax=Math.max(.1,...samples.map(function(p){return Math.max(p[1] || 0,p[2] || 0);}))*1.1;
+        var latencyMax=Math.max(10,...samples.map(function(p){return p[3] || 0;}))*1.1;
+        var svg=svgNode('svg',{viewBox:'0 0 '+canvasWidth+' 190',preserveAspectRatio:'none','aria-hidden':'true','data-plot-width':width});
+        function x(p){return 42+(p[0]-h.from)/span*width;}
+        [[14,78,speedMax,'Mbps'],[107,171,latencyMax,'ms']].forEach(function(lane){
             [0,.5,1].forEach(function(f){
-                var y=112-f*96;svg.appendChild(svgNode('line',{x1:42,x2:end,y1:y,y2:y,'class':'kk-grid-line'}));
-                var text=svgNode('text',{x:36,y:y+3,'text-anchor':'end','class':'kk-axis-label'+(signalAxis?' kk-axis-latency':'')});text.textContent=(upper*f).toFixed(unit==='ms'?0:2);svg.appendChild(text);
-                if(signalAxis){var label=svgNode('text',{x:end+8,y:y+3,'text-anchor':'start','class':'kk-axis-label kk-axis-signal'});label.textContent=-150+120*f;svg.appendChild(label);}
+                var y=lane[1]-(lane[1]-lane[0])*f;
+                svg.appendChild(svgNode('line',{x1:42,x2:end,y1:y,y2:y,'class':'kk-grid-line'}));
+                var label=svgNode('text',{x:36,y:y+3,'text-anchor':'end','class':'kk-axis-label'});
+                label.textContent=(lane[2]*f).toFixed(lane[3]==='ms'?0:2);svg.appendChild(label);
+                if(lane[3]==='ms'){
+                    var signal=svgNode('text',{x:end+8,y:y+3,'class':'kk-axis-label kk-axis-signal'});
+                    signal.textContent=-150+120*f;svg.appendChild(signal);
+                }
             });
-            series.forEach(function(s){
-                var points=[],count=samples.filter(function(p){return p[s[0]]!=null;}).length;
-                function flush(){if(points.length>1) svg.appendChild(svgNode('polyline',{points:points.join(' '),fill:'none','class':'kk-line-'+s[1],'stroke-width':2,'vector-effect':'non-scaling-stroke'}));points=[];}
-                samples.forEach(function(p){
-                    var x=42+(p[0]-h.from)/(h.to-h.from)*width;
-                    if(p[s[0]]==null){flush();if(s[1]==='latency' && p[8]) svg.appendChild(svgNode('circle',{cx:x,cy:112,r:2.2,'class':'kk-missing-dot'}));return;}
-                    var y=s[1]==='signal'?112-(p[s[0]]+150)/120*96:112-p[s[0]]/upper*96;points.push(x+','+y);
-                    svg.appendChild(svgNode('circle',{cx:x,cy:y,r:count<3?3:1.2,'class':'kk-dot-'+s[1]}));
-                });flush();
-            });
-            if(signalAxis && !samples.some(function(p){return p[10]!=null;})) {
-                var empty=svgNode('text',{x:316,y:127,'text-anchor':'middle','class':'kk-axis-label kk-axis-signal'});empty.textContent='本范围暂无信号记录';svg.appendChild(empty);
-            }
-            svg.appendChild(svgNode('line',{x1:end,x2:end,y1:10,y2:114,'class':'kk-chart-cursor'}));
-            box.replaceChildren(svg);
-            function inspect(ev){var rect=box.getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width*640;var t=h.from+Math.max(0,Math.min(1,(x-42)/width))*(h.to-h.from);self.inspectHistory(Math.round((t-h.points[0][0])/h.step));}
-            box.onpointermove=inspect;box.onpointerdown=inspect;
+        });
+        var separator=svgNode('text',{x:44,y:98,'class':'kk-axis-label kk-lane-label'});
+        separator.textContent='延迟 ms / 信号 dBm';svg.appendChild(separator);
+        [[1,'rx',14,78,speedMax],[2,'tx',14,78,speedMax],[3,'latency',107,171,latencyMax],[10,'signal',107,171,null]].forEach(function(s){
+            var points=[],count=samples.filter(function(p){return p[s[0]]!=null;}).length;
+            function flush(){if(points.length>1)svg.appendChild(svgNode('polyline',{points:points.join(' '),fill:'none','class':'kk-line-'+s[1],'stroke-width':2,'vector-effect':'non-scaling-stroke'}));points=[];}
+            samples.forEach(function(p){
+                if(p[s[0]]==null){flush();return;}
+                var ratio=s[1]==='signal'?Math.max(0,Math.min(1,(p[10]+150)/120)):Math.max(0,Math.min(1,p[s[0]]/s[4]));
+                var y=s[3]-(s[3]-s[2])*ratio;
+                points.push(x(p)+','+y);
+                if(count<3)svg.appendChild(svgNode('circle',{cx:x(p),cy:y,r:2.5,'class':'kk-dot-'+s[1]}));
+            });flush();
+        });
+        samples.forEach(function(p){
+            if(!p[8])return;
+            var loss=p[4]?Math.max(0,(p[4]-p[5])/p[4]):0;
+            if(loss>0)svg.appendChild(svgNode('line',{x1:x(p),x2:x(p),y1:184,y2:184-Math.max(3,Math.min(9,loss*9)),'class':'kk-loss-mark','vector-effect':'non-scaling-stroke'}));
+            else if(p[3]==null)svg.appendChild(svgNode('circle',{cx:x(p),cy:181,r:2,'class':'kk-missing-dot'}));
+        });
+        if(!samples.some(function(p){return p[10]!=null;})){
+            var empty=svgNode('text',{x:end-10,y:101,'text-anchor':'end','class':'kk-axis-label kk-axis-signal'});
+            empty.textContent='暂无信号记录';svg.appendChild(empty);
         }
-        draw('kk-chart',[[1,'rx'],[2,'tx']],'Mbps',false);draw('kk-latency-chart',[[3,'latency'],[10,'signal']],'ms',true);
+        svg.appendChild(svgNode('line',{x1:end,x2:end,y1:10,y2:186,'class':'kk-chart-cursor'}));
+        box.replaceChildren(svg);
+        function inspect(ev){if(!samples.length)return;var rect=box.getBoundingClientRect(),at=(ev.clientX-rect.left)/rect.width*canvasWidth;var t=h.from+Math.max(0,Math.min(1,(at-42)/width))*span;self.inspectHistory(Math.round((t-samples[0][0])/h.step));}
+        box.onpointermove=inspect;box.onpointerdown=inspect;
         this.el('kk-chart-times').replaceChildren(E('span',{},this.historyTime(h.from)),E('span',{},this.historyTime(h.to)));
         var resolution=h.step===60?'每分钟':h.step===300?'每 5 分钟':'每小时';
         var stale=!h.last_sample || this.data.timestamp-h.last_sample>30;

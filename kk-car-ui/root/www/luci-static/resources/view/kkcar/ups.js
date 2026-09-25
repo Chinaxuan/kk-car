@@ -39,10 +39,11 @@ return view.extend({
             E('aside',{'class':'ku-sidebar'},[
                 E('div',{'class':'ku-brand'},[E('b',{},'KK'),E('span',{},'CAR CONTROL')]),
                 E('div',{'class':'ku-nav'},[
-                    nav(L.url('admin/kkcar'),'网络总览',false),
-                    nav(L.url('admin/kkcar_dji'),'DJI 4G',false),
-                    nav(L.url('admin/kkcar_ups'),'UPS 电源',true),
-                    nav(L.url('admin/kkcar_notifications'),'飞书推送',false)]),
+                    nav(L.url('admin/kkcar'),'行车总览',false),
+                    nav(L.url('admin/kkcar_connections'),'连接设置',false),
+                    nav(L.url('admin/kkcar_dji'),'蜂窝与通信',false),
+                    nav(L.url('admin/kkcar_ups'),'电源与设备',true),
+                    nav(L.url('admin/kkcar_notifications'),'通知中心',false)]),
                 E('p',{'class':'ku-sidebar-note'},'52Pi UPS Plus · EP-0136\n树莓派 3B+ / OpenWrt')
             ]),
             E('main',{'class':'ku-main'},[

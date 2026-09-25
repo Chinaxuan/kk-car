@@ -99,7 +99,7 @@ return view.extend({
         this.root=E('div',{'class':'kk-app kk-studio kk-dji'},[
             E('header',{'class':'kk-header'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'DJ'),E('div',{},[E('h1',{},'DJI 4G 模块'),E('p',{},'蜂窝线路 · 信号、连接与模块控制')])]),
-                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-dji-update'},'读取中'),E('a',{href:L.url('admin/kkcar')},'网络总览'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_dji')},'DJI 4G'),E('a',{href:L.url('admin/kkcar_ups')},'UPS 电源'),E('a',{href:L.url('admin/kkcar_notifications')},'飞书推送')])
+                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-dji-update'},'读取中'),E('a',{href:L.url('admin/kkcar')},'行车总览'),E('a',{href:L.url('admin/kkcar_connections')},'连接设置'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_dji')},'蜂窝与通信'),E('a',{href:L.url('admin/kkcar_ups')},'电源与设备'),E('a',{href:L.url('admin/kkcar_notifications')},'通知中心')])
             ]),
             this.notice,
             E('section',{'class':'kk-dji-hero'},[

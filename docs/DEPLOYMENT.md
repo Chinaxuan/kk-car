@@ -44,6 +44,8 @@
 6. 更新某个采集器时，只重启对应服务。除非明确需要，不重启整个网络。
 7. 检查日志、首页更新时间、历史读取，以及国内、VPN、公司服务和 DNS；涉及分流时，还要验证 VPN 停止后的直出保护。
 
+本版新增的「连接设置」入口由 `root/usr/share/luci/menu.d/luci-app-kkcar.json` 指向既有 `kkcar/overview` 视图。更新页面时同时复制该菜单和 `overview.js` / `overview.css`，再刷新浏览器；此改动不需要重启网络、DHCP、VPN 或 UPS。若新入口暂未出现在 LuCI 中，先重新载入页面或清理 LuCI 菜单缓存，不要通过重置网络来处理。该入口仍受原 `luci-app-kkcar` ACL 保护。
+
 ## 有线 WAN 配置迁移
 
 `install-ethernet.uc` 会修改 network / firewall / pbr。它要求已有 `br-lan`、WAN 防火墙区、`wan.device=eth1` 且没有待应用更改；重复运行会保留已选择的端口模式。

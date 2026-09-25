@@ -1,6 +1,6 @@
 {
   "admin/kkcar": {
-    "title": "车载网络",
+    "title": "行车总览",
     "order": 1,
     "action": {
       "type": "view",
@@ -12,9 +12,20 @@
       ]
     }
   },
-  "admin/kkcar_notifications": {
-    "title": "飞书推送",
+  "admin/kkcar_connections": {
+    "title": "连接设置",
     "order": 2,
+    "action": {
+      "type": "view",
+      "path": "kkcar/overview"
+    },
+    "depends": {
+      "acl": ["luci-app-kkcar"]
+    }
+  },
+  "admin/kkcar_notifications": {
+    "title": "通知中心",
+    "order": 5,
     "action": {
       "type": "view",
       "path": "kkcar/notifications"
@@ -26,7 +37,7 @@
     }
   },
   "admin/kkcar_dji": {
-    "title": "DJI 4G 模块",
+    "title": "蜂窝与通信",
     "order": 3,
     "action": {
       "type": "view",
@@ -39,7 +50,7 @@
     }
   },
   "admin/kkcar_ups": {
-    "title": "UPS 电源",
+    "title": "电源与设备",
     "order": 4,
     "action": {
       "type": "view",

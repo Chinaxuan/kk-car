@@ -188,6 +188,41 @@ html:has(.kk-studio),body:has(.kk-studio){background:oklch(18% .022 255);color:o
 .kk-studio .kk-chart-heading strong{display:flex;gap:12px}.kk-studio .kk-chart-heading .kk-legend-latency{color:var(--vpn);font-size:11px}.kk-studio .kk-chart-heading .kk-legend-signal{color:var(--radio);font-size:11px}.kk-legend-latency::before,.kk-legend-signal::before{content:'';display:inline-block;width:12px;vertical-align:3px;margin-right:4px;border-top:2px solid currentColor}.kk-legend-signal::before{border-top-style:dashed}
 .kk-studio .kk-line-signal{stroke:var(--radio);stroke-width:2;stroke-dasharray:5 3}.kk-studio .kk-dot-signal{fill:var(--radio)}.kk-studio .kk-axis-label.kk-axis-latency{fill:var(--vpn)}.kk-studio .kk-axis-label.kk-axis-signal{fill:var(--radio)}
 
+/* One operational workspace: a full-width live overview and a separate control page. */
+.kk-studio .kk-workspace{display:block}
+.kk-studio .kk-workspace>[hidden]{display:none!important}
+.kk-studio .kk-path{grid-template-columns:repeat(3,minmax(0,1fr) 19px) minmax(0,1fr);gap:8px}
+.kk-studio .kk-path-node:last-child>strong{color:var(--warn)}
+.kk-studio .kk-plots-combined{display:block}
+.kk-studio .kk-combined-chart{height:162px;min-height:162px}
+.kk-studio .kk-lane-label{font-size:9px;fill:var(--muted)}
+.kk-studio .kk-loss-mark{stroke:var(--danger);stroke-width:2.5;stroke-linecap:round}
+.kk-studio .kk-chart-heading strong{gap:15px;flex-wrap:wrap}
+.kk-studio .kk-chart-heading .kk-legend-rx{color:var(--blue)}
+.kk-studio .kk-chart-heading .kk-legend-tx{color:var(--green)}
+.kk-studio .kk-chart-heading .kk-legend-rx,.kk-studio .kk-chart-heading .kk-legend-tx{font-size:11px}
+.kk-studio .kk-chart-heading .kk-legend-rx:before,.kk-studio .kk-chart-heading .kk-legend-tx:before{content:'';display:inline-block;width:12px;vertical-align:3px;margin-right:4px;border-top:2px solid currentColor}
+.kk-studio .kk-instrument-board{grid-template-columns:repeat(5,minmax(0,1fr))}
+.kk-studio .kk-instrument-group:nth-child(4){border-right:1px solid var(--line);padding-right:10px}
+.kk-studio .kk-instrument-group:nth-child(5){border:0;padding:0 0 0 10px}
+.kk-studio .kk-instrument-group:nth-child(5) h2{color:var(--warn)!important}
+.kk-studio #kk-ups-source,.kk-studio #kk-ups-percent,.kk-studio #kk-ups-voltage{color:var(--warn)}
+.kk-home-actions,.kk-page-jumps{display:flex;flex-wrap:wrap;gap:8px}
+.kk-home-actions{margin:0 0 8px}
+.kk-home-actions a,.kk-page-jumps a{color:var(--blue);font-size:11px;font-weight:650;text-decoration:none;border:1px solid var(--line);background:var(--paper);border-radius:7px;padding:5px 10px}
+.kk-home-actions a:hover,.kk-page-jumps a:hover{border-color:var(--blue);background:oklch(30% .035 255)}
+.kk-page-intro{display:flex;justify-content:space-between;align-items:end;gap:20px;padding:14px 18px;margin:4px 0 12px;border:1px solid var(--line);border-radius:9px;background:var(--paper)}
+.kk-page-intro .kk-eyebrow{display:block;color:var(--blue);font-size:10px;letter-spacing:.12em}
+.kk-page-intro h2{margin:3px 0 4px;font-size:19px;color:var(--ink)}
+.kk-page-intro p{margin:0;color:var(--muted);font-size:11px}
+.kk-connection-page .kk-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.kk-connection-page .kk-control-column>.kk-section{padding:16px!important}
+.kk-connection-page .kk-controls .kk-section-head h2{font-size:15px}
+.kk-connection-page .kk-controls .kk-section-head p,.kk-connection-page .kk-controls .kk-footnote{font-size:11px!important}
+.kk-connection-page .kk-controls .kk-button{font-size:12px;min-height:36px}
+@media(max-width:1099px){.kk-studio .kk-instrument-board{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:12px}.kk-studio .kk-instrument-group:nth-child(3){border:0}.kk-studio .kk-instrument-group:nth-child(4){padding-left:0}.kk-studio .kk-instrument-group:nth-child(5){padding-left:10px}}
+@media(max-width:680px){.kk-studio .kk-path{grid-template-columns:1fr;gap:6px}.kk-studio .kk-combined-chart{height:172px;min-height:172px}.kk-studio .kk-chart-heading{flex-wrap:wrap;gap:4px}.kk-studio .kk-chart-heading strong{gap:8px}.kk-studio .kk-chart-heading span{font-size:10px}.kk-studio .kk-instrument-board{grid-template-columns:1fr}.kk-studio .kk-instrument-group{border:0!important;padding:0!important}.kk-studio .kk-instrument-group:nth-child(5){padding-top:6px!important;border-top:1px solid var(--line)!important}.kk-home-actions a{flex:1 1 40%;text-align:center}.kk-page-intro{display:block;padding:13px}.kk-page-jumps{margin-top:10px}.kk-connection-page .kk-controls{grid-template-columns:1fr}.kk-connection-page .kk-control-column>.kk-section{padding:13px!important}}
+
 /* Separate observed geography from service/account availability. */
 .kk-studio .kk-check-result b.kk-unknown{background:oklch(31% .04 80);color:var(--warn)}
 .kk-studio .kk-ai-result small{font-size:9px;line-height:12px;color:var(--muted)}
