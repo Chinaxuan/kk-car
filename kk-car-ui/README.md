@@ -13,7 +13,7 @@
 
 ## EP-0136 UPS 电源页
 
-`/cgi-bin/luci/admin/kkcar_ups` 通过已登录 LuCI 会话展示 52Pi UPS Plus EP-0136 的实时输入、输出、电池、温度及控制器状态。依赖 `/boot/config.txt` 中的 `dtparam=i2c_arm=on` 与 `i2c-tools`；只读采集，不发送关机/重启指令或安装厂商遥测脚本。电量估计和电流/功率的验证边界见 [UPS 说明](../docs/UPS.md)。
+`/cgi-bin/luci/admin/kkcar_ups` 通过已登录 LuCI 会话展示 52Pi UPS Plus EP-0136 的实时输入、输出、电池、估算电流/功率、RTC、树莓派供电标志及控制器状态，并提供采样周期、来电自启、RTC 校时、低电安全关机和高级电源操作。依赖 `/boot/config.txt` 中的 `dtparam=i2c_arm=on` 与 `i2c-tools`；低电自动关机默认关闭，不安装厂商遥测脚本。电量估计、写入保护和实机验证边界见 [UPS 说明](../docs/UPS.md)。
 
 DJI 控制页现提供电话、短信、信号与流量的快捷入口。网页声音断开而 SIM 通话仍活动时，可手动重连音频；此恢复路径还需真实通话复测。功能与界面对照见 [DJI 开源对标](../docs/DJI-BENCHMARK.md)。
 

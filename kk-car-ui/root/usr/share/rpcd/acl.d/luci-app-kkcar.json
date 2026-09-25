@@ -47,6 +47,12 @@
           "phone_contact_save",
           "phone_contact_delete",
           "voice_ticket"
+        ],
+        "kkups": [
+          "set_option",
+          "save_policy",
+          "rtc_sync",
+          "power_action"
         ]
       }
     }

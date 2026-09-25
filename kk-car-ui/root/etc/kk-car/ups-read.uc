@@ -1,5 +1,5 @@
 'use strict';
-import { access, popen } from 'fs';
+import { access, popen, readfile } from 'fs';
 
 // EP-0136 UPS Plus. This module only reads documented registers.
 function command(cmd) {
@@ -10,38 +10,69 @@ function command(cmd) {
     return rc == 0 ? trim(output || '') : null;
 }
 
-function sample() {
+function bytes(cmd,count) {
+    let raw=command(cmd);
+    if (raw==null) return null;
+    let parts=split(raw,/\s+/), values=[];
+    if (length(parts)!=count) return null;
+    for (let part in parts) {
+        if (!match(part,/^0x[0-9a-fA-F]{2}$/)) return null;
+        push(values,int(part,16));
+    }
+    return values;
+}
+
+function ina219(addr,ohms) {
+    let base='/usr/sbin/i2ctransfer -y 1 w1@'+addr+' ';
+    let config=bytes(base+'0x00 r2',2), shunt=bytes(base+'0x01 r2',2);
+    let bus=bytes(base+'0x02 r2',2), calibration=bytes(base+'0x05 r2',2);
+    if (!config || !shunt || !bus || !calibration) return {detected:false};
+    let word=(b)=>b[0]*256+b[1];
+    let shunt_raw=word(shunt), bus_raw=word(bus);
+    if (shunt_raw>=32768) shunt_raw-=65536;
+    let shunt_uv=shunt_raw*10, bus_mv=(bus_raw>>3)*4;
+    // INA219's current/power registers are zero until calibrated. Derive estimates
+    // from its raw shunt voltage and the resistor values in the vendor's code.
+    let current_ma=shunt_uv/ohms/1000;
+    return {detected:true,bus_mv,shunt_uv,current_ma,power_mw:bus_mv*current_ma/1000,
+        calibration:word(calibration),config:word(config),conversion_ready:!!(bus_raw&2),overflow:!!(bus_raw&1),
+        shunt_ohms:ohms,estimated:true};
+}
+
+function bcd(v) { return (v>>4)*10+(v&15); }
+function rtc() {
+    let raw=bytes('/usr/sbin/i2ctransfer -y 1 w1@0x68 0x00 r7',7);
+    if (!raw) return {detected:false};
+    let halted=!!(raw[0]&0x80);
+    let hour=(raw[2]&0x40) ? bcd(raw[2]&0x1f)%12+(raw[2]&0x20?12:0) : bcd(raw[2]&0x3f);
+    let second=bcd(raw[0]&0x7f),minute=bcd(raw[1]&0x7f);
+    let day=bcd(raw[4]&0x3f),month=bcd(raw[5]&0x1f),year=2000+bcd(raw[6]);
+    let valid=!halted && year>=2020 && month>=1 && month<=12 && day>=1 && day<=31 &&
+        hour<=23 && minute<=59 && second<=59;
+    let stamp=valid?sprintf('%04d-%02d-%02d %02d:%02d:%02d',year,month,day,hour,minute,second):null;
+    return {detected:true,halted,valid,time_register:stamp};
+}
+
+function sample(lite) {
     let result = {ok:false, timestamp:time(), model:'52Pi UPS Plus EP-0136',
         interface:'i2c-1', warnings:[]};
     if (!access('/dev/i2c-1')) {
         result.error='I²C 接口未启用或设备未就绪';
         return result;
     }
-    let raw = command('/usr/sbin/i2ctransfer -y 1 w1@0x17 0x01 r42');
-    if (raw == null) {
+    let values = bytes('/usr/sbin/i2ctransfer -y 1 w1@0x17 0x01 r42',42);
+    if (values == null) {
         result.error='UPS 主控未响应（0x17）';
         return result;
     }
-    let parts = split(raw, /\s+/), bytes=[];
-    if (length(parts) != 42) {
-        result.error='UPS 返回的数据长度不正确';
-        return result;
-    }
-    for (let part in parts) {
-        if (!match(part, /^0x[0-9a-fA-F]{2}$/)) {
-            result.error='UPS 返回了无法解析的数据';
-            return result;
-        }
-        push(bytes, int(part,16));
-    }
-    function u16(reg) { let i=reg-1; return bytes[i] + 256*bytes[i+1]; }
-    function u32(reg) { let i=reg-1; return bytes[i] + 256*bytes[i+1] +
-        65536*bytes[i+2] + 16777216*bytes[i+3]; }
+    function u16(reg) { let i=reg-1; return values[i] + 256*values[i+1]; }
+    function u32(reg) { let i=reg-1; return values[i] + 256*values[i+1] +
+        65536*values[i+2] + 16777216*values[i+3]; }
     let temp=u16(0x0b);
     if (temp>=32768) temp-=65536;
     let charge=u16(0x13), pogo=u16(0x03), battery=u16(0x05);
     let usbC=u16(0x07), micro=u16(0x09), full=u16(0x0d), empty=u16(0x0f);
-    let mode=bytes[0x17-1], interval=u16(0x15), version=u16(0x28);
+    let mode=values[0x17-1], interval=u16(0x15), version=u16(0x28);
     if (pogo>5500 || battery>4500 || usbC>13500 || micro>13500 ||
         temp< -20 || temp>100 || charge>100 || interval<1 || interval>1440 ||
         (mode!=0 && mode!=1) || version<1) {
@@ -55,19 +86,32 @@ function sample() {
     result.ok=true;
     result.battery={percent:charge, millivolts:battery, temperature_c:temp,
         configured_full_mv:full, configured_empty_mv:empty,
-        percent_calibration_required:true};
+        configured_protect_mv:u16(0x11),user_programmed:values[0x2a-1]==1,
+        percent_calibration_unverified:true};
     result.input={external, usb_c_mv:usbC, micro_usb_mv:micro};
     result.output={pogo_mv:pogo, mcu_mv:u16(0x01),
         pi_undervoltage:throttled==null ? null : !!(throttled&1),
+        pi_frequency_capped:throttled==null ? null : !!(throttled&2),
+        pi_frequency_capped_history:throttled==null ? null : !!(throttled&0x20000),
         pi_undervoltage_history:throttled==null ? null : !!(throttled&0x10000),
-        pi_throttled:throttled==null ? null : !!(throttled&4)};
+        pi_throttled:throttled==null ? null : !!(throttled&4),
+        pi_throttled_history:throttled==null ? null : !!(throttled&0x40000),
+        pi_soft_temp_limit:throttled==null ? null : !!(throttled&8),
+        pi_soft_temp_limit_history:throttled==null ? null : !!(throttled&0x80000),
+        power_flags:throttled,
+        cpu_temperature_c:+(trim(readfile('/sys/class/thermal/thermal_zone0/temp') || '0'))/1000};
     result.controller={version, powered:mode==1, sample_minutes:interval,
-        auto_start_on_ac:bytes[0x19-1]==1,
-        shutdown_countdown_s:bytes[0x18-1], restart_countdown_s:bytes[0x1a-1],
+        auto_start_on_ac:values[0x19-1]==1,
+        shutdown_countdown_s:values[0x18-1], restart_countdown_s:values[0x1a-1],
         total_run_s:u32(0x1c), charging_s:u32(0x20), current_run_s:u32(0x24)};
-    result.sensors={pi_supply:access('/sys/bus/i2c/devices/1-0040') || !!command('/usr/sbin/i2ctransfer -y 1 w1@0x40 0x00 r2'),
-        battery:access('/sys/bus/i2c/devices/1-0045') || !!command('/usr/sbin/i2ctransfer -y 1 w1@0x45 0x00 r2'),
-        rtc:access('/sys/bus/i2c/devices/1-0068') || !!command('/usr/sbin/i2ctransfer -y 1 w1@0x68 0x00 r1')};
+    if (!lite) {
+        result.sensors={pi_supply:ina219('0x40',0.00725),battery:ina219('0x45',0.005),rtc:rtc()};
+        let uid=bytes('/usr/sbin/i2ctransfer -y 1 w1@0x17 0xf0 r12',12);
+        if (uid) {
+            let serial='';for (let b in uid) serial+=sprintf('%02X',b);
+            result.controller.serial=serial;
+        }
+    }
     if (!external) push(result.warnings,'外部输入已断开，正在使用电池');
     if (temp>=50) push(result.warnings,'电池温度偏高，请检查散热和充电环境');
     if (pogo<4700) push(result.warnings,'树莓派供电电压偏低');
