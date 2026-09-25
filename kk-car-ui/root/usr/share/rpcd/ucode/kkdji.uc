@@ -39,6 +39,19 @@ function save_storage(result) {
         rename('/tmp/kk-car-dji-sms-storage.json.new','/tmp/kk-car-dji-sms-storage.json');
     }
 }
+function sms_badges() {
+    let badges=filejson('/tmp/kk-car-sms-badge.json');
+    return fresh(badges,120) && type(badges.groups)=='array' ? badges : null;
+}
+function save_sms_seen(id) {
+    let path='/etc/kk-car/private/dji-sms-seen.json';
+    let seen=filejson(path), ids=type(seen.ids)=='object' ? seen.ids : {};
+    ids[id]=true;
+    let temp=path+'.new';
+    if (!writefile(temp,sprintf('%J',{ids}))) return false;
+    chmod(temp,0600);
+    return rename(temp,path);
+}
 function sms_index(input) {
     let result = '' + input;
     return match(result,/^(0|[1-9][0-9]{0,2})$/) && +result <= 255 ? result : null;
@@ -172,7 +185,25 @@ return {'kkdji': {
     action:{args:{action:''},call:function(req) {return start_action(req.args.action);}},
     sms_list:{call:function() {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'短信功能不可用'};
-        let result=call_sms('list',null); save_storage(result); return result;
+        let result=call_sms('list',null); save_storage(result);
+        let badges=sms_badges();
+        if (result.ok && badges && badges.storage==result.storage && type(result.groups)=='array') {
+            for (let group in result.groups) {
+                let badge=filter(badges.groups,b=>b.index==group.index && b.from==group.from && b.time==group.time)[0];
+                group.ui_unread=badge ? badge.unread==true : (group.status=='已发' || group.status=='待发' ? false : null);
+                group.ui_baseline=badge ? badge.baseline==true : false;
+                group.badge_id=badge ? badge.id : null;
+            }
+        }
+        return result;
+    }},
+    sms_ack:{args:{id:''},call:function(req) {
+        let id=req.args.id;
+        if (type(id)!='string' || !match(id,/^[0-9a-f]{64}$/)) return {ok:false,error:'短信标识无效'};
+        let badges=sms_badges();
+        if (!badges || !length(filter(badges.groups,b=>b.id==id)))
+            return {ok:false,error:'短信目录已变化，请刷新'};
+        return save_sms_seen(id) ? {ok:true} : {ok:false,error:'未能保存已读状态'};
     }},
     voice_probe:{call:function() {
         if (!state(false).capabilities.sms_read) return {ok:false,error:'模块控制接口不可用'};

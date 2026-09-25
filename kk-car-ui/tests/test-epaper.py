@@ -36,13 +36,41 @@ class EpaperTests(unittest.TestCase):
         self.assertEqual(console.selected, 1)
         self.assertEqual(console.handle(0, .1, {}), 'gray')
         self.assertEqual(console.view, 'pages')
-        for page in range(5):
+        self.assertEqual(len(epaper.PAGES), 6)
+        for page in range(6):
             console.page = page
-            self.assertEqual(len(epaper.metrics(page, {}, {}, {})), 10)
+            if page:
+                self.assertEqual(len(epaper.metrics(page, {}, {}, {})), 10)
+            else:
+                self.assertEqual(len(epaper.metrics(page, {}, {}, {})), 14)
             frame = epaper.render(console, {}, {})
             self.assertEqual((frame.size, frame.mode), ((264, 176), 'L'))
             self.assertEqual(frame.getpixel((240, 171)), 0)  # solid high-contrast footer
             self.assertTrue(set(frame.tobytes()).issubset({0, 192, 255}))
+
+    def test_home_uses_distinct_fresh_sources_and_unread_badge(self):
+        now = time.time()
+        car = {'ok': True, 'timestamp': now, 'uptime': 1000,
+               'wan': {'up': True}, 'vpn': {'connected': True, 'ip': '10.8.250.1', 'age': 700},
+               'vpn_ping': {'timestamp': now, 'uptime': 995, 'avg_ms': 23, 'loss_percent': 0},
+               'modem': {'online': True, 'timestamp': now, 'rsrp': -87},
+               'telemetry': {'loads': ['.12', '.28', '.41']},
+               'memory': {'total': 100, 'available': 82}, 'temperature': 54,
+               'wifi': {'clients': 2}}
+        ups = {'ok': True, 'sensors': {'pi_supply': {'detected': True, 'power_mw': 7100}}}
+        aux = {'radio': {'band': 'LTE B1', 'earfcn': 300},
+               'traffic': {'estimated_remaining': 193273528320, 'day': {'rx': 200000000, 'tx': 300000000}},
+               'sms': {'unread_known': True, 'unread_count': 2}}
+        fields = epaper.metrics(0, car, ups, {}, aux)
+        self.assertEqual((fields['band'], fields['earfcn'], fields['unread'], fields['memory']),
+                         ('B1', 300, 2, '18%'))
+        frame = epaper.render(epaper.Console(), car, ups, aux=aux)
+        self.assertEqual(frame.getpixel((7, 85)), 0)  # inverted SMS alert
+        car['vpn']['connected'] = False
+        car['modem']['timestamp'] = now - 100
+        fields = epaper.metrics(0, car, ups, {}, aux)
+        self.assertIsNone(fields['vpn_ip'])
+        self.assertEqual(fields['band'], '--')
 
     def test_battery_header_uses_current_direction(self):
         ups = {'ok': True, 'battery': {'percent': 85},

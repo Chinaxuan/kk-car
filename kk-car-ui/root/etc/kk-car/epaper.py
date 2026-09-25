@@ -20,7 +20,7 @@ from epaper_lut import LUT_DATA_4GRAY
 
 WIDTH, HEIGHT = 264, 176
 KEYS = (5, 6, 13, 19)  # KEY1=home/back, KEY2=up, KEY3=down, KEY4=menu/confirm
-PAGES = ('OVERVIEW', 'CELLULAR', 'VPN / DATA', 'UPS / POWER', 'SYSTEM')
+PAGES = ('OVERVIEW', 'CELLULAR', 'VPN', 'SMS / DATA', 'UPS / POWER', 'SYSTEM')
 MENU = (
     ('diagnose', 'Run network check'),
     ('modem_refresh', 'Refresh LTE status'),
@@ -61,6 +61,25 @@ def read_status():
     return car, ups
 
 
+def read_aux():
+    """Use existing, short-lived modem caches; never wait on another AT call."""
+    sources = {'radio': ('/tmp/kk-car-dji-at.json', 600),
+               'traffic': ('/tmp/kk-car-dji-traffic.json', 180),
+               'sms': ('/tmp/kk-car-sms-forward-status.json', 120),
+               'storage': ('/tmp/kk-car-dji-sms-storage.json', 600)}
+    result = {}
+    now = time.time()
+    for name, (path, lifetime) in sources.items():
+        try:
+            data = json.loads(Path(path).read_text())
+            stamp = data.get('timestamp')
+            if isinstance(stamp, (int, float)) and 0 <= now - stamp <= lifetime:
+                result[name] = data
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+    return result
+
+
 def load_refresh():
     try:
         value = json.loads(SETTINGS_PATH.read_text()).get('refresh_seconds')
@@ -94,6 +113,24 @@ def mib(v):
     return number(v / 1048576, ' MiB', 1) if isinstance(v, (int, float)) else '--'
 
 
+def size(v):
+    if not isinstance(v, (int, float)) or isinstance(v, bool) or v < 0:
+        return '--'
+    for unit, divisor in (('GiB', 1073741824), ('MiB', 1048576), ('KiB', 1024)):
+        if v >= divisor:
+            return f'{v / divisor:.1f}{unit}'
+    return f'{v:.0f}B'
+
+
+def percentage(used, total):
+    return number(100 * (total - used) / total, '%') if isinstance(total, (int, float)) and total > 0 and isinstance(used, (int, float)) else '--'
+
+
+def short_band(radio):
+    band = radio.get('band')
+    return str(band).replace('LTE ', '') if band else '--'
+
+
 def fresh_data(car, ups):
     wan, vpn = car.get('wan') or {}, car.get('vpn') or {}
     ping, modem = car.get('vpn_ping') or {}, car.get('modem') or {}
@@ -108,8 +145,12 @@ def fresh_data(car, ups):
     return wan, vpn, ping, modem, ups
 
 
-def metrics(page, car, ups, rates):
+def metrics(page, car, ups, rates, aux=None):
+    aux = aux or {}
     wan, vpn, ping, modem, ups = fresh_data(car, ups)
+    radio = aux.get('radio') or {}
+    traffic = aux.get('traffic') or {}
+    sms = aux.get('sms') or {}
     uplink, wifi = car.get('uplink') or {}, car.get('wifi') or {}
     eth, power = car.get('ethernet') or {}, car.get('power') or {}
     battery, output, inputs = ups.get('battery') or {}, ups.get('output') or {}, ups.get('input') or {}
@@ -121,52 +162,69 @@ def metrics(page, car, ups, rates):
     ping_ms = number(ping.get('avg_ms'), ' ms', 1)
     loss = number(ping.get('loss_percent'), ' %')
     net = modem.get('network') or '--'
-    band = modem.get('band') or '--'
+    band = short_band(radio) if modem else '--'
     peers = wifi.get('clients') if isinstance(wifi.get('clients'), int) else None
     uptime = car.get('uptime')
+    memory = car.get('memory') or {}
+    loads = (car.get('telemetry') or {}).get('loads') or []
+    load = '/'.join(str(v) for v in loads[:3]) if len(loads) >= 3 else '--'
+    power_w = (ups.get('sensors') or {}).get('pi_supply') or {}
+    watt = '~' + number(power_w.get('power_mw') / 1000, 'W', 1) if power_w.get('detected') and isinstance(power_w.get('power_mw'), (int, float)) else '--'
+    unread = sms.get('unread_count') if sms.get('unread_known') is True else None
+    remaining = traffic.get('estimated_remaining')
+    today = traffic.get('day') or {}
+    today_bytes = today.get('rx', 0) + today.get('tx', 0) if isinstance(today.get('rx'), (int, float)) and isinstance(today.get('tx'), (int, float)) else None
     if page == 0:
-        return (
-            ('PING / LOSS', f'{number(ping.get("avg_ms"), "ms", 0)}/{number(ping.get("loss_percent"), "%")}' if ping else '--'), ('RSRP', number(modem.get('rsrp'), ' dBm')),
-            ('UPLINK', source), ('SINR', number(modem.get('snr'), ' dB', 1)),
-            ('VPN', 'ONLINE' if vpn.get('connected') else 'OFFLINE'), ('BAND', str(band)),
-            ('DOWN', number(rates.get('down'), ' Mbps', 2)), ('UPS OUTPUT', volts),
-            ('UP', number(rates.get('up'), ' Mbps', 2)), ('CLIENTS', number(peers)),
-        )
+        return {
+            'ping': ping, 'modem': modem, 'band': band,
+            'earfcn': radio.get('earfcn') if modem else None,
+            'unread': unread, 'vpn_ip': vpn.get('ip') if vpn.get('connected') else None,
+            'vpn_age': age(vpn.get('age')) if vpn.get('connected') else '--',
+            'load': load, 'memory': percentage(memory.get('available'), memory.get('total')),
+            'temperature': temp, 'clients': number(peers), 'power': watt,
+            'remaining': size(remaining), 'today': size(today_bytes),
+        }
     if page == 1:
         return (
+            ('RSRP', number(modem.get('rsrp'), ' dBm')), ('SINR', number(modem.get('snr'), ' dB', 1)),
+            ('BAND', band), ('EARFCN', number(radio.get('earfcn')) if modem else '--'),
+            ('RSRQ', number(modem.get('rsrq'), ' dB')), ('RSSI', number(modem.get('rssi'), ' dBm')),
             ('NETWORK', net), ('OPERATOR', modem.get('operator') or '--'),
-            ('BAND', str(band)), ('SIM', modem.get('sim_state') or '--'),
-            ('RSRP', number(modem.get('rsrp'), ' dBm')), ('RSRQ', number(modem.get('rsrq'), ' dB')),
-            ('SINR', number(modem.get('snr'), ' dB', 1)), ('RSSI', number(modem.get('rssi'), ' dBm')),
-            ('REGISTERED', str(modem.get('registration') or '--')), ('SESSION', age(modem.get('connection_uptime'))),
+            ('PCI', number(radio.get('pci')) if modem else '--'), ('SESSION', age(modem.get('connection_uptime'))),
         )
     if page == 2:
         return (
-            ('TUNNEL', 'ONLINE' if vpn.get('connected') else 'OFFLINE'), ('AUTO START', 'ON' if vpn.get('auto') else 'OFF'),
-            ('ROUTE', 'READY' if vpn.get('route') else 'MISSING'), ('UPTIME', age(vpn.get('age')) if vpn.get('connected') else '--'),
             ('VPN RTT', ping_ms), ('PING LOSS', loss),
-            ('DOWN', number(rates.get('down'), ' Mbps', 2)), ('UP', number(rates.get('up'), ' Mbps', 2)),
-            ('WAN RX', mib(wan.get('rx'))), ('WAN TX', mib(wan.get('tx'))),
+            ('TUNNEL', 'ONLINE' if vpn.get('connected') else 'OFFLINE'), ('VPN ADDRESS', vpn.get('ip') if vpn.get('connected') else '--'),
+            ('UPTIME', age(vpn.get('age')) if vpn.get('connected') else '--'), ('ROUTE', 'READY' if vpn.get('route') else 'MISSING'),
+            ('AUTO START', 'ON' if vpn.get('auto') else 'OFF'), ('REKEY', age((car.get('telemetry') or {}).get('rekey'))),
+            ('VPN RX', size(vpn.get('rx'))), ('VPN TX', size(vpn.get('tx'))),
         )
     if page == 3:
+        return (
+            ('EST. LEFT', size(remaining)), ('TODAY', size(today_bytes)),
+            ('UNREAD SMS', number(unread)), ('SMS STORED', number((aux.get('storage') or {}).get('used'))),
+            ('THIS MONTH', size(sum(v for v in ((traffic.get('month') or {}).get(k) for k in ('rx', 'tx')) if isinstance(v, (int, float)))) if traffic.get('month') else '--'), ('EST. USED', size(traffic.get('estimated_used'))),
+            ('LAST QUERY', traffic.get('last_query_day') or '--'), ('SMS FORWARD', 'ON' if sms.get('enabled') else 'OFF' if sms else '--'),
+            ('LIVE DOWN', number(rates.get('down'), ' Mbps', 2)), ('LIVE UP', number(rates.get('up'), ' Mbps', 2)),
+        )
+    if page == 4:
         external = inputs.get('external')
         origin = 'EXTERNAL' if external is True else 'BATTERY' if external is False else '--'
         millivolts = battery.get('millivolts')
         return (
-            ('SOURCE', origin), ('PI POWER', 'LOW' if power.get('undervoltage') else 'OK' if power.get('known') else '--'),
-            ('BATTERY', batt), ('UPS OUTPUT', volts),
+            ('BATTERY', batt), ('PI POWER', watt),
+            ('SOURCE', origin), ('UPS OUTPUT', volts),
             ('BATTERY V', number(millivolts / 1000, ' V', 2) if isinstance(millivolts, (int, float)) else '--'), ('BATTERY T', number(battery.get('temperature_c'), ' C', 1)),
             ('USB-C IN', number(inputs.get('usb_c_mv') / 1000, ' V', 1) if isinstance(inputs.get('usb_c_mv'), (int, float)) else '--'), ('MICRO IN', number(inputs.get('micro_usb_mv') / 1000, ' V', 1) if isinstance(inputs.get('micro_usb_mv'), (int, float)) else '--'),
-            ('PI TEMP', temp), ('THROTTLED', 'YES' if power.get('throttled') else 'NO' if power.get('known') else '--'),
+            ('PI POWER IN', 'LOW' if power.get('undervoltage') else 'OK' if power.get('known') else '--'), ('PI TEMP', temp),
         )
-    memory = car.get('memory') or {}
-    free = memory.get('available')
     auto = car.get('diagnostics_auto') or {}
     return (
-        ('WI-FI SSID', wifi.get('ssid') or '--'), ('CLIENTS', number(peers)),
+        ('LOAD 1/5/15', load), ('MEM USED', percentage(memory.get('available'), memory.get('total'))),
+        ('CLIENTS', number(peers)), ('WI-FI SSID', wifi.get('ssid') or '--'),
         ('WI-FI BAND', (wifi.get('band') or '--').upper()), ('CHANNEL', str(wifi.get('channel') or '--')),
         ('ETH PORT', (eth.get('mode') or '--').upper()), ('ETH LINK', 'UP' if eth.get('carrier') else 'DOWN'),
-        ('PI TEMP', temp), ('MEM FREE', mib(free)),
         ('UPTIME', age(uptime)), ('AUTO CHECK', 'ON' if auto.get('enabled') else 'OFF'),
     )
 
@@ -381,9 +439,53 @@ def fitted(draw, text, face, width):
     return text + '..'
 
 
-def render(console, car, ups, rates=None):
+def render_home(draw, data):
+    """Hierarchy: two large radio/VPN figures, SMS alert, then four detail rows."""
+    small, compact = font(11), font(13)
+    ping, modem = data['ping'], data['modem']
+    draw.text((7, 33), 'VPN LATENCY', fill=0, font=small)
+    latency = number(ping.get('avg_ms'), decimals=0)
+    draw.text((7, 39), fitted(draw, latency, font(31), 70), fill=0, font=font(31))
+    draw.text((83, 57), 'ms' if latency != '--' else '', fill=0, font=compact)
+    draw.text((99, 34), 'LOSS', fill=0, font=font(10))
+    draw.text((99, 45), fitted(draw, number(ping.get('loss_percent'), '%'), font(17), 32), fill=0, font=font(17))
+    draw.text((139, 33), 'RSRP', fill=0, font=small)
+    draw.text((139, 40), fitted(draw, number(modem.get('rsrp')), font(29), 70), fill=0, font=font(29))
+    draw.text((196, 57), 'dBm' if modem.get('rsrp') is not None else '', fill=0, font=font(12))
+    draw.text((226, 33), fitted(draw, data['band'], font(14), 36), fill=0, font=font(14))
+    earfcn = data['earfcn']
+    draw.text((220, 49), fitted(draw, 'E' + str(earfcn) if earfcn is not None else '--', font(12), 42), fill=0, font=font(12))
+    draw.line((0, 78, 263, 78), fill=0)
+    draw.line((132, 32, 132, 78), fill=192)
+    unread = data['unread']
+    if isinstance(unread, int) and unread > 0:
+        draw.rectangle((6, 82, 105, 99), fill=0)
+        draw.text((12, 82), fitted(draw, f'SMS {unread} NEW', font(14), 88), fill=255, font=font(14))
+    else:
+        draw.text((12, 82), 'SMS ' + (str(unread) if unread is not None else '--') + ' NEW', fill=0, font=font(14))
+    vpn_label = 'VPN ' + (data['vpn_ip'] or '--')
+    draw.text((139, 82), fitted(draw, vpn_label, compact, 122), fill=0, font=compact)
+    draw.line((0, 102, 263, 102), fill=0)
+    rows = (
+        (('VPN UP', data['vpn_age']), ('LOAD', data['load'])),
+        (('MEM', data['memory']), ('TEMP', data['temperature'])),
+        (('CLIENTS', data['clients']), ('POWER', data['power'])),
+        (('LEFT', data['remaining']), ('TODAY', data['today'])),
+    )
+    for row, pair in enumerate(rows):
+        y = 103 + row * 14
+        draw.line((0, y + 13, 263, y + 13), fill=192)
+        for column, (label, result) in enumerate(pair):
+            x = 6 + 132 * column
+            draw.text((x, y), label, fill=0, font=small)
+            value_x = x + max(36, int(draw.textlength(label, font=small)) + 4)
+            draw.text((value_x, y), fitted(draw, result, compact, x + 126 - value_x), fill=0, font=compact)
+    draw.line((132, 79, 132, 158), fill=192)
+
+
+def render(console, car, ups, rates=None, aux=None):
     """Render an actual four-level 264x176 frame without touching the HAT."""
-    rates = rates or {}
+    rates, aux = rates or {}, aux or {}
     image = Image.new('L', (WIDTH, HEIGHT), 255)
     draw = CrispDraw(image)
     small, value_font, title_font = font(11), font(14), font(19)
@@ -405,17 +507,20 @@ def render(console, car, ups, rates=None):
               fill=255, font=small)
     controls = None
     if console.view == 'pages':
-        items = metrics(console.page, car, ups, rates)
-        for i, (label, value) in enumerate(items):
-            row, col = divmod(i, 2)
-            x, y = 7 + col * 130, 33 if row == 0 else 67 + (row - 1) * 23
-            draw.text((x, y), fitted(draw, label, small, 120), fill=0, font=small)
-            face = font(20) if console.page == 0 and row == 0 else value_font
-            draw.text((x, y + (7 if row == 0 else 8)),
-                      fitted(draw, value, face, 119), fill=0, font=face)
-            if row < 4:
-                rule_y = 65 if row == 0 else y + 23
-                draw.line((x, rule_y, x + 120, rule_y), fill=192)
+        items = metrics(console.page, car, ups, rates, aux)
+        if console.page == 0:
+            render_home(draw, items)
+        else:
+            for i, (label, value) in enumerate(items):
+                row, col = divmod(i, 2)
+                x, y = 7 + col * 130, 33 if row == 0 else 67 + (row - 1) * 23
+                draw.text((x, y), fitted(draw, label, small, 120), fill=0, font=small)
+                face = font(20) if row == 0 else value_font
+                draw.text((x, y + (7 if row == 0 else 8)),
+                          fitted(draw, value, face, 119), fill=0, font=face)
+                if row < 4:
+                    rule_y = 65 if row == 0 else y + 23
+                    draw.line((x, rule_y, x + 120, rule_y), fill=192)
         footer = '1 HOME  2 UP  3 DOWN  4 SET'
         controls = ('1 HOME', '2 UP', '3 DOWN', '4 SET')
     elif console.view == 'menu':
@@ -720,7 +825,7 @@ def rates_from(car, last_counters, now):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--preview', metavar='PNG')
-    parser.add_argument('--page', type=int, choices=range(1, 6), default=1)
+    parser.add_argument('--page', type=int, choices=range(1, len(PAGES) + 1), default=1)
     parser.add_argument('--view', choices=('pages', 'menu', 'confirm', 'pending', 'result'), default='pages')
     parser.add_argument('--once', action='store_true')
     parser.add_argument('--mode', choices=('gray', 'fast'), default='gray')
@@ -735,7 +840,7 @@ def main():
                            'started': time.time() - 25, 'deadline': time.time() + 100}
     if args.preview:
         car, ups = read_status()
-        render(console, car, ups).save(args.preview)
+        render(console, car, ups, aux=read_aux()).save(args.preview)
         return
     paper = Paper()
     counts = [0, 0, 0, 0]
@@ -746,7 +851,7 @@ def main():
     last_pending_read = 0
     last_counters = None
     rates = {}
-    car, ups = {}, {}
+    car, ups, aux = {}, {}, {}
     try:
         while True:
             now = time.monotonic()
@@ -774,7 +879,8 @@ def main():
             if periodic or pending_changed or redraw:
                 car, ups = read_status()
                 rates, last_counters = rates_from(car, last_counters, now)
-                image = render(console, car, ups, rates)
+                aux = read_aux()
+                image = render(console, car, ups, rates, aux)
                 mode = 'gray' if periodic and console.view == 'pages' else redraw or 'partial'
                 if args.once:
                     mode = args.mode

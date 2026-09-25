@@ -38,6 +38,7 @@
         "kkdji": [
           "action",
           "sms_send",
+          "sms_ack",
           "sms_delete",
           "traffic_save",
           "traffic_query",

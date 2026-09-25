@@ -10,6 +10,8 @@ import { read_config, valid_url } from '/etc/kk-car/notify-config.uc';
 const dir='/tmp/kk-car-sms-forward';
 const state_path='/etc/kk-car/private/dji-sms-forward-state.json';
 const status_path='/tmp/kk-car-sms-forward-status.json';
+const badge_path='/tmp/kk-car-sms-badge.json';
+const seen_path='/etc/kk-car/private/dji-sms-seen.json';
 const archive_dir='/etc/kk-car/private/sms-archive';
 const recipient='/etc/kk-car/private/sms-archive-recipient.pem';
 function parse(path) { try { return json(readfile(path) || ''); } catch(e) { return null; } }
@@ -83,10 +85,13 @@ function send(dest,text) {
 }
 
 if (!mkdir(dir,0700)) exit(0); // a previous poll still owns the tmpfs workdir
-let summary={timestamp:time(),enabled:false,initialized:false,pending:0,last_success:null,error:null};
+let summary={timestamp:time(),enabled:false,initialized:false,pending:0,last_success:null,
+    unread_count:null,unread_known:false,error:null};
 function process_messages() {
     let c=read_config(), list=sms('list',null);
-    if (!list?.ok || type(list.groups)!='array') { summary.error='短信目录暂不可读'; return; }
+    if (!list?.ok || type(list.groups)!='array') {
+        unlink(badge_path); summary.error='短信目录暂不可读'; return;
+    }
     let state=parse(state_path);
     if (!state || type(state.entries)!='array' || !match(state.salt || '',/^[0-9a-f]{64}$/)) {
         let salt=run('head -c 32 /dev/urandom | hexdump -v -e \'1/1 "%02x"\'');
@@ -95,18 +100,30 @@ function process_messages() {
     }
     summary.enabled=c.enabled==true && c.events?.sms_received==true;
     summary.initialized=state.initialized;
+    let seen=parse(seen_path)?.ids || {};
+    let badges=[];
+    let unread=0;
+    let incomplete=false;
     // A SIM/module store switch can expose historical messages that were not
     // visible in the previous poll. Archive them, but never label them new.
     let storage_changed=state.storage!=null && state.storage!=list.storage;
     for (let group in list.groups) {
-        if (!group.complete || !group.from || !group.time || group.status=='已发' || group.status=='待发') continue;
+        if (group.status=='已发' || group.status=='待发') continue;
+        if (!group.complete || !group.from || !group.time) { incomplete=true; continue; }
         let id=fingerprint(state,group);
         if (!id) { summary.error='无法识别短信'; return; }
         let existing=filter(state.entries,e=>e.id==id)[0];
         if (!existing) {
             existing={id,baseline:!state.initialized || !summary.enabled || storage_changed,archived:false,delivered:{}};
+            // Automatic archival reads the SIM slot, but is not a user read.
+            existing.unread=state.initialized && !storage_changed;
+            existing.legacy=!state.initialized || storage_changed;
             push(state.entries,existing);
         }
+        let is_new=existing.unread==true && seen[id]!=true;
+        if (is_new) unread++;
+        push(badges,{id,index:group.index,from:group.from,time:group.time,
+            unread:is_new,baseline:existing.legacy==true || (existing.unread==null && existing.baseline==true)});
         let targets=existing.baseline || !summary.enabled ? [] : filter(c.destinations || [],d=>d.enabled && valid_url(d.url));
         let waiting=filter(targets,d=>existing.delivered[d.id]!=true);
         if (existing.archived && !length(waiting)) continue;
@@ -131,7 +148,12 @@ function process_messages() {
     state.storage=list.storage;
     if (length(state.entries)>512) state.entries=slice(state.entries,length(state.entries)-512);
     if (!save(state_path,state)) { summary.error='无法保存去重状态'; return; }
+    if (!save(badge_path,{timestamp:summary.timestamp,storage:list.storage,groups:badges})) {
+        summary.error='无法保存短信提示'; return;
+    }
     summary.initialized=true;
+    summary.unread_count=incomplete ? null : unread;
+    summary.unread_known=!incomplete;
 }
 process_messages();
 save(status_path,summary);

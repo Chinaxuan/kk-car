@@ -8,6 +8,7 @@ var getDji = rpc.declare({object:'kkdji',method:'status',expect:{}});
 var djiAction = rpc.declare({object:'kkdji',method:'action',params:['action'],expect:{}});
 var smsList = rpc.declare({object:'kkdji',method:'sms_list',expect:{}});
 var smsRead = rpc.declare({object:'kkdji',method:'sms_read',params:['index'],expect:{}});
+var smsAck = rpc.declare({object:'kkdji',method:'sms_ack',params:['id'],expect:{}});
 var smsSend = rpc.declare({object:'kkdji',method:'sms_send',params:['to','text'],expect:{}});
 var smsDelete = rpc.declare({object:'kkdji',method:'sms_delete',params:['index'],expect:{}});
 var voiceProbe = rpc.declare({object:'kkdji',method:'voice_probe',expect:{}});
@@ -653,12 +654,13 @@ return view.extend({
             var still=selected && messages.some(function(x){return Number(x.index)===self.selectedSmsIndex && x.from===selected.from && x.time===selected.time;});
             if(!still)self.clearSmsDetail();
             self.smsItems=messages.slice().sort(function(a,b){
-                var unreadA=a.status==='未读'?1:0,unreadB=b.status==='未读'?1:0;
+                var unreadA=a.ui_unread===true?1:0,unreadB=b.ui_unread===true?1:0;
                 return unreadB-unreadA || String(b.time || '').localeCompare(String(a.time || ''));
             });
-            var unread=self.smsItems.filter(function(x){return x.status==='未读';}).length;
-            self.el('kk-dji-sms-count').textContent=messages.length+' 条短信'+(unread?' · '+unread+' 条未读':'')+' / '+reply.count+' 个存储槽';
-            self.set('kk-dji-shortcut-sms',unread?unread+' 条未读':messages.length+' 条短信');
+            var unread=self.smsItems.filter(function(x){return x.ui_unread===true;}).length;
+            var badgeKnown=self.smsItems.every(function(x){return typeof x.ui_unread==='boolean';});
+            self.el('kk-dji-sms-count').textContent=messages.length+' 条短信 · '+(badgeKnown?unread+' 条未查看':'未查看状态待同步')+' / '+reply.count+' 个存储槽';
+            self.set('kk-dji-shortcut-sms',badgeKnown&&unread?unread+' 条未查看':messages.length+' 条短信');
             self.renderSmsItems();
         }).catch(function(err){if(!background || !self.smsItems.length)self.smsListArea.textContent='短信目录读取失败：'+(err.message || '未知错误');}).finally(function(){self.smsLoading=false;self.smsListButton.disabled=false;});
     },
@@ -672,7 +674,7 @@ return view.extend({
             var index=Number(item.index),safe=Number.isInteger(index)&&index>=0&&index<=255;
             var select=E('button',{type:'button','class':'kk-dji-sms-item'+(index===self.selectedSmsIndex?' selected':''),
                 click:function(){self.readSms(index);}},[
-                E('span',{'class':'kk-dji-sms-item-top'},[E('strong',{},shown(item.from || item.number,'未知号码')),E('small',{},shown(item.status,'状态未知'))]),
+                E('span',{'class':'kk-dji-sms-item-top'},[E('strong',{},shown(item.from || item.number,'未知号码')),E('small',{},item.ui_unread===true?'未查看':item.ui_baseline===true?'历史短信':item.ui_unread===false?'已查看':'待同步')]),
                 E('span',{'class':'kk-dji-sms-item-bottom'},[E('span',{},shown(item.time,'时间未知')),E('span',{},item.concat?'长短信 '+item.parts.filter(function(n){return Number.isInteger(n);}).length+'/'+item.concat.total+(item.complete?' · 查看合并正文 →':' · 缺少片段'):'查看正文 →')])
             ]);
             select.disabled=!safe;
@@ -718,6 +720,16 @@ return view.extend({
             self.smsDetailBody.textContent=(item.complete?'':'片段尚未收齐，以下内容不完整：\n')+(body || '这是一条空短信。');
             self.smsDeleteButton.disabled=self.capabilities.sms_delete!==true;
             self.smsReplyButton.disabled=!/^\+?[0-9]{3,15}$/.test(item.from || '');
+            if(item.complete && item.badge_id && item.ui_unread===true){
+                smsAck(item.badge_id).then(function(reply){
+                    if(!reply || reply.ok!==true)return;
+                    item.ui_unread=false;
+                    self.renderSmsItems();
+                    var unread=self.smsItems.filter(function(x){return x.ui_unread===true;}).length;
+                    self.el('kk-dji-sms-count').textContent=self.smsItems.length+' 条短信 · '+unread+' 条未查看';
+                    self.set('kk-dji-shortcut-sms',unread?unread+' 条未查看':self.smsItems.length+' 条短信');
+                }).catch(function(){});
+            }
         }).catch(function(err){if(self.smsRequestId===requestId && self.selectedSmsIndex===index)self.smsDetailBody.textContent='读取失败：'+(err.message || '未知错误');})
             .finally(function(){if(self.smsRequestId===requestId)self.smsReading=false;});
     },
