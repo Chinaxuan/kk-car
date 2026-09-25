@@ -53,7 +53,26 @@ function rtc() {
     return {detected:true,halted,valid,time_register:stamp};
 }
 
-function sample(lite) {
+function validRaw(v) {
+    if (!v || length(v)!=42) return false;
+    let u16=(reg)=>v[reg-1]+256*v[reg];
+    let u32=(reg)=>u16(reg)+65536*u16(reg+2);
+    let temperature=u16(0x0b);
+    if (temperature>=32768) temperature-=65536;
+    let total=u32(0x1c),charging=u32(0x20),current=u32(0x24);
+    return u16(0x01)>=2400 && u16(0x01)<=3600 &&
+        u16(0x03)<=5500 && u16(0x05)<=4500 &&
+        u16(0x07)<=13500 && u16(0x09)<=13500 &&
+        temperature>=-20 && temperature<=100 &&
+        u16(0x0d)<=4500 && u16(0x0f)<=4500 && u16(0x11)<=4500 &&
+        u16(0x13)<=100 && u16(0x15)>=1 && u16(0x15)<=1440 &&
+        (v[0x17-1]==0 || v[0x17-1]==1) &&
+        u16(0x28)>=1 && u16(0x28)<=255 &&
+        total<=2147483647 && charging<=2147483647 && current<=2147483647 &&
+        current<=total+120 && charging<=total+86400;
+}
+
+function sample(lite,attempt) {
     let result = {ok:false, timestamp:time(), model:'52Pi UPS Plus EP-0136',
         interface:'i2c-1', warnings:[]};
     if (!access('/dev/i2c-1')) {
@@ -62,6 +81,7 @@ function sample(lite) {
     }
     let values = bytes('/usr/sbin/i2ctransfer -y 1 w1@0x17 0x01 r42',42);
     if (values == null) {
+        if ((attempt || 0)<2) return sample(lite,(attempt || 0)+1);
         result.error='UPS 主控未响应（0x17）';
         return result;
     }
@@ -73,9 +93,8 @@ function sample(lite) {
     let charge=u16(0x13), pogo=u16(0x03), battery=u16(0x05);
     let usbC=u16(0x07), micro=u16(0x09), full=u16(0x0d), empty=u16(0x0f);
     let mode=values[0x17-1], interval=u16(0x15), version=u16(0x28);
-    if (pogo>5500 || battery>4500 || usbC>13500 || micro>13500 ||
-        temp< -20 || temp>100 || charge>100 || interval<1 || interval>1440 ||
-        (mode!=0 && mode!=1) || version<1) {
+    if (!validRaw(values)) {
+        if ((attempt || 0)<2) return sample(lite,(attempt || 0)+1);
         result.error='UPS 数值超出合理范围；已隐藏本次读数';
         return result;
     }
@@ -120,4 +139,4 @@ function sample(lite) {
     return result;
 }
 
-export { sample };
+export { sample, validRaw };

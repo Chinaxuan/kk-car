@@ -49,7 +49,7 @@ return view.extend({
     render:function(data){
         var self=this;
         document.title='KK-Car · DJI 4G';
-        ['overview','dji-console-v2'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')+(name==='dji-console-v2'?'?v=20260925-4':'')}));});
+        ['overview','dji-console-v2'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')+'?v=20260925-ui1'}));});
         this.notice=E('div',{'class':'kk-notice',role:'status','aria-live':'polite',hidden:true});
         this.summary=E('strong',{id:'kk-dji-summary'},'读取中');
         this.refreshButton=button('刷新状态',function(){self.refresh(true);});
@@ -98,7 +98,7 @@ return view.extend({
         this.root=E('div',{'class':'kk-app kk-studio kk-dji'},[
             E('header',{'class':'kk-header'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'DJ'),E('div',{},[E('h1',{},'DJI 4G 模块'),E('p',{},'蜂窝线路 · 信号、连接与模块控制')])]),
-                E('div',{'class':'kk-header-links'},[E('span',{id:'kk-dji-update'},'读取中'),E('a',{href:L.url('admin/kkcar')},'返回网络面板'),E('a',{href:L.url('admin/kkcar_notifications')},'飞书推送')])
+                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-dji-update'},'读取中'),E('a',{href:L.url('admin/kkcar')},'网络总览'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_dji')},'DJI 4G'),E('a',{href:L.url('admin/kkcar_ups')},'UPS 电源'),E('a',{href:L.url('admin/kkcar_notifications')},'飞书推送')])
             ]),
             this.notice,
             E('section',{'class':'kk-dji-hero'},[

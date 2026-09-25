@@ -15,12 +15,13 @@ return view.extend({
     render:function(data){
         var self=this,c=data.config;this.fields={};this.switches={};this.targets=[];
         document.title='KK-Car · 飞书推送';
-        ['overview','notifications'].forEach(function(n){var id='kk-css-'+n;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+n+'.css')}));});
+        ['overview','notifications'].forEach(function(n){var id='kk-css-'+n;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+n+'.css')+'?v=20260925-ui1'}));});
         this.master=check('notify-enabled','启用飞书推送',c.enabled);
         this.notice=E('p',{'class':'kk-notice',role:'status','aria-live':'polite',hidden:true});
         this.status=E('div',{'class':'kk-push-status','aria-live':'polite'});
         this.saveButton=E('button',{type:'submit','class':'kk-button primary'},'保存推送设置');
-        this.testButton=E('button',{type:'button','class':'kk-button',click:function(){self.perform(test(),'测试已排队，请看下方各地址的发送结果。');}},'发送测试通知');
+        this.testButton=E('button',{type:'button','class':'kk-button',click:function(){if(self.dirty){self.showMessage('请先保存当前修改，再发送测试通知。',true);return;}self.perform(test(),'测试已排队，请看下方各地址的发送结果。');}},'发送测试通知');
+        this.unsaved=E('span',{'class':'kk-push-unsaved',role:'status','aria-live':'polite'},'设置已保存');
         var eventNodes=events.map(function(e){var f=check('notify-'+e[0],e[1],c.events[e[0]]);self.switches[e[0]]=f.input;return f.node;});
         var thresholdNodes=limits.map(function(l){var f=E('input',{id:'notify-'+l[0],type:'number',min:l[2],max:l[3],step:1,value:c[l[0]],required:true});self.fields[l[0]]=f;return E('label',{'class':'kk-push-field',for:'notify-'+l[0]},[E('span',{},l[1]),f]);});
         var destinations=c.destinations.map(function(d,i){
@@ -36,14 +37,20 @@ return view.extend({
                     E('label',{'class':'kk-push-field',for:'notify-url-'+i},[E('span',{},'Webhook · 不回显'),url])]),clear.node]);
         });
         var form=E('form',{submit:function(e){e.preventDefault();self.submit();}},[
-            E('div',{'class':'kk-push-toolbar'},[this.master.node,E('div',{'class':'kk-actions'},[this.saveButton,this.testButton])]),
+            E('div',{'class':'kk-push-toolbar'},[this.master.node,E('div',{'class':'kk-actions'},[this.unsaved,this.saveButton,this.testButton])]),
             E('div',{'class':'kk-push-grid'},[
-                E('div',{},[section('通知事件',[E('div',{'class':'kk-push-events'},eventNodes)]),section('告警阈值',[E('div',{'class':'kk-push-limits'},thresholdNodes),E('p',{'class':'kk-footnote'},'延迟、丢包、高温需持续达到阈值；弱信号至少持续 60 秒。恢复采用回落区间，减少边缘反复提醒。')])]),
+                E('div',{},[section('通知事件',[E('p',{'class':'kk-push-lead'},'按场景选择，未勾选的事件不会发送。'),E('div',{'class':'kk-push-event-groups'},[
+                    E('div',{'class':'kk-push-event-group'},[E('h3',{},'连接与设备'),E('div',{'class':'kk-push-events'},eventNodes.slice(0,8))]),
+                    E('div',{'class':'kk-push-event-group'},[E('h3',{},'网络与电源告警'),E('div',{'class':'kk-push-events'},eventNodes.slice(8,14))]),
+                    E('div',{'class':'kk-push-event-group'},[E('h3',{},'DJI 通信'),E('div',{'class':'kk-push-events'},eventNodes.slice(14))])
+                ])]),section('告警阈值',[E('div',{'class':'kk-push-limits'},thresholdNodes),E('p',{'class':'kk-footnote'},'延迟、丢包、高温需持续达到阈值；弱信号至少持续 60 秒。恢复采用回落区间，减少边缘反复提醒。')])]),
                 section('飞书机器人地址',destinations.concat([E('p',{'class':'kk-footnote'},'三个地址独立启停，开启的地址接收相同事件。短信正文可能含验证码，只会发到已启用地址；历史短信不会补发。留空保留，勾选清除后保存才删除。')]))
             ])
         ]);
+        form.addEventListener('input',function(){self.markDirty(true);});
+        form.addEventListener('change',function(){self.markDirty(true);});
         var root=E('div',{'class':'kk-app kk-studio kk-push'},[
-            E('div',{'class':'kk-header'},[E('div',{},[E('h1',{},'飞书推送'),E('p',{'class':'kk-muted'},'变化才提醒，恢复有回音')]),E('a',{'class':'kk-button',href:L.url('admin/kkcar')},'返回网络面板')]),
+            E('header',{'class':'kk-header'},[E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'飞'),E('div',{},[E('h1',{},'飞书推送'),E('p',{'class':'kk-muted'},'事件通知、阈值和机器人地址')])]),E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('a',{href:L.url('admin/kkcar')},'网络总览'),E('a',{href:L.url('admin/kkcar_dji')},'DJI 4G'),E('a',{href:L.url('admin/kkcar_ups')},'UPS 电源'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_notifications')},'飞书推送')])]),
             this.notice,form,section('发送状态',[this.status]),
             E('p',{'class':'kk-footnote'},'突然断电无法即时推送，下次开机补报。断网时通知在内存中保留最多 50 条、1 小时，网络恢复后重试；断电会丢失待发队列。正常关机只做有限时长的发送尝试。'),
             E('p',{'class':'kk-footnote'},'Wi-Fi 按实时关联检测，有线设备按新鲜邻居记录判断；安静设备可能延迟识别。初次启用不逐台通知现有设备。通知不包含公网 IP 或密钥。')
@@ -51,13 +58,23 @@ return view.extend({
         this.paint(data);poll.add(function(){return get().then(function(d){self.paint(d);}).catch(function(){self.status.textContent='暂时无法读取发送状态，页面内容可能已过期。';});},5);
         return root;
     },
+    markDirty:function(dirty){this.dirty=dirty;this.unsaved.textContent=dirty?'有未保存的修改':'设置已保存';this.unsaved.classList.toggle('is-dirty',!!dirty);},
+    showMessage:function(message,error){this.notice.hidden=false;this.notice.className='kk-notice'+(error?' error':'');this.notice.textContent=message;},
     perform:function(promise,message){var self=this;this.saveButton.disabled=this.testButton.disabled=true;return promise.then(function(r){if(!r.ok)throw Error(r.error || '操作失败');self.notice.hidden=false;self.notice.className='kk-notice';self.notice.textContent=message;return r;}).catch(function(e){self.notice.hidden=false;self.notice.className='kk-notice error';self.notice.textContent=e.message;return null;}).finally(function(){self.saveButton.disabled=self.testButton.disabled=false;});},
     submit:function(){
         var self=this,c={enabled:this.master.input.checked,events:{},destinations:[]};
         events.forEach(function(e){c.events[e[0]]=self.switches[e[0]].checked;});
         limits.forEach(function(l){c[l[0]]=Number(self.fields[l[0]].value);});
         this.targets.forEach(function(d){c.destinations.push({id:d.id,name:d.name.value,enabled:d.on.checked,url:d.url.value.trim(),clear:d.clear.checked});});
-        this.perform(save(JSON.stringify(c)),'推送设置已保存，后台约 10 秒内生效。').then(function(r){if(r){self.targets.forEach(function(d,i){d.url.value='';d.clear.checked=false;d.configured.textContent=r.config.destinations[i].configured?'地址已保存':'尚未配置';d.url.placeholder=r.config.destinations[i].configured?'已保存，留空保留原地址':'粘贴飞书 Webhook';});}});
+        this.perform(save(JSON.stringify(c)),'设置已提交，正在读回确认。').then(function(r){if(!r)return;return get().then(function(data){
+            var saved=data.config,consistent=!!saved && saved.enabled===c.enabled;
+            events.forEach(function(e){if(saved && saved.events[e[0]]!==c.events[e[0]])consistent=false;});
+            limits.forEach(function(l){if(saved && Number(saved[l[0]])!==c[l[0]])consistent=false;});
+            c.destinations.forEach(function(d,i){var actual=saved && saved.destinations[i];if(!actual || actual.id!==d.id || actual.enabled!==d.enabled || (d.name && actual.name!==d.name))consistent=false;});
+            if(!consistent){self.showMessage('设置已提交，但读回与页面修改不一致。请刷新后检查。',true);return;}
+            self.targets.forEach(function(d,i){d.name.value=saved.destinations[i].name;d.url.value='';d.clear.checked=false;d.configured.textContent=saved.destinations[i].configured?'地址已保存':'尚未配置';d.url.placeholder=saved.destinations[i].configured?'已保存，留空保留原地址':'粘贴飞书 Webhook';});
+            self.markDirty(false);self.paint(data);self.showMessage('推送设置已保存并读回，后台约 10 秒内生效。',false);
+        }).catch(function(){self.showMessage('设置已提交，但暂时无法读回确认；请刷新检查。',true);});});
     },
     paint:function(data){
         var s=data.status || {},c=data.config,stale=!s.timestamp || Date.now()/1000-s.timestamp>90;

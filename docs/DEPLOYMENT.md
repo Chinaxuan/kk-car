@@ -92,7 +92,7 @@
 
 ## EP-0136 UPS 电源
 
-UPS 管理页依赖 I²C 与 `i2c-tools`。先备份启动配置，在 `/boot/config.txt` 启用 `dtparam=i2c_arm=on`，重启后确认主控与传感器地址；再部署 `ups-read.uc`、`ups-control.uc`、`ups-watch.uc`、`ups-watch.sh`、`kk-car-ups` init、`kkups.uc`、`ups.js/css` 及对应菜单/ACL。启用监控服务后默认策略仍为关闭。页面和后台更新需重启 rpcd 并刷新浏览器，不重启 network。设备只从 UPS 供电；实机电源操作与低电关机验收边界见 [UPS 适配说明](UPS.md)。
+UPS 管理页依赖 I²C 与 `i2c-tools`。先备份启动配置，在 `/boot/config.txt` 启用 `dtparam=i2c_arm=on`，重启后确认主控与传感器地址；再部署 `ups-read.uc`、`ups-control.uc`、`ups-watch.uc`、`ups-watch.sh`、`kk-car-ups` init、`kkups.uc`、`ups.js/css` 及对应菜单/ACL。启用监控服务后默认策略仍为关闭。只替换四个页面的 JS/CSS 时刷新浏览器即可；改动 `ups-read.uc` 等 rpcd 模块后需重启 rpcd，再确认管理页重新登录和状态读回，不重启 network。设备只从 UPS 供电；实机电源操作与低电关机验收边界见 [UPS 适配说明](UPS.md)。
 
 ## VPN 备用管理与无线修复
 

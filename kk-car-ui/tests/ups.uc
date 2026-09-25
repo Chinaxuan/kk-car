@@ -2,6 +2,7 @@
 'use strict';
 import { step } from '/etc/kk-car/ups-watch.uc';
 import { set_option } from '/etc/kk-car/ups-control.uc';
+import { validRaw } from '/etc/kk-car/ups-read.uc';
 
 function check(ok,name) {if (!ok) {print('FAIL '+name+'\n');exit(1);}}
 let config={enabled:true,shutdown_mv:3550};
@@ -20,4 +21,15 @@ check(step({enabled:false,shutdown_mv:3550},low,d).status=='disabled','default o
 check(!set_option('restart_countdown',20,0,'').ok,'reject unlisted register');
 check(!set_option('protect_mv',2800,0,'修改电池参数').ok,'reject low voltage');
 check(!set_option('auto_start_on_ac',2,0,'').ok,'reject invalid bool');
-print('PASS 9 UPS policy and write-validation cases\n');
+let frame=[];for (let i=0;i<42;i++) push(frame,0);
+function put16(reg,value) {frame[reg-1]=value&255;frame[reg]=(value>>8)&255;}
+function put32(reg,value) {put16(reg,value&65535);put16(reg+2,(value>>16)&65535);}
+put16(0x01,3300);put16(0x03,4950);put16(0x05,4000);
+put16(0x0b,49);put16(0x0d,4282);put16(0x0f,1792);
+put16(0x13,86);put16(0x15,2);frame[0x17-1]=1;
+put32(0x1c,3600);put32(0x20,3600);put32(0x24,3600);put16(0x28,10);
+check(validRaw(frame),'valid controller frame');
+put16(0x28,65535);check(!validRaw(frame),'reject corrupt firmware version');put16(0x28,10);
+put32(0x24,4294967295);check(!validRaw(frame),'reject corrupt uptime');put32(0x24,3600);
+put16(0x11,65535);check(!validRaw(frame),'reject corrupt protection voltage');
+print('PASS 13 UPS policy, write-validation, and corrupt-frame cases\n');

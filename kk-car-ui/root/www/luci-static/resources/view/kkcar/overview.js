@@ -42,7 +42,7 @@ return view.extend({
         var self=this;
         this.previous=null; this.requesting=false; this.historyRange='1h'; this.historyRequest=0; this.historyFetched=0;
         document.title='KK-Car · 车载网络';
-        if(!document.getElementById('kk-style')) document.head.appendChild(E('link',{id:'kk-style',rel:'stylesheet',href:L.resource('view/kkcar/overview.css')}));
+        if(!document.getElementById('kk-style')) document.head.appendChild(E('link',{id:'kk-style',rel:'stylesheet',href:L.resource('view/kkcar/overview.css')+'?v=20260925-ui1'}));
         this.root=E('div',{'class':'kk-app'});
         var refresh=button('刷新状态',function(){self.refresh();});
         var diag=button('检查网络',function(){self.perform('diagnose');},'primary');
@@ -71,7 +71,7 @@ return view.extend({
         this.root.append(
             E('div',{'class':'kk-header',role:'banner'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'KK'),E('div',{},[E('h1',{},'车载网络'),E('p',{},'KK-Car · 你的随行网络')])]),
-                E('div',{'class':'kk-header-links'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{href:L.url('admin/kkcar_dji')},'DJI 4G 模块'),E('a',{href:L.url('admin/kkcar_notifications')},'飞书推送'),E('a',{href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{href:L.url('admin/logout')},'退出')])
+                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar')},'网络总览'),E('a',{href:L.url('admin/kkcar_dji')},'DJI 4G'),E('a',{href:L.url('admin/kkcar_ups')},'UPS 电源'),E('a',{href:L.url('admin/kkcar_notifications')},'飞书推送'),E('a',{'class':'kk-nav-utility',href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{'class':'kk-nav-utility',href:L.url('admin/logout')},'退出')])
             ]),
             E('div',{id:'kk-message','class':'kk-notice',role:'status','aria-live':'polite',hidden:true}),
             E('div',{id:'kk-pending','class':'kk-notice warning',hidden:true},[
@@ -82,7 +82,7 @@ return view.extend({
                 E('strong',{},'网口用途正在试用'),E('p',{id:'kk-port-pending-text'},''),
                 button('管理连接正常，保留网口设置',function(){self.request(confirmPort(),'已提交确认，正在保存网口用途。');},'primary')
             ]),
-            E('div',{id:'kk-power','class':'kk-power',hidden:true},[E('strong',{},'注意供电'),E('span',{id:'kk-power-text'},'')]),
+            E('div',{id:'kk-power','class':'kk-power',hidden:true},[E('strong',{},'注意供电'),E('span',{id:'kk-power-text'},''),E('a',{href:L.url('admin/kkcar_ups')},'查看 UPS →')]),
             E('section',{'class':'kk-overview'},[
                 E('div',{'class':'kk-overview-top'},[
                     E('div',{},[E('div',{'class':'kk-eyebrow'},'当前连接'),E('h2',{id:'kk-summary'},'读取网络状态…'),E('p',{id:'kk-summary-desc'},'')]),

@@ -16,7 +16,7 @@ function yesno(v){return v==null?'未知':v?'是':'否';}
 function watchLabel(v){return ({disabled:'未启用',monitoring:'监测中',external_power:'外部供电中',on_battery:'电池供电中',low_battery_wait:'低电压复核中',low_battery:'已触发低电关机',read_error:'采样失败',invalid_voltage:'电压读数无效'})[v]||'等待首次采样';}
 function cell(label,value,hint){var children=[E('span',{},label),E('strong',{},value)];if(hint)children.push(E('small',{},hint));return E('div',{'class':'ku-cell'},children);}
 function section(title,nodes,subtitle){var heading=[E('h2',{},title)];if(subtitle)heading.push(E('span',{},subtitle));return E('section',{'class':'ku-panel'},[E('div',{'class':'ku-panel-title'},heading),E('div',{'class':'ku-grid'},nodes)]);}
-function nav(href,title,active){return E('a',{href:href,'class':'ku-nav-item'+(active?' active':'')},title);}
+function nav(href,title,active){return E('a',{href:href,'class':'ku-nav-item'+(active?' active':''),'aria-current':active?'page':null},title);}
 
 return view.extend({
     handleSaveApply:null,handleSave:null,handleReset:null,
@@ -24,11 +24,12 @@ return view.extend({
     render:function(data){
         document.title='KK-Car · UPS 电源';
         if(!document.getElementById('kk-ups-css'))
-            document.head.appendChild(E('link',{id:'kk-ups-css',rel:'stylesheet',href:L.resource('view/kkcar/ups.css')}));
+            document.head.appendChild(E('link',{id:'kk-ups-css',rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260925-ui1'}));
         var self=this;
         this.hero=E('div',{'class':'ku-hero-main'});
         this.warnings=E('div',{'class':'ku-warnings'});
         this.metrics=E('div',{'class':'ku-metrics'});
+        this.quickControls=E('div',{'class':'ku-controls ku-quick-controls'});
         this.controls=E('div',{'class':'ku-controls'});
         this.notice=E('div',{'class':'ku-notice',hidden:true,role:'status','aria-live':'polite'});
         this.controlsReady=false;
@@ -48,6 +49,7 @@ return view.extend({
                 E('header',{'class':'ku-header'},[E('div',{},[E('span',{'class':'ku-eyebrow'},'POWER SYSTEM / 01'),E('h1',{},'UPS 电源管理'),E('p',{},'实时查看输入、电池、树莓派供电与控制器状态')]),E('div',{'class':'ku-header-actions'},[this.updated,this.refresh])]),
                 this.notice,
                 E('section',{'class':'ku-hero'},[this.hero,this.warnings]),
+                this.quickControls,
                 this.metrics,
                 this.controls,
                 E('div',{'class':'ku-foot'},[E('span',{},'电量百分比需完成至少一次完整充放电后才可校准。'),E('span',{},'本页每 10 秒更新；设置只在点击保存后写入 UPS。')])
@@ -57,11 +59,11 @@ return view.extend({
         poll.add(function(){return get().then(function(r){self.paint(r);}).catch(function(){self.showError('UPS 状态暂时无法读取');});},10);
         return root;
     },
-    showError:function(message){this.hero.replaceChildren(E('div',{'class':'ku-error'},message));this.warnings.replaceChildren();this.metrics.replaceChildren();this.updated.textContent='读取失败';},
+    showError:function(message){this.hero.replaceChildren(E('div',{'class':'ku-error'},message));this.warnings.replaceChildren();this.metrics.replaceChildren();this.quickControls.replaceChildren();this.controls.replaceChildren();this.controlsReady=false;this.updated.textContent='读取失败';},
     message:function(text,error){this.notice.hidden=false;this.notice.className='ku-notice'+(error?' error':'');this.notice.textContent=text;},
     perform:function(promise,success,rebuild){
         var self=this;if(this.busy)return Promise.resolve();this.busy=true;
-        return promise.then(function(r){if(!r||!r.ok)throw Error(r&&r.error||'操作失败');self.message(success||'设置已保存',false);return get().then(function(d){if(rebuild){self.controlsReady=false;self.controls.replaceChildren();}self.paint(d);});})
+        return promise.then(function(r){if(!r||!r.ok)throw Error(r&&r.error||'操作失败');self.message(success||'设置已保存',false);return get().then(function(d){if(rebuild){self.controlsReady=false;self.quickControls.replaceChildren();self.controls.replaceChildren();}self.paint(d);});})
             .catch(function(e){self.message(e.message||'操作失败',true);})
             .finally(function(){self.busy=false;});
     },
@@ -82,8 +84,8 @@ return view.extend({
         var policyOn=E('input',{type:'checkbox','aria-label':'启用低电安全关机'});policyOn.checked=!!p.enabled;
         var policyMv=E('input',{type:'number',min:3300,max:3900,step:10,value:p.shutdown_mv,'aria-label':'低电关机阈值 mV'});
         function action(label,key,phrase,description){return E('div',{'class':'ku-action'},[E('div',{},[E('strong',{},label),E('small',{},description)]),E('button',{'class':'ku-button'+(phrase?' danger':''),type:'button',click:function(){var answer=phrase?(window.prompt('此操作会改变设备供电状态。请输入“'+phrase+'”确认：')||''):'';if(phrase&&answer!==phrase)return;self.perform(powerAction(key,answer),key.startsWith('cancel')?'倒计时取消指令已发送':'操作指令已发送',true);}},label)]);}
-        this.controls.replaceChildren(
-            E('div',{'class':'ku-controls-title'},[E('h2',{},'手动设置与维护'),E('p',{},'页面只在点击保存后写入。所有 UPS 设置先校验范围，再读回确认。')]),
+        this.quickControls.replaceChildren(
+            E('div',{'class':'ku-controls-title'},[E('h2',{},'常用设置'),E('p',{},'仅点击保存后写入；低电保护默认关闭。')]),
             E('div',{'class':'ku-settings-grid'},[
                 E('section',{'class':'ku-panel'},[E('h3',{},'日常设置'),
                     this.controlRow('来电自启','auto_start_on_ac',c.auto_start_on_ac?1:0,0,1,'外部电源恢复后自动启动',false,true),
@@ -92,7 +94,12 @@ return view.extend({
                 E('section',{'class':'ku-panel'},[E('h3',{},'低电安全关机'),E('p',{'class':'ku-helper'},'默认关闭。启用后，只有外部输入断开且电池电压连续 3 次低于阈值，才会安排 UPS 180 秒后断电，并立即让 OpenWrt 正常关机。'),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'启用监控'),E('small',{},'断电后持续监测电池电压')]),policyOn]),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'关机阈值'),E('small',{},'3300–3900 mV，建议先保持默认 3550 mV')]),policyMv,E('button',{'class':'ku-button',type:'button',click:function(){var mv=Number(policyMv.value);if(!Number.isInteger(mv)){self.message('请输入整数电压',true);return;}if(policyOn.checked&&!p.enabled&&!window.confirm('启用后，当车载外部供电断开且电池持续低电压时，树莓派会自动关机。确定启用？'))return;self.perform(savePolicy(policyOn.checked,mv),'低电保护设置已保存',true);}},'保存策略')]),
-                    E('small',{'class':'ku-watch'},'监控状态：'+watchLabel(d.watch&&d.watch.status)+' · 连续低电样本 '+((d.watch&&d.watch.consecutive)||0)+'/3')]),
+                    E('small',{'class':'ku-watch'},'监控状态：'+watchLabel(d.watch&&d.watch.status)+' · 连续低电样本 '+((d.watch&&d.watch.consecutive)||0)+'/3')])
+            ])
+        );
+        this.controls.replaceChildren(
+            E('div',{'class':'ku-controls-title'},[E('h2',{},'高级维护'),E('p',{},'电池基准和供电操作会影响设备稳定性，请核对后再执行。')]),
+            E('div',{'class':'ku-settings-grid'},[
                 E('section',{'class':'ku-panel'},[E('h3',{},'电池参数 · 高级'),E('p',{'class':'ku-helper'},'仅在确认电池型号及外部供电稳定时修改。当前原值已显示；改动需输入确认文字。'),
                     this.controlRow('满电基准','full_mv',b.configured_full_mv,4000,4500,'4000–4500 mV',true,false),
                     this.controlRow('空电基准','empty_mv',b.configured_empty_mv,2500,3900,'2500–3900 mV；当前值可能低于可设置范围',true,false),

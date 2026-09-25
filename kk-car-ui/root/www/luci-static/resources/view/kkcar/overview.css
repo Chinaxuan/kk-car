@@ -196,3 +196,14 @@ html:has(.kk-studio),body:has(.kk-studio){background:oklch(18% .022 255);color:o
 .kk-studio .kk-bottom-grid{grid-template-columns:minmax(210px,.65fr) minmax(0,1.65fr)}
 .kk-studio #kk-diagnostics{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 12px}
 }
+
+/* Shared page navigation. Keep it compact on the one-screen network overview. */
+.kk-app .kk-global-nav{gap:5px;min-width:0;align-items:center}
+.kk-app .kk-global-nav>a{display:inline-flex;align-items:center;justify-content:center;min-height:29px;padding:5px 10px;border:1px solid transparent;border-radius:7px;color:var(--muted);font-size:11px;font-weight:650;white-space:nowrap;text-decoration:none;transition:background .15s,border-color .15s,color .15s}
+.kk-app .kk-global-nav>a:hover{background:oklch(29% .032 255);color:var(--ink);border-color:var(--line)}
+.kk-app .kk-global-nav>a.active{background:oklch(31% .068 252);border-color:oklch(48% .095 252);color:oklch(92% .08 247)}
+.kk-app .kk-global-nav>a.kk-nav-utility{font-weight:500;color:oklch(72% .024 252)}
+.kk-app .kk-global-nav>span{margin-right:7px;font-size:10px;white-space:nowrap}
+.kk-app .kk-power>a{margin-left:auto;color:var(--warn);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.kk-app .kk-header:has(.kk-global-nav){flex-wrap:wrap}.kk-app .kk-global-nav{width:100%;overflow-x:auto;scrollbar-width:thin}.kk-app .kk-global-nav>a{min-height:35px}.kk-console .kk-header>.kk-actions{margin-left:auto}}
+@media(max-width:680px){.kk-app .kk-global-nav{order:9;margin-left:0}.kk-app .kk-global-nav>span{display:none}.kk-app .kk-power{flex-wrap:wrap}.kk-app .kk-power>a{margin-left:0}}

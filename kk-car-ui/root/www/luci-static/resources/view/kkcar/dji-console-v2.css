@@ -210,3 +210,19 @@
 @media(max-width:760px){.kk-dji>.kk-header{padding:12px 15px!important}.kk-dji-layout{display:block}.kk-dji-sidebar{padding:8px 12px;border-right:0;border-bottom:1px solid #304154}.kk-dji-sidebar-heading,.kk-dji-sidebar-foot{display:none}.kk-dji-side-nav{display:flex;gap:5px;overflow:auto;margin:0}.kk-app.kk-studio.kk-dji .kk-dji-side-nav button{flex:none;width:auto;padding:8px 11px;white-space:nowrap}.kk-dji-side-nav button small{display:none!important}.kk-dji-main{padding:18px 14px 28px}.kk-dji-view-head h2{font-size:22px}.kk-dji-view[data-section=device]{grid-template-columns:1fr}.kk-dji-view[data-section=device] .kk-dji-view-head,.kk-dji-view[data-section=device]>.kk-dji-card:last-child{grid-column:auto}.kk-dji-phone-workspace{grid-template-columns:1fr}.kk-dji-phone-pad{border-right:0;border-bottom:1px solid #394b5e;padding:0 0 18px}.kk-dji-contact-form{grid-template-columns:1fr 1fr}.kk-dji-contact-form .kk-button{grid-column:1/-1}}
 @media(max-width:900px){.kk-dji-overview-grid{grid-template-columns:1fr 1fr}.kk-dji-overview-block:last-child{grid-column:1/-1}}
 @media(max-width:600px){.kk-dji-overview-grid{grid-template-columns:1fr}.kk-dji-overview-block:last-child{grid-column:auto}.kk-dji-overview-block{min-height:155px}}
+
+/* Use the available monitor width and make the first view a scannable control desk. */
+body:has(.kk-dji) .container{max-width:none;width:100%;padding-inline:10px}
+.kk-dji>.kk-header{gap:16px}
+.kk-dji .kk-brand h1{font-size:20px;line-height:1.2}
+.kk-dji .kk-global-nav{margin-left:auto}
+.kk-dji .kk-dji-hero{background:radial-gradient(circle at 5% 0,#244c55 0,transparent 36%),linear-gradient(130deg,#172e3b,#14202f 68%);border-color:#39616b}
+.kk-dji .kk-dji-shortcuts a{border-color:#395064;background:#1d2d3e;transition:transform .15s,border-color .15s,background .15s}
+.kk-dji .kk-dji-shortcuts a:hover{transform:translateY(-2px);border-color:#65a9ad;background:#24394b;text-decoration:none}
+.kk-dji-overview-grid{gap:12px;margin-top:12px}
+.kk-dji-overview-block{min-height:152px;padding:16px 18px;border-color:#3a5062;background:linear-gradient(155deg,#203144,#192736)}
+.kk-dji-overview-block:nth-child(2){background:linear-gradient(155deg,#1b3c3d,#192736)}
+.kk-dji-overview-block:nth-child(3){background:linear-gradient(155deg,#26344e,#192736)}
+.kk-dji-overview-block>strong{margin-top:6px;font-size:27px}
+.kk-dji-overview-block>p{margin:5px 0 8px;line-height:1.35}
+@media(max-width:760px){body:has(.kk-dji) .container{padding:0}.kk-dji>.kk-header{padding:12px 14px!important}.kk-dji .kk-global-nav{margin-left:0}.kk-dji-overview-block{min-height:145px}}
