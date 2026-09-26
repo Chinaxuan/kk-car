@@ -59,7 +59,8 @@
 | `kk-car-ui-recovery` | 网络启动前回退尚未确认的热点 / 网口试用 |
 | `kk-car-route` | 保持 IKEv2 策略路由 |
 | `kk-car-uplink` | 有线 / 4G 出口选择 |
-| `kk-car-modem` | 上网棒 ADB 状态采集 |
+| `kk-car-modem` | 上网棒 QMI/ADB 与 DJI AT 信号采集 |
+| `kk-car-diagnostics` | 每分钟私有故障快照、开关机标记与 16 MiB 轮转 |
 | `kk-car-vpn-ping` | VPN 探测与历史保存 |
 | `kk-car-auto-check` | 每 10 分钟执行六项网络检查，与手动检查互斥 |
 | `kk-car-notify` | 事件推送、限频队列与开关机通知 |
@@ -146,3 +147,7 @@ UPS 管理页依赖 I²C 与 `i2c-tools`。先备份启动配置，在 `/boot/co
 左侧导航、通话记录与网络详情迭代需先放 `dji-phonebook.uc`（0600）、新版 `dji-at-status.sh`（0755）和 `dji-sms.uc`，再更新 `kkdji.uc`、ACL、`notify-worker.uc` 与前端资源。`notify-worker.uc` 需要导入 phonebook 模块；放齐文件后重启 `rpcd` 与 `kk-car-notify` 即可，不重启网络。首次通话记录文件由服务在 `/etc/kk-car/private/dji-phonebook.json` 自动创建，目录应为 0700、文件 0600；迁移时只通过私密加密备份转移此文件，绝不加入公开仓库。小区 ID/TAC/PCI/EARFCN 只来自 `/tmp/kk-car-dji-at.json` 当前采样，不能纳入历史或公开截图。
 
 验收顺序是：先检查原首页、Wi-Fi、VPN 与当前出口；再用 `ubus call kkdji status`、`ubus call kkdji traffic_status` 查 QMI、AT、短信仓和设备流量；最后用浏览器检查新页面的实机数据及短信目录自动读取。新增的 `call_status` 和 `gps_probe` 是受 LuCI 登录权限限制的只读 RPC；GPS 启停经原 `action` 白名单执行，不重启网络。目录读取可能改变未读标志；正文仍要点击会话才读取。每天查询依保存的运营商、号码、指令和时间运行；部署当天若已经手动查过，应先记录当天已查询，避免立刻重复发送。发送、删除与重新连接需真实业务意图。定位天线未验证时可以只读检查；若测试启动 GNSS，结束后应停止并读回关闭状态。操作解释见 [DJI 模块控制](DJI-CONTROL.md)。
+
+## 故障记录增量更新
+
+按 [故障记录部署说明](FAULT-LOG.md#安装更新与停用) 更新记录器、UPS 事件桥和模块采集器；设备需有 Python 3。记录目录及 `/etc/init.d/kk-car-diagnostics`、`/etc/rc.d/S19kk-car-diagnostics`、`/etc/rc.d/K11kk-car-diagnostics` 加入升级保留。无需重启 network、无线、DHCP 或 VPN。

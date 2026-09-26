@@ -8,6 +8,12 @@ function status() {
     data.policy=policy();
     try { data.watch=json(readfile('/tmp/kk-car-ups-watch.json') || '{}'); }
     catch(e) { data.watch={}; }
+    try {
+        let r=json(readfile('/tmp/kk-car-diagnostics.json') || '{}');
+        data.diagnostics={timestamp:r.timestamp,ok:r.ok,interval_s:r.interval_s,
+            max_bytes:r.max_bytes,qmi_errors:(r.errors_new?.qmi_timeout || 0)+(r.errors_new?.qmi_parse || 0),
+            sd_unclean:r.errors_total?.sd_unclean || 0};
+    } catch(e) { data.diagnostics={}; }
     return data;
 }
 

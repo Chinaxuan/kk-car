@@ -29,3 +29,7 @@ GNSS 可手动启停并查询位置与速度，但外壳天线及实际定位 fi
 ## HDMI 只读状态屏
 
 新增 `root/etc/kk-car/hdmi.uc` 与 `root/etc/init.d/kk-car-hdmi`，直接通过树莓派 legacy framebuffer 显示 VPN 延迟、LTE RSRP、CPU、温度、内存、Wi-Fi 客户端及接口速率，每 5 秒更新。独立于浏览器运行，不修改网络。需要匹配的显示模式，详细部署与撤销见发布仓库 `docs/HDMI.md`。
+
+## 每分钟私有故障记录
+
+`kk-car-diagnostics` 每 60 秒保存设备运行快照，UPS 低电与电源操作即时保存事件，总量轮转上限约 16 MiB。只落盘指标和错误类别计数，原始日志、短信、设备标识、公网端点及凭据不写入记录。详情见发布目录 `docs/FAULT-LOG.md`。模块采集在 QMI 初始化时避让 netifd，AT 信号与数据会话独立显示；新增回退不代表开机和移动搜网已通过实机耐久测试。

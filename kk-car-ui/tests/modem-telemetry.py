@@ -66,6 +66,10 @@ esac
     calls = (base/'calls').read_text().splitlines()
     assert len(calls) == 5 and all(str(dev/'cdc-wdm7') in call for call in calls), calls
     assert 'network_device=wwan7' in qmi_raw
+    discovery = subprocess.run(['sh', str(ETC/'modem-qmi-read.sh'), 'discover'], env=env,
+                               text=True, capture_output=True, timeout=5)
+    assert discovery.returncode == 0 and 'network_device=wwan7' in discovery.stdout
+    assert (base/'calls').read_text().splitlines() == calls, 'Discovery must not query QMI while netifd initializes'
     (usb/'idVendor').write_text('2c7c\n'); (usb/'idProduct').write_text('0125\n')
     assert read().returncode == 0, 'Standard Quectel identity must also work'
     # One unresponsive QMI request must not block later signal/SIM requests.
@@ -121,4 +125,18 @@ assert not rows[10]['online'], rows[10]
 assert not rows[11]['online'], rows[11]
 assert rows[12]['online'] and rows[12]['connected'] is None and rows[12]['sim_state']=='ready', rows[12]
 assert not any(key in json.dumps(rows) for key in ['pin1_status','verify_tries','imei','imsi','phone']), rows
+source = (ETC/'modem-parse.uc').read_text().split('// CLI entry point;')[0]
+source += '''
+let at={timestamp:42,rsrp_dbm:-85,rsrq_db:-8,rssi_dbm:-65,sinr_db:16,
+    technology:'FDD LTE',band:'LTE B3',sim_pin_state:'ready',cell_id:'private-cell'};
+let waiting=parse_modem('transport=QMI\\nkkcar_probe=1\\ncollector_state=wan_initializing',0,42);
+let merged=merge_at(waiting,at,43);
+if (!merged.online || merged.connected!==null || merged.rsrp!=-85 || merged.signal_source!='AT' || merged.bars!=4 || merged.cell_id) exit(1);
+if (merge_at(parse_modem('transport=QMI',124,42),at,118).online) exit(2);
+if (merge_at(parse_modem('transport=QMI',124,42),at,41).online) exit(3);
+print('PASS AT fallback without claiming data connection, stale and future rejection\\n');
+'''
+result = subprocess.run(command, input=source, text=True, capture_output=True, timeout=15)
+assert result.returncode == 0, result.stderr or result.stdout
+print(result.stdout.strip())
 print('PASS: both USB identities, IF04/node association, QMI connected/disconnected/unknown, SIM states, bounds, privacy and F30A compatibility')

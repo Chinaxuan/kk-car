@@ -18,13 +18,13 @@ cleanup() {
     [ -z "$active" ] || kill "$active" 2>/dev/null
     [ -z "$timer" ] || kill "$timer" 2>/dev/null
     [ -z "$deadline" ] || kill "$deadline" 2>/dev/null
-    rm -f "$lock/pid" /tmp/kk-car-modem.raw
+    rm -f "$lock/pid" /tmp/kk-car-modem.raw /tmp/kk-car-dji-at.json.poll-new
     rmdir "$lock" 2>/dev/null
 }
 trap cleanup EXIT
 # Also bounds driver/tool failures that ignore their own per-request timeout.
 trap 'ucode /etc/kk-car/modem-parse.uc 124; exit 124' TERM INT
-(sleep 30; kill -TERM $$ 2>/dev/null) & deadline=$!
+(sleep 45; kill -TERM $$ 2>/dev/null) & deadline=$!
 bounded() {
     seconds="$1"; shift
     "$@" & active=$!
@@ -34,8 +34,29 @@ bounded() {
     active= timer=
     return "$rc"
 }
-bounded 27 sh /etc/kk-car/modem-qmi-read.sh > /tmp/kk-car-modem.raw 2>/dev/null
+# Do not contend with netifd's SIM/QMI initialization. AT radio telemetry uses
+# another USB interface and remains available while the data link is pending.
+discover=
+if [ "$(uci -q get network.wan.proto)" = qmi ] &&
+    [ "$(bounded 3 ubus -t 2 call network.interface.wan status 2>/dev/null | jsonfilter -e '@.pending')" = true ]; then
+    discover=discover
+fi
+bounded 27 sh /etc/kk-car/modem-qmi-read.sh $discover > /tmp/kk-car-modem.raw 2>/dev/null
 rc=$?
+[ -n "$discover" ] && printf 'collector_state=wan_initializing\n' >> /tmp/kk-car-modem.raw
+if grep -q '^transport=QMI$' /tmp/kk-car-modem.raw && [ -x /etc/kk-car/dji-at-status.sh ]; then
+    now=$(date +%s)
+    last=$(cat /tmp/kk-car-dji-last-at-attempt 2>/dev/null)
+    case "$last" in ''|*[!0-9]*) last=0 ;; esac
+    if [ "$now" -lt "$last" ] || [ "$((now-last))" -ge 60 ]; then
+        printf '%s' "$now" > /tmp/kk-car-dji-last-at-attempt
+        if bounded 14 /etc/kk-car/dji-at-status.sh > /tmp/kk-car-dji-at.json.poll-new 2>/dev/null; then
+            mv /tmp/kk-car-dji-at.json.poll-new /tmp/kk-car-dji-at.json
+        else
+            rm -f /tmp/kk-car-dji-at.json.poll-new
+        fi
+    fi
+fi
 if [ "$rc" -eq 3 ]; then
     # Only a validated private default gateway on logical WAN can be an ADB
     # target. A public/carrier-assigned gateway must never receive ADB probes.

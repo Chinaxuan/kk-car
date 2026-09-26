@@ -1,6 +1,6 @@
 #!/usr/bin/ucode
 'use strict';
-import { step } from '/etc/kk-car/ups-watch.uc';
+import { step,orphaned_timer } from '/etc/kk-car/ups-watch.uc';
 import { set_option } from '/etc/kk-car/ups-control.uc';
 import { validRaw } from '/etc/kk-car/ups-read.uc';
 
@@ -18,6 +18,12 @@ check(!e.should_shutdown && e.triggered,'once only');
 check(step(config,plugged,e).consecutive==0,'external power resets');
 check(step(config,{ok:false},e).consecutive==0,'read error resets');
 check(step({enabled:false,shutdown_mv:3550},low,d).status=='disabled','default off');
+let armed={ok:true,input:{external:true},controller:{shutdown_countdown_s:88}};
+check(orphaned_timer({},armed,false),'cancel orphaned timer on powered startup');
+check(!orphaned_timer({timestamp:1},armed,false),'do not cancel timer during normal running');
+check(!orphaned_timer({},armed,true),'preserve explicit power action');
+armed.input.external=false;
+check(!orphaned_timer({},armed,false),'do not cancel hardware protection on battery');
 let loaded={ok:true,input:{external:false},battery:{millivolts:3750},
     sensors:{battery:{detected:true,conversion_ready:true,overflow:false,bus_mv:3450}}};
 let sag=step(config,loaded,{});

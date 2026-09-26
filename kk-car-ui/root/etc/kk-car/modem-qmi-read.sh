@@ -43,6 +43,7 @@ for direction in rx tx; do
     cat "$sysfs/class/net/$network/statistics/${direction}_bytes" 2>/dev/null
     printf '\n'
 done
+if [ "$1" = discover ]; then exit 0; fi
 command -v uqmi >/dev/null 2>&1 || exit 1
 active= timer=
 cleanup() {

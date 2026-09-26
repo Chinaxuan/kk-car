@@ -1,6 +1,7 @@
 'use strict';
 import { readfile, writefile, rename, chmod, mkdir, rmdir, popen } from 'fs';
 import { sample } from '/etc/kk-car/ups-read.uc';
+import { record_event } from '/etc/kk-car/diagnostic-event.uc';
 
 const POLICY='/etc/kk-car/private/ups-policy.json';
 const LOCK='/tmp/kk-car-ups-write-lock';
@@ -127,13 +128,18 @@ function power_action(action,confirm) {
         return locked(function() {
             let reg=action=='cancel_shutdown'?0x18:0x1a;
             if (!write_reg(reg,0)) return {ok:false,error:'取消倒计时失败'};
-            return {ok:true,status:sample()};
+            let after=sample(), left=action=='cancel_shutdown'?after.controller?.shutdown_countdown_s:after.controller?.restart_countdown_s;
+            let ok=after.ok && left==0;
+            record_event(ok?'power_action':'power_action_failed',{action});
+            return ok?{ok:true,status:after}:{ok:false,error:'取消后读回未确认'};
         });
     }
     if (!phrases[action] || confirm!=phrases[action]) return {ok:false,error:'操作确认文字不匹配'};
     return locked(function() {
         let before=sample();
         if (!before.ok) return {ok:false,error:'UPS 当前无法读取'};
+        record_event('power_action',{action,external:before.input?.external,
+            controller_mv:before.battery?.millivolts,sensor_mv:before.sensors?.battery?.bus_mv});
         if (action=='factory_reset') {
             if (!before.input.external) return {ok:false,error:'恢复出厂必须连接外部电源'};
             let backup='/etc/kk-car/private/ups-settings-before-reset.json';
@@ -145,15 +151,21 @@ function power_action(action,confirm) {
         }
         if (action=='shutdown'||action=='restart_ups') {
             let reg=action=='shutdown'?0x18:0x1a;
-            if (!write_reg(reg,180)) return {ok:false,error:'无法设置 UPS 断电倒计时'};
+            if (!write_reg(reg,180)) {
+                record_event('power_action_failed',{action});
+                return {ok:false,error:'无法设置 UPS 断电倒计时'};
+            }
             let after=sample();
             let left=action=='shutdown'?after.controller?.shutdown_countdown_s:after.controller?.restart_countdown_s;
             if (left==null || left<170 || left>180) {
                 write_reg(reg,0);
+                record_event('power_action_failed',{action});
                 return {ok:false,error:'UPS 倒计时未确认，已尝试取消'};
             }
         }
         // The response reaches the browser before the operating system stops.
+        writefile('/tmp/kk-car-power-intent.json',sprintf('%J',{timestamp:time(),action}));
+        chmod('/tmp/kk-car-power-intent.json',0600);
         system('(/bin/sleep 2; /bin/sync; /sbin/'+(action=='reboot_pi'?'reboot':'poweroff')+') </dev/null >/dev/null 2>&1 &');
         return {ok:true,accepted:true};
     });

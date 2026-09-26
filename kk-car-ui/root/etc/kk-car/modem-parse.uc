@@ -25,7 +25,7 @@ function parse_modem(raw, rc, timestamp) {
         let m = match(trim(line), /^([a-z_]+)=(.*)$/);
         if (m) values[m[1]] = m[2];
     }
-    let data = {timestamp, online:false};
+    let data = {timestamp, online:false,collector_rc:metric(rc,0,255),collector_state:values.collector_state=='wan_initializing'?'wan_initializing':+rc==124?'timeout':'sampled'};
     if (values.transport == 'QMI') {
         let signal = decode(values.qmi_signal), serving = decode(values.qmi_serving);
         let status = decode(values.qmi_data), caps = decode(values.qmi_capabilities);
@@ -93,7 +93,28 @@ function parse_modem(raw, rc, timestamp) {
     return data;
 }
 
+function merge_at(data,at,now) {
+    if (data.transport!='QMI' || type(at)!='object' || !at.timestamp || now<at.timestamp || now-at.timestamp>75)
+        return data;
+    let rsrp=metric(at.rsrp_dbm,-150,-30),rssi=metric(at.rssi_dbm,-140,-1);
+    if (rsrp==null && rssi==null) return data;
+    // Radio availability is distinct from a data session. A valid AT signal
+    // does not make connected=true or turn a failed data query into success.
+    data.online=true;
+    if (data.connected==null) data.connected=null;
+    if (data.rsrp==null) {data.rsrp=rsrp;data.rssi=rssi;
+        data.rsrq=metric(at.rsrq_db,-40,20);data.snr=metric(at.sinr_db,-30,50);
+        data.signal_source='AT';data.signal_timestamp=at.timestamp;}
+    else {data.signal_source='QMI';data.signal_timestamp=data.timestamp;}
+    data.network=data.network || (match(at.technology || '',/LTE/)?'LTE':'');
+    data.band=match(at.band || '',/^LTE B[0-9]{1,3}$/)?at.band:null;
+    if (data.sim_state=='unknown' && at.sim_pin_state=='ready') data.sim_state='ready';
+    if (data.rsrp!=null) {data.bars=data.rsrp>=-80?5:data.rsrp>=-90?4:data.rsrp>=-100?3:data.rsrp>=-110?2:1;data.bars_estimated=true;}
+    return data;
+}
+
 // CLI entry point; fixture tests exercise parse_modem without any state writes.
 let data = parse_modem(readfile('/tmp/kk-car-modem.raw'), ARGV[0], time());
+data=merge_at(data,decode(readfile('/tmp/kk-car-dji-at.json')),time());
 writefile('/tmp/kk-car-modem.json.new', sprintf('%J', data));
 rename('/tmp/kk-car-modem.json.new', '/tmp/kk-car-modem.json');
