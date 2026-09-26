@@ -31,7 +31,7 @@ MENU = (
     ('port_mode', 'Ethernet LAN / WAN'),
     ('refresh', 'Screen refresh time'),
 )
-REFRESH_CHOICES = (180, 300, 600)
+REFRESH_CHOICES = (60, 180, 300, 600)
 MAX_QUICK_UPDATES = 3  # clean sooner than the vendor's five-update upper guidance
 STATUS_PATH = Path('/tmp/kk-car-epaper-status.json')
 SETTINGS_PATH = Path('/etc/kk-car/private/epaper-settings.json')
