@@ -39,6 +39,27 @@ function ina219(addr,ohms) {
         shunt_ohms:ohms,estimated:true};
 }
 
+function voltage_reference(data) {
+    function valid(v) { return (type(v)=='int' || type(v)=='double') && v>=2500 && v<=4500; }
+    let reported=data?.battery?.millivolts;
+    let controller_mv=valid(reported)?reported:null;
+    let sensor=data?.sensors?.battery;
+    let sensor_mv=sensor?.detected && sensor.conversion_ready && !sensor.overflow &&
+        valid(sensor.bus_mv)?sensor.bus_mv:null;
+    let difference_mv=null;
+    if (controller_mv!=null && sensor_mv!=null) {
+        difference_mv=controller_mv-sensor_mv;
+        if (difference_mv<0) difference_mv=-difference_mv;
+    }
+    // A consistency check, not a calibrated correction or a discharge endpoint.
+    // Preserve both raw readings; never invent an offset from one measurement.
+    let sensor_rejected=difference_mv!=null && difference_mv>150;
+    let use_sensor=sensor_mv!=null && !sensor_rejected;
+    return {millivolts:use_sensor?sensor_mv:controller_mv,
+        source:use_sensor?'battery_sensor':controller_mv!=null?'controller':null,
+        controller_mv,sensor_mv,difference_mv,sensor_rejected,calibration_verified:false};
+}
+
 function bcd(v) { return (v>>4)*10+(v&15); }
 function rtc() {
     let raw=bytes('/usr/sbin/i2ctransfer -y 1 w1@0x68 0x00 r7',7);
@@ -123,9 +144,11 @@ function sample(lite,attempt) {
         auto_start_on_ac:values[0x19-1]==1,
         shutdown_countdown_s:values[0x18-1], restart_countdown_s:values[0x1a-1],
         total_run_s:u32(0x1c), charging_s:u32(0x20), current_run_s:u32(0x24)};
-    // The UPS controller can report a higher voltage than the loaded battery.
-    // Keep the battery-side INA voltage in light samples used by the shutdown watcher.
+    // Keep both raw voltages in light samples used by the shutdown watcher.
     result.sensors={battery:ina219('0x45',0.005)};
+    result.voltage_reference=voltage_reference(result);
+    if (result.voltage_reference.sensor_rejected)
+        push(result.warnings,'两路电池电压差异超过 150 mV；低电判断回退主控读数，低压段仍需实测核对');
     if (!lite) {
         result.sensors.pi_supply=ina219('0x40',0.00725);
         result.sensors.rtc=rtc();
@@ -143,4 +166,4 @@ function sample(lite,attempt) {
     return result;
 }
 
-export { sample, validRaw };
+export { sample, validRaw, voltage_reference };

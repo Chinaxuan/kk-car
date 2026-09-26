@@ -1,6 +1,6 @@
 'use strict';
 import { readfile, writefile, chmod } from 'fs';
-import { sample } from '/etc/kk-car/ups-read.uc';
+import { sample,voltage_reference } from '/etc/kk-car/ups-read.uc';
 import { policy, power_action } from '/etc/kk-car/ups-control.uc';
 import { record_event } from '/etc/kk-car/diagnostic-event.uc';
 
@@ -12,15 +12,16 @@ function orphaned_timer(previous,data,pending) {
 function step(config,data,previous) {
     let prior=previous || {},state={timestamp:time(),enabled:!!config.enabled,
         consecutive:0,triggered:!!prior.triggered,status:'monitoring',threshold_mv:config.shutdown_mv};
-    if (!config.enabled) {state.triggered=false;state.status='disabled';return state;}
-    if (!data?.ok) {state.status='read_error';state.triggered=false;return state;}
-    state.controller_mv=data.battery?.millivolts;
-    let sensor=data.sensors?.battery;
-    state.sensor_mv=sensor?.detected && sensor.conversion_ready && !sensor.overflow &&
-        sensor.bus_mv>=2500 && sensor.bus_mv<=4500 ? sensor.bus_mv : null;
-    state.battery_mv=state.sensor_mv ?? state.controller_mv;
-    state.voltage_source=state.sensor_mv!=null?'battery_sensor':'controller';
+    if (!data?.ok) {state.status=config.enabled?'read_error':'disabled';state.triggered=false;return state;}
+    let reference=voltage_reference(data);
+    state.controller_mv=reference.controller_mv;
+    state.sensor_mv=reference.sensor_mv;
+    state.battery_mv=reference.millivolts;
+    state.voltage_source=reference.source;
+    state.voltage_difference_mv=reference.difference_mv;
+    state.sensor_voltage_rejected=reference.sensor_rejected;
     state.external=!!data.input?.external;
+    if (!config.enabled) {state.triggered=false;state.status='disabled';return state;}
     if (state.external) {state.status='external_power';state.triggered=false;return state;}
     if (state.battery_mv==null || state.battery_mv<2500 || state.battery_mv>4500) {
         state.status='invalid_voltage';state.triggered=false;return state;

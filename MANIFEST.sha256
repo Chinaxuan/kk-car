@@ -1,7 +1,7 @@
 0a5e054b15448776b86aa3387a600a2ebf665db1c5f314f038b97d39549e27b7  .gitignore
 5ce6acecee002d8834f83517e34b9b974dcbbebeb0d40dd277ccd0ee1aab8a2d  DESIGN.md
 cd71e1ee27fba5f47592de4ab27f6ed743d2d103a2b0223266eecb45894273ae  PRODUCT.md
-3e03c3193e641dd36390d38fdb0b39397cc090b62a6aec0dba3ef247678e4ab7  README.md
+8b6c651a314de5d0fe6807e68dc5ff118f926c327e2da502f3b9e23372c500ad  README.md
 c25d7d74e87fd8e6752cb8f1e28d2d0625e924199ee1d9bc055e425278b655d8  docs/ARCHITECTURE.md
 57dc52c9e95043e899b29b1fcf3bcbce57b2b07dd0729b1d693db67433410a68  docs/BACKUP.md
 13f22a6cda2cd2f1a198b3479610ee660a1a363c359dae186990c59621399ea1  docs/DEPLOYMENT.md
@@ -13,9 +13,9 @@ c6342255cc0e2d3e617f593e7dd72fb56b22e3e58e34da7ba7d82beca654866c  docs/FAULT-LOG
 615a35f0efd9f3b904304a6ef19395467cc40ee28f13c8ddce5e43535b0b65b5  docs/HDMI.md
 633e99704234ec88121fad28c2ecb4bfcbf25ccd464a7c09f3f1386b88b7d987  docs/NETWORK-RECOVERY.md
 3d723d0a6b030c3af1504194b79018ebd340f451ff9ef3ab69dab9a5e3ce85be  docs/NOTIFICATIONS.md
-66e23e648d75d2175f2f20616d525c736f75ed52aeef8f71af265add4c111826  docs/UPS.md
+82b8cf55b4347cd9e185ade5d76c1f3c0cc10da7cb89e18520a8abe5aced5107  docs/UPS.md
 6ddf99b289188e28dbc5a93d3d79b3658672b6365ae96ab91a66191c25abb9c7  docs/USAGE.md
-d4d7278bf4caa71118e125cf2c504a5ed771c0b24c8f543a1ef05f426c423fd5  docs/VALIDATION.md
+f3882bcfba79b7724cc904a32dd671a74333a44b96964554bc6431f76b5791a8  docs/VALIDATION.md
 9a8ae85e5fcd0506c0adf8ba25a3f3801ffb1a7bc1c103b35f837ec33049782b  docs/VOICE-CALLS.md
 2744e4500a9a765b282c5d05c667dfa5ace2dd4371b3cc059908cd413e743d09  docs/packages-reference.txt
 26ec7ff2c13a7f2cf43c792631c388d1e66ff898ec1a90e789455a03367824d9  kk-car-ui/README.md
@@ -37,6 +37,8 @@ caaa4be5d94f42c8f48d33c73ccdd8e77fe0424d058c58a5a88b0846d12e4ed7  kk-car-ui/root
 b7d2f9aa0112843b6ae0be8bd8d1ce42ee4aee8cfa1ad79afa956c9b07b22f5b  kk-car-ui/root/etc/init.d/kk-car-voice-gateway
 d5b4fad3bdc72ed09510c25580b19260549d83a03b3fff994f43b768390787de  kk-car-ui/root/etc/init.d/kk-car-voice-runtime
 e2562169e96560e95d3c27429cc1d2c1ff84a38ee3c295a4581cf4a398a5c2e1  kk-car-ui/root/etc/init.d/kk-car-vpn-ping
+1914982c56746f65ec9723f8e043fe041b73bff4609d25cc8d96224da08243b1  kk-car-ui/root/etc/kk-car/__pycache__/epaper.cpython-312.pyc
+db15d8c304f47cdbe23631b96e466c73721815d492e17463f5dbdd7ff550cef4  kk-car-ui/root/etc/kk-car/__pycache__/epaper_lut.cpython-312.pyc
 95a85565bcd0830e6521dc10f6bc67dad401f0a87172c82701e4489fbe21a281  kk-car-ui/root/etc/kk-car/ai-region-report.uc
 cb9591eaf4edde6f31902357160451f77b7a91e44aa6553b60a8317429c04207  kk-car-ui/root/etc/kk-car/ai-region.uc
 0b89c3beb1b0fc99bdf1c87627827b03ee2388053f0ad030489fb00e12c479fc  kk-car-ui/root/etc/kk-car/auto-check.sh
@@ -85,9 +87,9 @@ ef0533fb3d486599d2dfc67c587ad170f74163465480d633fc91b241b6c6e2f1  kk-car-ui/root
 1d933751186141fc35d36b137406ee758644b5a733a0dfe2d5fa2f9bffccabdd  kk-car-ui/root/etc/kk-car/uplink-step.uc
 227752026ecf338617eddb90ab624a2d2f24a1ad6fcd386ac9955220ad002117  kk-car-ui/root/etc/kk-car/uplink-watch.sh
 27a78ebd3596d1e013fbefd235dab2fd3dbe22617bd23468ebadc223df152e94  kk-car-ui/root/etc/kk-car/ups-control.uc
-61dac98307b7f1916deb93af8397a342cf30e86862abaa3a48470ffb5b0b9505  kk-car-ui/root/etc/kk-car/ups-read.uc
+5fa82d31cfeaeeb02aeaa9dceda7c3b5b8275116d302c868731566629876a810  kk-car-ui/root/etc/kk-car/ups-read.uc
 678203f39b9616234b93deed5e88e04ad83d7224d6b1d0b263537fff37e5b725  kk-car-ui/root/etc/kk-car/ups-watch.sh
-6c0d8dcdf2aa2284db54f49997b3e0715cf5321a89bb966651af39c3ac099a99  kk-car-ui/root/etc/kk-car/ups-watch.uc
+266555de41266be8df8409b05ac2bfac3c0488d8f048465ea85c9a645a005911  kk-car-ui/root/etc/kk-car/ups-watch.uc
 c8b1b7828a2f3739849cab35bad63dc57eaebfac83f863b5f962cb9d7f7cd2b4  kk-car-ui/root/etc/kk-car/vpn-management-route.sh
 f1a24736fa737a44e3054196cd98c48aaf948767d877d41617a5c2af72a91aa2  kk-car-ui/root/etc/kk-car/vpn-ping-parse.uc
 59d305b5fa221dceffe2096fc2d806eb6736aab7d0b4afc12f945ef29d6f6f32  kk-car-ui/root/etc/kk-car/vpn-ping-write.uc
@@ -106,7 +108,7 @@ f5ae702ccc7c58aba3a31e59084df8fc2a6cf0c510186e6b8438184ef8d75e66  kk-car-ui/root
 ac5f137dc1229aec5492fdf1b6df69c13fc5fe3ca77d57d6016fe3f4debe4a10  kk-car-ui/root/www/luci-static/resources/view/kkcar/overview.css
 afa8dcab6ffe6aca97d62c86aa5cddcc267078ca07a42e0402a4a61b3174c8cb  kk-car-ui/root/www/luci-static/resources/view/kkcar/overview.js
 14b18694d9c73ed4ed9f46175522b6d2e04fd47ead7dadfb84a6328f4665f6ea  kk-car-ui/root/www/luci-static/resources/view/kkcar/ups.css
-cce37343fc5629969b6a672250002fec7b3d5d207c6cb3f3fa9af0f053a49b0d  kk-car-ui/root/www/luci-static/resources/view/kkcar/ups.js
+c25c49a8e676177919dd4e3ac8efcef8c8386dfec6adf06b649fbc929635286a  kk-car-ui/root/www/luci-static/resources/view/kkcar/ups.js
 61e61bd933fedfccea88372041d32f9d9c7bfc8a66a3f8f9eb2515f294a497e0  kk-car-ui/root/www/luci-static/resources/view/kkcar/voice-worklet.js
 f94d254058b6f0f0bac526549d84579d7eb4db9a32e91349c6e65db806e37082  kk-car-ui/tests/ai-region.py
 20fff616152c2645424bd4bab7ec5a1a9f7be708ca7e4d260c59eddd423658c7  kk-car-ui/tests/auto-check.py
@@ -123,7 +125,7 @@ be86dd4bf718319490ef38a7011034b8a7409399b041a742f7f40677610d1af1  kk-car-ui/test
 a77ed81e3486a9946bdf43265ad0b69b1f7c6158a0c0111ac6fe87bcf8aa4bb4  kk-car-ui/tests/test-epaper.py
 ebd45ff9dbe843d0864ed09b0621f3e2e0da1ad1ec03119b3bfafc7ca6002052  kk-car-ui/tests/uplink-model.py
 ef32d639a99b7a663fa6abcccaea0b3cfaec476e6a49b5dd3ea8bf929c8c894d  kk-car-ui/tests/uplink-routing.py
-10372042442a89b4b7f2283ff361d0e0b799fc0ce335cc92c011b43b857c5231  kk-car-ui/tests/ups.uc
+81f73a441839f0baa451f955e81499952e1db3d35e65d7994337c07b32b825f3  kk-car-ui/tests/ups.uc
 b6c2205875dab94a77c5183730b461bea130ab99356591e8e79b66694aadd0eb  kk-car-ui/tests/vpn-management.py
 3ecf0010390700bbb7c69800802226635731d9ec42d73eb6a80a22c9fe673ad5  kk-car-ui/tests/vpn-ping.py
 537d9b9df14adfc34c8a7da8a12ffea21ddee44b0863b567beba4ed8778a3909  kk-car-ui/tests/wifi-safety.py

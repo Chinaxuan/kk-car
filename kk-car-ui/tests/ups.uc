@@ -2,7 +2,7 @@
 'use strict';
 import { step,orphaned_timer } from '/etc/kk-car/ups-watch.uc';
 import { set_option } from '/etc/kk-car/ups-control.uc';
-import { validRaw } from '/etc/kk-car/ups-read.uc';
+import { validRaw,voltage_reference } from '/etc/kk-car/ups-read.uc';
 
 function check(ok,name) {if (!ok) {print('FAIL '+name+'\n');exit(1);}}
 let config={enabled:true,shutdown_mv:3550};
@@ -25,12 +25,33 @@ check(!orphaned_timer({},armed,true),'preserve explicit power action');
 armed.input.external=false;
 check(!orphaned_timer({},armed,false),'do not cancel hardware protection on battery');
 let loaded={ok:true,input:{external:false},battery:{millivolts:3750},
-    sensors:{battery:{detected:true,conversion_ready:true,overflow:false,bus_mv:3450}}};
+    sensors:{battery:{detected:true,conversion_ready:true,overflow:false,bus_mv:3600}}};
 let sag=step(config,loaded,{});
-check(sag.consecutive==1 && sag.battery_mv==3450 && sag.voltage_source=='battery_sensor',
-    'loaded battery voltage takes priority');
+check(sag.consecutive==0 && sag.battery_mv==3600 && sag.voltage_source=='battery_sensor',
+    'consistent sensor voltage remains usable at boundary');
+loaded.sensors.battery.bus_mv=3340;
+let conflict=step(config,loaded,{});
+check(conflict.consecutive==0 && conflict.battery_mv==3750 && conflict.voltage_source=='controller' &&
+    conflict.sensor_voltage_rejected && !conflict.should_shutdown,'reject false low voltage from disagreeing sensor');
+loaded.battery.millivolts=3500;
+let fallbackLow=step(config,loaded,{});
+check(fallbackLow.consecutive==1 && fallbackLow.battery_mv==3500 && fallbackLow.sensor_voltage_rejected,
+    'controller low voltage remains effective during sensor disagreement');
+check(step(config,loaded,step(config,loaded,fallbackLow)).should_shutdown,
+    'three controller low samples still trigger shutdown');
+loaded.sensors.battery.bus_mv=3540;loaded.battery.millivolts=3570;
+let low_consistent=step(config,loaded,{});
+check(low_consistent.consecutive==1 && low_consistent.battery_mv==3540,'retain genuine consistent low sample');
+loaded.battery.millivolts=3750;
 loaded.sensors.battery.conversion_ready=false;
 check(step(config,loaded,{}).battery_mv==3750,'unready battery sensor falls back');
+let disabled=step({enabled:false,shutdown_mv:3550},loaded,{});
+check(disabled.status=='disabled' && disabled.battery_mv==3750 && !disabled.should_shutdown,
+    'disabled protection still reports voltage reference without acting');
+let missing=voltage_reference({battery:{millivolts:0},sensors:{battery:{detected:false}}});
+check(missing.millivolts==null && missing.source==null,'invalid sources never become a battery voltage');
+loaded.sensors.battery.conversion_ready=true;loaded.battery.millivolts=0;
+check(voltage_reference(loaded).source=='battery_sensor','usable sensor survives missing controller');
 check(!set_option('restart_countdown',20,0,'').ok,'reject unlisted register');
 check(!set_option('protect_mv',2800,0,'修改电池参数').ok,'reject low voltage');
 check(!set_option('auto_start_on_ac',2,0,'').ok,'reject invalid bool');
@@ -45,4 +66,4 @@ check(validRaw(frame),'valid controller frame');
 put16(0x28,65535);check(!validRaw(frame),'reject corrupt firmware version');put16(0x28,10);
 put32(0x24,4294967295);check(!validRaw(frame),'reject corrupt uptime');put32(0x24,3600);
 put16(0x11,65535);check(!validRaw(frame),'reject corrupt protection voltage');
-print('PASS UPS policy, sensor fallback, write-validation, and corrupt-frame cases\n');
+print('PASS UPS policy, voltage consistency, disabled monitoring, write-validation, and corrupt-frame cases\n');
