@@ -19,6 +19,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont
 from epaper_lut import LUT_DATA_4GRAY
 
 WIDTH, HEIGHT = 264, 176
+DISPLAY_ROTATION = 180  # Physical mounting direction; key roles stay unchanged.
 KEYS = (5, 6, 13, 19)  # KEY1=home/back, KEY2=up, KEY3=down, KEY4=menu/confirm
 PAGES = ('OVERVIEW', 'CELLULAR', 'VPN', 'SMS / DATA', 'UPS / POWER', 'SYSTEM')
 MENU = (
@@ -688,7 +689,8 @@ class Paper:
 
     @staticmethod
     def portrait(image):
-        return image.rotate(90, expand=True)
+        # The controller needs a portrait frame in addition to the mounting rotation.
+        return image.rotate(90 + DISPLAY_ROTATION, expand=True)
 
     @staticmethod
     def gray_planes(image):
@@ -803,6 +805,7 @@ def write_status(console, state, mode, paper=None, error=None, key_counts=None):
     payload = {'view': console.view, 'page': console.page + 1,
                'selected': console.selected + 1 if console.view == 'menu' else None,
                'refresh_seconds': console.refresh, 'refresh_mode': mode,
+               'rotation': DISPLAY_ROTATION,
                'partial_count': paper.partials if paper else 0,
                'state': state, 'updated': int(time.time()), 'error': error,
                'key_counts': key_counts or [0, 0, 0, 0]}
@@ -842,7 +845,7 @@ def main():
                            'started': time.time() - 25, 'deadline': time.time() + 100}
     if args.preview:
         car, ups = read_status()
-        render(console, car, ups, aux=read_aux()).save(args.preview)
+        render(console, car, ups, aux=read_aux()).rotate(DISPLAY_ROTATION).save(args.preview)
         return
     paper = Paper()
     counts = [0, 0, 0, 0]

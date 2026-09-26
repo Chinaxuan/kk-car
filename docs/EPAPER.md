@@ -4,6 +4,8 @@
 
 首页先用两个大数字突出 VPN 延迟与 RSRP，并在旁边显示丢包、LTE 频段及 EARFCN 信道；新短信用反白提示，旁边显示 VPN 隧道地址。下方四行依次展示隧道连接时长及 1/5/15 分钟负载、内存使用率及温度、终端数量及估算功率、估算剩余流量及今日收发量。详情页每页两列 10 项：蜂窝页集中显示信号和小区参数；VPN 页显示隧道、路由、重协商与流量；短信/流量页显示未查看数、短信仓、套餐估算及两次屏幕采样间的平均速率；电源页显示电池、输入、输出和树莓派供电；系统页显示负载、内存、热点、网口与自动检查。无法取得的新鲜数据用 `--`，不会沿用旧值。
 
+当前画面按安装方向整体旋转 **180°**，包括六个状态页、设置菜单、灰阶全刷、快刷及局刷；预览图片也采用相同方向。KEY1–KEY4 仍按板子上标注的编号操作，功能没有互换。方向由 `epaper.py` 的 `DISPLAY_ROTATION = 180` 控制，设为 `0` 可恢复原方向；更改后只需重启 `kk-car-epaper`，无需重启网络或整机。原有私有刷新周期保留。
+
 硬件规格与引脚以 [Waveshare 官方手册](https://www.waveshare.com/wiki/2.7inch_e-Paper_HAT_Manual) 和 [官方驱动仓库](https://github.com/waveshareteam/e-Paper) 为依据。V2 画面为 264×176；HAT 使用 SPI0 CE0，屏幕控制脚采用 BCM 编号：RST 17、DC 25、BUSY 24、PWR 18。四键依次使用 BCM 5、6、13、19。当前 EP-0136 UPS 走 I²C，两者已在同一台树莓派上同时运行。其他屏幕版本或带不同转接板的产品需重新核对引脚和驱动命令。
 
 | 按键 | 状态页 | 设置菜单 |
@@ -35,7 +37,7 @@ apk add python3 python3-gpiod python3-pillow kmod-spi-dev
 cat /tmp/kk-car-epaper-status.json
 ```
 
-`state` 为 `ok` 表示最近一次屏幕写入完成；`page` 为 1–6，`refresh_mode` 可为 `gray`、`full`、`fast` 或 `partial`，`key_counts` 记录本次服务启动以来四键触发次数。再到实体屏幕查看内容并逐个按键，不能只以服务启动成功代替屏幕验收。程序在显示时通过 `ubus` 读取现有 KK-Car 和 UPS 状态，蜂窝、流量及短信提示读取对应的短期状态缓存；执行设置时复用现有的 `kkcar` 操作接口。把 `/boot/config.txt`、程序、字体、服务文件、init 启动链接，以及可选的 `/etc/kk-car/private/epaper-settings.json` 纳入设备升级保留清单；系统升级后如软件包丢失，还需重新安装依赖。若字体文件意外缺失，程序会退回 Pillow 默认字体，但小字可能再次难辨。
+`state` 为 `ok` 表示最近一次屏幕写入完成；`rotation` 记录画面旋转角度，`page` 为 1–6，`refresh_mode` 可为 `gray`、`full`、`fast` 或 `partial`，`key_counts` 记录本次服务启动以来四键触发次数。再到实体屏幕查看内容并逐个按键，不能只以服务启动成功代替屏幕验收。程序在显示时通过 `ubus` 读取现有 KK-Car 和 UPS 状态，蜂窝、流量及短信提示读取对应的短期状态缓存；执行设置时复用现有的 `kkcar` 操作接口。把 `/boot/config.txt`、程序、字体、服务文件、init 启动链接，以及可选的 `/etc/kk-car/private/epaper-settings.json` 纳入设备升级保留清单；系统升级后如软件包丢失，还需重新安装依赖。若字体文件意外缺失，程序会退回 Pillow 默认字体，但小字可能再次难辨。
 
 维护时可用 `/usr/bin/python3 /etc/kk-car/epaper.py --preview /tmp/epaper-preview.png --page 1` 仅生成预览图，不占用屏幕 GPIO。`--once` 会真正写一帧；运行前先停止常驻服务，否则 GPIO 独占会导致冲突。退出后再启动服务。`/tmp/kk-car-epaper-status.json` 是运行时文件，重启后重新生成，不应当作历史记录。
 
