@@ -55,3 +55,6 @@
 ## VPN 备用管理与无线修复的回退资料
 
 实施前离线保留 firewall、wireless 与 ike-route-ensure.sh。VPN 返回路由的运行状态位于 `/tmp/kk-car-vpn-management-sources`，由守护按实际地址重建，不应当作固定地址配置恢复。停用方法、无线回退和本地故障分层排查见 [网络恢复](NETWORK-RECOVERY.md)。
+
+
+UPS 空电/保护参数修改前的寄存器和模式快照只保存在设备 `/etc/kk-car/private/` 与本地私有目录。恢复时保持外部供电，逐项回读；不要把保护值 0 当成关闭保护，也不要直接刷入其他板子的加密固件。彻底断电后参数保留尚未验证，详见 [UPS 电源](UPS.md)。这些快照与固件包不进入公开备份。

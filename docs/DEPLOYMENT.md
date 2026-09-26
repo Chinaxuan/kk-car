@@ -151,3 +151,6 @@ UPS 管理页依赖 I²C 与 `i2c-tools`。先备份启动配置，在 `/boot/co
 ## 故障记录增量更新
 
 按 [故障记录部署说明](FAULT-LOG.md#安装更新与停用) 更新记录器、UPS 事件桥和模块采集器；设备需有 Python 3。记录目录及 `/etc/init.d/kk-car-diagnostics`、`/etc/rc.d/S19kk-car-diagnostics`、`/etc/rc.d/K11kk-car-diagnostics` 加入升级保留。无需重启 network、无线、DHCP 或 VPN。
+
+
+UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC；无需重启网络。2750 mV 起的保护范围只在核对实际电芯规格后使用，软件关机仍默认关闭。自动模式允许空电与保护相等；手动模式须留差值。参数与固件核对流程见 [UPS 电源](UPS.md)。

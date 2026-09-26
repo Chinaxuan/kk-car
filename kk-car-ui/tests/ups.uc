@@ -1,7 +1,7 @@
 #!/usr/bin/ucode
 'use strict';
 import { step,orphaned_timer } from '/etc/kk-car/ups-watch.uc';
-import { set_option } from '/etc/kk-car/ups-control.uc';
+import { set_option,battery_voltage_error } from '/etc/kk-car/ups-control.uc';
 import { validRaw,voltage_reference } from '/etc/kk-car/ups-read.uc';
 
 function check(ok,name) {if (!ok) {print('FAIL '+name+'\n');exit(1);}}
@@ -53,7 +53,19 @@ check(missing.millivolts==null && missing.source==null,'invalid sources never be
 loaded.sensors.battery.conversion_ready=true;loaded.battery.millivolts=0;
 check(voltage_reference(loaded).source=='battery_sensor','usable sensor survives missing controller');
 check(!set_option('restart_countdown',20,0,'').ok,'reject unlisted register');
-check(!set_option('protect_mv',2800,0,'修改电池参数').ok,'reject low voltage');
+check(!set_option('protect_mv',2749,0,'修改电池参数').ok,'reject voltage below confirmed cell cutoff');
+check(!set_option('protect_mv',0,0,'修改电池参数').ok,'zero is not a protection-disable command');
+let limits={configured_full_mv:4200,configured_empty_mv:2750,configured_protect_mv:2750,user_programmed:false};
+check(battery_voltage_error('empty_mv',2750,limits)==null &&
+    battery_voltage_error('protect_mv',2750,limits)==null,'equal cutoff accepted in automatic mode');
+check(battery_voltage_error('user_programmed',1,limits)!=null,'manual mode rejects equal cutoff before voltage clamping');
+limits.user_programmed=true;
+check(battery_voltage_error('empty_mv',2750,limits)!=null &&
+    battery_voltage_error('protect_mv',2750,limits)!=null,'manual mode cannot acquire equal cutoff by either field');
+check(battery_voltage_error('protect_mv',2800,limits)==null,'manual mode accepts distinct protection cutoff');
+limits.user_programmed=false;
+check(battery_voltage_error('empty_mv',2800,limits)!=null,'empty cannot exceed protection');
+check(battery_voltage_error('protect_mv',4100,limits)!=null,'protection retains full voltage margin');
 check(!set_option('auto_start_on_ac',2,0,'').ok,'reject invalid bool');
 let frame=[];for (let i=0;i<42;i++) push(frame,0);
 function put16(reg,value) {frame[reg-1]=value&255;frame[reg]=(value>>8)&255;}

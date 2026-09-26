@@ -53,6 +53,24 @@ function field(data,key) {
     return null;
 }
 
+function battery_voltage_error(key,value,b) {
+    if (key=='full_mv' && value<=b.configured_protect_mv+100)
+        return '满电基准必须高于保护电压至少 100 mV';
+    if (key=='empty_mv' && b.configured_protect_mv &&
+        (value>b.configured_protect_mv || b.user_programmed && value==b.configured_protect_mv))
+        return '自动模式空电基准可等于保护电压；手动模式必须低于保护电压';
+    if (key=='protect_mv' && (value>=b.configured_full_mv-100 || value<b.configured_empty_mv ||
+        b.user_programmed && value==b.configured_empty_mv))
+        return '保护电压须低于满电基准；手动模式须高于空电基准';
+    // Vendor V9 clamps the measured voltage to the empty value in manual mode
+    // before its protection comparison. Equal limits are only allowed in auto mode.
+    if (key=='user_programmed' && value==1 &&
+        (b.configured_empty_mv<2500 || b.configured_protect_mv<2750 ||
+         b.configured_empty_mv>=b.configured_protect_mv || b.configured_protect_mv>=b.configured_full_mv-100))
+        return '先核对电压关系；手动模式空电基准必须低于保护电压';
+    return null;
+}
+
 function set_option(key,value,expected,confirm) {
     let regs={sample_minutes:0x15,auto_start_on_ac:0x19,full_mv:0x0d,
         empty_mv:0x0f,protect_mv:0x11,user_programmed:0x2a};
@@ -63,7 +81,7 @@ function set_option(key,value,expected,confirm) {
         (key=='auto_start_on_ac'||key=='user_programmed') && value!=0 && value!=1 ||
         key=='full_mv' && (value<4000||value>4500) ||
         key=='empty_mv' && (value<2500||value>3900) ||
-        key=='protect_mv' && value!=0 && (value<3000||value>3900))
+        key=='protect_mv' && (value<2750||value>3900))
         return {ok:false,error:'设置值超出设备允许的安全范围'};
     if (battery && confirm!='修改电池参数')
         return {ok:false,error:'电池参数需要明确确认'};
@@ -75,16 +93,8 @@ function set_option(key,value,expected,confirm) {
         if (value==old) return {ok:true,unchanged:true,status:before};
         if (battery && !before.input.external) return {ok:false,error:'修改电池参数必须保持外部供电'};
         let b=before.battery;
-        if (key=='full_mv' && value<=b.configured_protect_mv+100)
-            return {ok:false,error:'满电基准必须高于保护电压至少 100 mV'};
-        if (key=='empty_mv' && b.configured_protect_mv && value>=b.configured_protect_mv)
-            return {ok:false,error:'空电基准必须低于保护电压'};
-        if (key=='protect_mv' && value && (value>=b.configured_full_mv-100 || value<=b.configured_empty_mv))
-            return {ok:false,error:'保护电压必须位于空电与满电基准之间'};
-        if (key=='user_programmed' && value==1 &&
-            (b.configured_empty_mv<2500 || b.configured_protect_mv<3000 ||
-             b.configured_empty_mv>=b.configured_protect_mv || b.configured_protect_mv>=b.configured_full_mv))
-            return {ok:false,error:'先核对并设置合理的满电、空电及保护电压'};
+        let invalid=battery_voltage_error(key,value,b);
+        if (invalid) return {ok:false,error:invalid};
         let reg=regs[key], ok=(key=='auto_start_on_ac'||key=='user_programmed') ?
             write_reg(reg,value) : write_u16(reg,value);
         let after=sample();
@@ -171,4 +181,4 @@ function power_action(action,confirm) {
     });
 }
 
-export { policy,save_policy,set_option,rtc_sync,power_action };
+export { policy,save_policy,set_option,battery_voltage_error,rtc_sync,power_action };
