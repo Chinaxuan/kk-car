@@ -2,6 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
+'require view.kkcar.battery_history as batteryHistory';
 
 var get=rpc.declare({object:'kkups',method:'status',expect:{}});
 var setOption=rpc.declare({object:'kkups',method:'set_option',params:['key','value','expected','confirm'],expect:{}});
@@ -24,8 +25,9 @@ return view.extend({
     render:function(data){
         document.title='KK-Car · UPS 电源';
         if(!document.getElementById('kk-ups-css'))
-            document.head.appendChild(E('link',{id:'kk-ups-css',rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260925-ui3'}));
+            document.head.appendChild(E('link',{id:'kk-ups-css',rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260927-curves1'}));
         var self=this;
+        this.historyPanel=batteryHistory.create();
         this.hero=E('div',{'class':'ku-hero-main'});
         this.warnings=E('div',{'class':'ku-warnings'});
         this.metrics=E('div',{'class':'ku-metrics'});
@@ -51,6 +53,7 @@ return view.extend({
                 E('header',{'class':'ku-header'},[E('div',{},[E('span',{'class':'ku-eyebrow'},'POWER SYSTEM / 01'),E('h1',{},'UPS 电源管理'),E('p',{},'实时查看输入、电池、树莓派供电与控制器状态')]),E('div',{'class':'ku-header-actions'},[this.updated,this.refresh])]),
                 this.notice,
                 E('section',{'class':'ku-hero'},[this.hero,this.warnings]),
+                this.historyPanel.node,
                 this.quickControls,
                 this.metrics,
                 this.controls,

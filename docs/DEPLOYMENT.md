@@ -158,3 +158,8 @@ UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC�
 ## 设置中心增量更新
 
 新增 `kksettings` RPC、`device_settings.py`、`settings.js/settings.css` 及菜单/ACL；同时更新电子纸、HDMI、自动检查调度器和各页面的导航。具体文件、生效方式、私有配置保留与回退步骤见 [设置中心](SETTINGS.md)。保持现有刷新、方向和电池参数，只重启对应显示/检查服务。定时检查默认仍为 10 分钟，现在可在后台调整。通用服务按钮不允许操作网络、DHCP、出口路由或 UPS 保护服务。
+
+
+## 电池历史分析增量更新
+
+部署 `ups_history.py`、`battery_history.js` 以及更新的 `kkups.uc`、ACL、`ups.js`、`ups.css`。Python 文件 0755，其余 0644；将 helper 加入 sysupgrade 保留列表。只 reload rpcd，刷新浏览器，核对 `ubus call kkups history` 与实际曲线。不要重启网络、UPS 或记录服务；先备份待替换代码并保留私有日志。详见 [电池历史分析](BATTERY-HISTORY.md)。

@@ -19,7 +19,8 @@
           "traffic_status"
         ],
         "kkups": [
-          "status"
+          "status",
+          "history"
         ],
         "kksettings": [
           "status"

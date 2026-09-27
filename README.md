@@ -4,7 +4,7 @@
 
 本仓库保存 **截至 2026-09-27 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
 
-[使用说明](docs/USAGE.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
+[使用说明](docs/USAGE.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [充放电曲线](docs/BATTERY-HISTORY.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
 
 ## 它能做什么
 
@@ -24,6 +24,7 @@
 | 电子纸本地控制台 | Waveshare 2.7 英寸 V2 六页按总览、蜂窝、VPN、短信/流量、UPS 电源、系统分类；首页突出 VPN 延迟、蜂窝信号、未查看短信与关键运行数据；四键负责首页、上下翻页、设置/确认，可运行检查并调整 VPN、Wi-Fi 频段、有线口和 1/3/5/10 分钟刷新周期；高对比度文字、快刷/局刷与灰阶全刷配合，画面支持在菜单和后台切换 0°/180°，当前安装方向为 180°，网络设置沿用限时回退 |
 | 设置中心 | 统一电子纸方向与刷新、HDMI 周期、自动检查周期，十个后台服务的运行/开机启动控制，以及网络、通信、电源与通知设置目录；屏幕菜单和后台共用配置、拒绝并发覆盖 |
 | UPS 电源页 | 读取 52Pi EP-0136 的输入、输出、电池、估算电流/功率、RTC 与树莓派供电状态；常用设置与高级维护分区，低电关机默认关闭；展示两路电池电压差与参考来源，明显差异会告警并回退主控；支持按电芯规格设置 2.75V 起的保护值，区分自动与手动模式的电压关系；异常原始采样会重试或报错 |
+| 电池充放电分析 | UPS 页读取每分钟私有日志；两路原始电压、电流/功率、温度与电量曲线，按区间或供电过程查看，导出全部原始 CSV；空档不连线，积分未校准，16 MiB 轮转不保证固定天数 |
 | IPv6 状态 | 检查内核开关、地址与路由；当前部署采用 IPv4，IPv6 已关闭 |
 
 页面只呈现已取得的数据：未知和过期状态不会显示成正常，隧道建立也不等同于网站可用。
@@ -67,7 +68,8 @@ flowchart LR
 | 页面实时状态 | 每 5 秒读取路由器缓存与计数器 |
 | VPN 连通性 | 每 10 秒经 `ikecar` Ping `10.8.8.8`，每轮最多 3 次 |
 | 蜂窝信号 | 每约 30 秒通过 QMI 或 ADB 只读采集一次，排除重复及过期样本 |
-| 历史曲线 | 每分钟汇总，约每 5 分钟批量保存，保留 30 天 |
+| 网络历史曲线 | 每分钟汇总，约每 5 分钟批量保存，保留 30 天 |
+| 电池历史曲线 | 每分钟诊断快照，每 60 秒更新图表，最多 16 MiB 轮转；实际日期在 UPS 页面显示 |
 | ChatGPT / Gemini 地区 | 每 10 分钟自动或手动检查时请求，无账号、Cookie 或 API 密钥 |
 
 突然断电可能丢失最近约 6 分钟尚未保存的历史。旧时段没有采集的信号保持空白，不补造数据。接口累计流量不是运营商套餐账单。

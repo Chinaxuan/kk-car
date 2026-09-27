@@ -62,3 +62,8 @@ UPS 空电/保护参数修改前的寄存器和模式快照只保存在设备 `/
 ## 显示与调度器设置
 
 `/etc/kk-car/private/device-settings.json` 是屏幕菜单与后台共同的持久设置（0600、版本检查、原子替换）；首次迁移保留旧 `epaper-settings.json` 的周期。设备备份及 `/etc/sysupgrade.conf` 应保留此文件、`device_settings.py`、电子纸字体和新增菜单/ACL/RPC/前端；公开仓库只保存默认逻辑，不保存设备的实际配置。运行中的服务状态不是持久开机启动状态，备份时同时保留相关 init 启动链接。旧版回退不会读取新配置，详见 [设置中心](SETTINGS.md)。
+
+
+## 电池曲线恢复
+
+新增的 `ups_history.py` 与 `battery_history.js` 需与 RPC/ACL/UPS 前端一起恢复。分析依赖原私有诊断日志：只有代码、没有日志的恢复仍能打开页面，但旧曲线为空，新样本需等待记录服务产生。公开仓库不保存实机日志或导出的 CSV。
