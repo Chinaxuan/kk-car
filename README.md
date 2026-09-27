@@ -1,16 +1,16 @@
 # KK-Car · 车载网络控制台
 
-把闲置的树莓派 3B+ 变成车载路由器：USB 4G 上网、Wi-Fi 热点、回公司 VPN。管理台按使用场景组织为行车总览、连接设置、网络守护、蜂窝与通信、电源与设备、通知中心和设置中心；顶部或侧栏可以直接切换。
+把闲置的树莓派 3B+ 变成车载路由器：USB 4G 上网、Wi-Fi 热点、回公司 VPN。管理台按使用场景组织为行车总览、连接设置、网络守护、蜂窝与通信、电源与设备、通知中心和设置中心；所有页面共用左侧导航、页头、深色界面和操作规范，手机从「功能」按钮切换。
 
 本仓库保存 **截至 2026-09-27 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
 
-[使用说明](docs/USAGE.md) · [网络守护](docs/NETWORK-HEALTH.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [充放电曲线](docs/BATTERY-HISTORY.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
+[使用说明](docs/USAGE.md) · [统一界面](docs/CONSOLE-UI.md) · [网络守护](docs/NETWORK-HEALTH.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [充放电曲线](docs/BATTERY-HISTORY.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
 
 ## 它能做什么
 
 | 功能 | 实际行为 |
 | --- | --- |
-| 一屏状态面板 | 统一深色布局，电脑优先、兼容手机；下载/上传速度旁同步显示 VPN 延迟与丢包、蜂窝 RSRP/SINR、UPS 电量与输出电压，下方保留系统、出口、VPN、蜂窝和供电详细数据 |
+| 实时状态面板 | 统一深色布局，电脑优先、兼容手机；下载/上传速度旁同步显示 VPN 延迟与丢包、蜂窝 RSRP/SINR、UPS 电量与输出电压，下方保留系统、出口、VPN、蜂窝和供电详细数据 |
 | VPN 备用管理 | 可选开启 VPN 通道内的管理页、SSH 和 Ping；按当前 VPN 地址维护返回路由，仍需原有管理员认证 |
 | VPN 管理 | 启动、暂停、重连 IKEv2 / IPsec，设置开机连接；旧 WireGuard 配置在设备上停用保留 |
 | 流量与延迟历史 | 单张三层图共用时间轴，速度、VPN 延迟/丢包、LTE RSRP 分别使用独立刻度；支持 5 分钟、1 小时、1 天、30 天 |
@@ -18,7 +18,7 @@
 | 有线 / 4G 选网 | 网口可切换 LAN 或 DHCP WAN；有线探测稳定后优先，失效后回到 4G |
 | 热点设置 | 修改名称、密码，选择 5 GHz 或 2.4 GHz，均为 20 MHz；修改后限时确认，未确认自动恢复 |
 | 上网棒状态 | 兼容 F30A ADB 与 DJI 一代 QMI；只读采集运营商、SIM 状态、RSRP/RSRQ/SINR 与接口流量，未知保持留空 |
-| DJI 独立控制页 | 左侧导航分开总览、网络详情、短信、电话、流量、定位和设备；总览同时显示实时信号四指标与当前工作小区，网络页提供阈值与更多小区参数；电话页含拨号盘、本机通话记录和联系人；短信自动加载、合并/回复与加密备份；网页电话已有一次短时双向通话实测，长期稳定性待验收 |
+| 蜂窝与通信 | 页内功能栏分开总览、网络详情、短信、电话、流量、定位和设备；总览同时显示实时信号四指标与当前工作小区，网络页提供阈值与更多小区参数；电话页含拨号盘、本机通话记录和联系人；短信自动加载、合并/回复与加密备份；网页电话已有一次短时双向通话实测，长期稳定性待验收 |
 | 六项网络检查 | 本机每 10 分钟自动检查国内出口、VPN 出口、公司服务、国外 DNS 和 ChatGPT / Gemini 地区信号，也可手动检查 |
 | 飞书推送 | VPN、开关机、设备接入、出口切换与异常恢复通知；DJI 来电/未接提醒与新短信正文可分别启停，三个地址独立控制；事件按场景分组，保存后从设备读回核对 |
 | HDMI 本地显示 | 中文高密度只读状态屏，双趋势图、32 项详情、设备和上次检查结果；支持 720p/1080p 布局，真实输出模式需另行配置 |
@@ -60,7 +60,7 @@ flowchart LR
 4. 切换热点或网口后，按页面提示在约 2 分钟内确认保留；没有确认会回退。
 5. 点击「最近 5 分钟 / 1 小时 / 1 天 / 30 天」查看历史，拖动时间滑块读取具体时刻。5 分钟范围仍按分钟汇总，并非秒级曲线。
 
-完整操作及故障排查见 [使用说明](docs/USAGE.md)。首次迁移到新设备前，请先阅读 [部署前提](docs/DEPLOYMENT.md)：源码仍有特定接口、地址和路由标记约定，不应直接覆盖另一台路由器。
+完整操作及故障排查见 [使用说明](docs/USAGE.md) · [统一界面](docs/CONSOLE-UI.md)。首次迁移到新设备前，请先阅读 [部署前提](docs/DEPLOYMENT.md)：源码仍有特定接口、地址和路由标记约定，不应直接覆盖另一台路由器。
 
 ## 数据怎么来的
 

@@ -2,6 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
+'require view.kkcar.console as consoleUI';
 var get=rpc.declare({object:'kkcar',method:'notify_get',expect:{}});
 var save=rpc.declare({object:'kkcar',method:'notify_save',params:['settings'],expect:{}});
 var test=rpc.declare({object:'kkcar',method:'notify_test',expect:{}});
@@ -18,6 +19,7 @@ return view.extend({
         ['overview','notifications'].forEach(function(n){var id='kk-css-'+n;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+n+'.css')+'?v=20260925-ui1'}));});
         this.master=check('notify-enabled','启用飞书推送',c.enabled);
         this.notice=E('p',{'class':'kk-notice',role:'status','aria-live':'polite',hidden:true});
+        this.updated=E('span',{},'读取中');
         this.status=E('div',{'class':'kk-push-status','aria-live':'polite'});
         this.saveButton=E('button',{type:'submit','class':'kk-button primary'},'保存推送设置');
         this.testButton=E('button',{type:'button','class':'kk-button',click:function(){if(self.dirty){self.showMessage('请先保存当前修改，再发送测试通知。',true);return;}self.perform(test(),'测试已排队，请看下方各地址的发送结果。');}},'发送测试通知');
@@ -50,13 +52,16 @@ return view.extend({
         form.addEventListener('input',function(){self.markDirty(self.signature()!==self.savedSignature);});
         form.addEventListener('change',function(){self.markDirty(self.signature()!==self.savedSignature);});
         var root=E('div',{'class':'kk-app kk-studio kk-push'},[
-            E('header',{'class':'kk-header'},[E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'飞'),E('div',{},[E('h1',{},'通知中心'),E('p',{'class':'kk-muted'},'飞书事件、阈值和机器人地址')])]),E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('a',{href:L.url('admin/kkcar')},'行车总览'),E('a',{href:L.url('admin/kkcar_connections')},'连接设置'),E('a',{href:L.url('admin/kkcar_health')},'网络守护'),E('a',{href:L.url('admin/kkcar_dji')},'蜂窝与通信'),E('a',{href:L.url('admin/kkcar_ups')},'电源与设备'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_notifications')},'通知中心'),E('a',{href:L.url('admin/kkcar_settings')},'设置中心')])]),
+
             this.notice,form,section('发送状态',[this.status]),
             E('p',{'class':'kk-footnote'},'突然断电无法即时推送，下次开机补报。断网时通知在内存中保留最多 50 条、1 小时，网络恢复后重试；断电会丢失待发队列。正常关机只做有限时长的发送尝试。'),
             E('p',{'class':'kk-footnote'},'Wi-Fi 按实时关联检测，有线设备按新鲜邻居记录判断；安静设备可能延迟识别。初次启用不逐台通知现有设备。通知不包含公网 IP 或密钥。')
         ]);
-        this.savedSignature=this.signature();this.paint(data);poll.add(function(){return get().then(function(d){self.paint(d);}).catch(function(){self.status.textContent='暂时无法读取发送状态，页面内容可能已过期。';});},5);
-        return root;
+        this.savedSignature=this.signature();this.paint(data);poll.add(function(){return get().then(function(d){self.paint(d);}).catch(function(){self.updated.textContent='读取中断 · 保留上次状态';self.status.textContent='暂时无法读取发送状态，页面内容可能已过期。';});},5);
+        return consoleUI.mount(root, {
+            page:'kkcar_notifications',title:'通知中心',description:'飞书事件、告警阈值与机器人地址 · 只发送已启用事件',
+            status:this.updated
+        });
     },
     signature:function(){var self=this;return JSON.stringify({enabled:this.master.input.checked,events:events.map(function(e){return self.switches[e[0]].checked;}),limits:limits.map(function(l){return self.fields[l[0]].value;}),targets:this.targets.map(function(d){return [d.name.value,d.on.checked,d.clear.checked,!!d.url.value.trim()];})});},
     markDirty:function(dirty){this.dirty=dirty;this.unsaved.textContent=dirty?'有未保存的修改':'设置已保存';this.unsaved.classList.toggle('is-dirty',!!dirty);},
@@ -79,6 +84,7 @@ return view.extend({
     },
     paint:function(data){
         var s=data.status || {},c=data.config,stale=!s.timestamp || Date.now()/1000-s.timestamp>90;
+        this.updated.textContent=stale?'后台状态未更新':'后台采样 '+new Date(s.timestamp*1000).toLocaleTimeString('zh-CN',{hour12:false});
         var rows=[E('p',{},!c.enabled?'推送已暂停':s.error || (stale?'后台状态未更新，请检查推送服务':s.sample_error?'监控数据暂不可用':'后台监控中')+' · 待发 '+(s.queued || 0)+' 条')];
         c.destinations.forEach(function(d){var r=s.deliveries && s.deliveries[d.id];rows.push(E('div',{'class':'kk-data-row'},[E('span',{},d.name),E('strong',{},!d.enabled?'地址已停用':!r?'尚未发送':(r.ok?'飞书已接收':'发送失败，将重试')+' · '+new Date(r.at*1000).toLocaleTimeString('zh-CN',{hour12:false})+(!r.ok?' · HTTP '+r.http+' / code '+r.code:''))]));});
         if(s.log && s.log.length)rows.push(E('p',{'class':'kk-footnote'},'最近成功：'+s.log[s.log.length-1].text));

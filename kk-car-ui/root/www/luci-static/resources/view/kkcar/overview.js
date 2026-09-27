@@ -2,6 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
+'require view.kkcar.console as consoleUI';
 
 var getHistory = rpc.declare({object:'kkcar', method:'history', params:['range'], expect:{}});
 var getStatus = rpc.declare({object:'kkcar', method:'status', expect:{}});
@@ -74,7 +75,7 @@ return view.extend({
         this.root.append(
             E('div',{'class':'kk-header',role:'banner'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'KK'),E('div',{},[E('h1',{},this.settingsPage?'连接设置':'行车总览'),E('p',{},'KK-Car · 连接、通信与供电')])]),
-                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{'class':this.settingsPage?'':'active','aria-current':this.settingsPage?null:'page',href:L.url('admin/kkcar')},'行车总览'),E('a',{'class':this.settingsPage?'active':'','aria-current':this.settingsPage?'page':null,href:L.url('admin/kkcar_connections')},'连接设置'),E('a',{href:L.url('admin/kkcar_health')},'网络守护'),E('a',{href:L.url('admin/kkcar_dji')},'蜂窝与通信'),E('a',{href:L.url('admin/kkcar_ups')},'电源与设备'),E('a',{href:L.url('admin/kkcar_notifications')},'通知中心'),E('a',{href:L.url('admin/kkcar_settings')},'设置中心'),E('a',{'class':'kk-nav-utility',href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{'class':'kk-nav-utility',href:L.url('admin/logout')},'退出')])
+                E('span',{id:'kk-refreshed'},'正在读取')
             ]),
             E('div',{id:'kk-message','class':'kk-notice',role:'status','aria-live':'polite',hidden:true}),
             E('div',{id:'kk-pending','class':'kk-notice warning',hidden:true},[
@@ -218,7 +219,13 @@ return view.extend({
         if(!this.settingsPage) this.loadHistory(true);
         poll.add(function(){return self.refresh();},5);
         poll.add(function(){return self.refreshUps();},30);
-        return this.root;
+        return consoleUI.mount(this.root, {
+            page:this.settingsPage?'kkcar_connections':'kkcar',
+            title:this.settingsPage?'连接设置':'行车总览',
+            description:this.settingsPage?'管理 VPN、网口与热点；连接修改后两分钟内确认，未确认自动回退。':'实时网络、蜂窝通信与供电状态 · 详细指标持续记录',
+            status:this.el('kk-refreshed'),badge:this.el('kk-summary'),
+            actions:Array.from(this.root.querySelector('.kk-header > .kk-actions').children)
+        });
     },
     el:function(id){return this.root.querySelector('#'+id);},
     compactLayout:function(){

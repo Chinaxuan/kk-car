@@ -167,3 +167,10 @@ UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC�
 ## 网络守护增量更新
 
 新增 Python 网络守护、init、kkhealth RPC 与前端，更新菜单、ACL、总览状态、各页导航、设置中心服务白名单和分钟诊断。只刷新管理组件及对应采集服务，不重启网络、VPN 或整机；保留设备私有设置。本轮正常探测、页面保存与关闭/重新启用已验证，原网络配置哈希不变；实际断线恢复尚未现场验收。具体步骤及回退见 [网络守护](NETWORK-HEALTH.md)。
+
+
+## 2026-09-27 统一控制台界面
+
+七个路由页共用 `view/kkcar/console.js` 和 `console.css`：全局侧栏、页头与更新时间、操作按钮、输入、提示和手机功能菜单。DJI 页内功能改为第二层横向栏，UPS/设置不再单独创建全局导航。现有控件原节点移入框架，保留监听器、输入、唯一 ID 与 RPC；未修改网络、电话音频或电源控制后端。
+
+这次更新只部署前端：`console.js`、`console.css`、`overview.js`、`dji-console-v2.js`、`ups.js`、`settings.js`、`notifications.js` 和 `network-health.js`。JS/CSS 为 0644。把两个新共用资源加入 `/etc/sysupgrade.conf`，保留原列表；不重启网络、VPN、DHCP、UPS 或整机，也不需要刷新 RPC 服务。若浏览器仍显示旧框架，刷新 LuCI 静态资源版本并重新加载页面；备份和回退方法见 [统一界面](CONSOLE-UI.md)。

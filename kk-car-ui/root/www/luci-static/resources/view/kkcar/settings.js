@@ -2,6 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
+'require view.kkcar.console as consoleUI';
 
 var get=rpc.declare({object:'kksettings',method:'status',expect:{}});
 var save=rpc.declare({object:'kksettings',method:'save',params:['settings','revision'],expect:{}});
@@ -50,6 +51,7 @@ return view.extend({
   document.head.appendChild(E('link',{rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260927-settings'}));
   document.head.appendChild(E('link',{rel:'stylesheet',href:L.resource('view/kkcar/settings.css')+'?v=20260927-1'}));
   this.notice=E('div',{'class':'ku-notice',hidden:true,role:'status','aria-live':'polite'});
+  this.updated=E('span',{},'读取中');
   this.summary=E('div',{'class':'ks-summary'});this.services=E('div',{'class':'ks-service-list'});
   this.saveButton=button('保存显示与检查设置',function(){self.saveSettings();});
   this.reloadButton=button('重新读取',function(){if(self.dirty&&!window.confirm('放弃尚未保存的设置并读取设备当前值？'))return;get().then(function(d){self.bind(d);self.paint(d);}).catch(function(){self.message('设置读取失败，请稍后重试',true);});});
@@ -71,15 +73,16 @@ return view.extend({
    ['kkcar_notifications','通知与机器人','总开关、各事件开关、各推送地址开关、WebHook、延迟 / 丢包 / 信号 / 温度等阈值、冷却时间与测试推送。']
   ];
   var root=E('div',{'class':'ku-shell ks-shell'},[
-   E('aside',{'class':'ku-sidebar'},[E('div',{'class':'ku-brand'},[E('b',{},'KK'),E('span',{},'CAR CONTROL')]),E('nav',{'class':'ku-nav','aria-label':'KK-Car 页面'},[
-    nav('kkcar','行车总览'),nav('kkcar_connections','连接设置'),nav('kkcar_health','网络守护'),nav('kkcar_dji','蜂窝与通信'),nav('kkcar_ups','电源与设备'),nav('kkcar_notifications','通知中心'),nav('kkcar_settings','设置中心',true)]),E('p',{'class':'ku-sidebar-note'},'设置共享 · 实时读回\n屏幕 / 服务 / 各模块')]),
    E('main',{'class':'ku-main'},[E('header',{'class':'ku-header'},[E('div',{},[E('span',{'class':'ku-eyebrow'},'DEVICE SETTINGS'),E('h1',{},'设置中心'),E('p',{},'显示、诊断、后台服务与各模块控制')]),E('div',{'class':'ku-header-actions'},[this.reloadButton,this.cleanButton])]),this.notice,this.summary,controls,
     E('div',{'class':'ks-save-bar'},[this.saveButton,E('span',{},'仅保存修改的字段；不会重启网络、Wi-Fi 或 VPN。')]),
     E('section',{'class':'ku-panel'},[E('div',{'class':'ku-panel-title'},[E('h2',{},'后台服务'),E('span',{},'运行状态与开机启动独立设置')]),this.job=E('p',{'class':'ku-helper','aria-live':'polite'}),this.services]),
     E('section',{'class':'ks-catalogue'},catalogue.map(function(c){return E('a',{href:L.url('admin/'+c[0])},[E('strong',{},c[1]+' →'),E('p',{},c[2])]);}))])]);
   this.bind(data[0]);this.paint(data[0]);this.paintQuick(data[1],data[2]);
-  poll.add(function(){return get().then(function(d){self.paint(d);}).catch(function(){self.message('设备状态暂时无法读取，已有设置未改动',true);});},5);
-  return root;
+  poll.add(function(){return get().then(function(d){self.paint(d);}).catch(function(){self.updated.textContent='读取中断 · 保留上次状态';self.message('设备状态暂时无法读取，已有设置未改动',true);});},5);
+  return consoleUI.mount(root, {
+   page:'kkcar_settings',title:'设置中心',description:'屏幕、自动检查和后台服务 · 设置保存在路由器上',
+   status:this.updated,actions:[this.reloadButton,this.cleanButton]
+  });
  },
  message:function(text,error){this.notice.hidden=false;this.notice.className='ku-notice'+(error?' error':'');this.notice.textContent=text;},
  bind:function(data){if(!data.ok){this.message(data.error||'无法读取设置',true);this.saveButton.disabled=true;return;}this.base=data;this.dirty=false;this.saveButton.disabled=true;for(var k in this.inputs){var input=this.inputs[k];if(input.type==='checkbox')input.checked=data.settings[k];else input.value=data.settings[k];}this.updateDependencies();},
@@ -105,6 +108,7 @@ return view.extend({
  },
  paint:function(d){
   if(!d.ok){this.message(d.error||'无法读取设备设置',true);return;}
+  this.updated.textContent='更新于 '+stamp(d.timestamp);
   this.last=d;if(!this.dirty&&d.revision!==this.base.revision)this.bind(d);
   var self=this,ep=d.epaper||{},hd=d.hdmi||{},epService=(d.services||[]).find(function(s){return s.name==='epaper';}),hdService=(d.services||[]).find(function(s){return s.name==='hdmi';});
   var applied=epService&&epService.running&&ep.state==='ok'&&ep.settings_revision===d.revision;

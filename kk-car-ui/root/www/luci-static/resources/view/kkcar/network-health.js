@@ -2,6 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
+'require view.kkcar.console as consoleUI';
 
 var read = rpc.declare({object:'kkhealth',method:'status',expect:{}});
 var save = rpc.declare({object:'kkhealth',method:'save',params:['settings','revision'],expect:{}});
@@ -54,17 +55,18 @@ return view.extend({
    E('div',{'class':'kk-actions'},[this.saveButton,button('重新读取设置',function(){if(window.confirm('重新读取会放弃当前未保存的修改。'))self.reload();})])
   ]);
   this.root=E('div',{'class':'kk-app kk-studio kh-app'},[
-   E('header',{'class':'kk-header'},[
-    E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram'},'KK'),E('div',{},[E('h1',{},'网络守护'),E('p',{},'区分线路、隧道和解析故障')])]),
-    E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[nav('kkcar','行车总览'),nav('kkcar_connections','连接设置'),nav('kkcar_health','网络守护',true),nav('kkcar_dji','蜂窝与通信'),nav('kkcar_ups','电源与设备'),nav('kkcar_notifications','通知中心'),nav('kkcar_settings','设置中心')])
-   ]),this.notice,
+   this.notice,
    E('div',{'class':'kh-toolbar'},[E('div',{},[E('span',{'class':'kh-eyebrow'},'CONTINUOUS HEALTH'),this.updated]),E('div',{'class':'kk-actions'},[this.checkButton])]),
    E('div',{'class':'kh-layout'},[
     E('main',{},[cards,E('section',{'class':'kh-history'},[E('div',{'class':'kh-history-head'},[E('h2',{},'故障与恢复记录'),E('small',{},'本机保留 · 最近 80 条')]),this.summary,this.timeline])]),
     E('aside',{},form)
    ]),E('p',{'class':'kh-footer'},'探测响应不能保证所有网站和业务可用。无响应可能是目标禁止 Ping；请结合网络检查、信号参数和历史记录判断。')
   ]);
-  this.fill(data);this.paint(data);poll.add(function(){return self.refresh();},5);return this.root;
+  this.fill(data);this.paint(data);poll.add(function(){return self.refresh();},5);
+  return consoleUI.mount(this.root, {
+   page:'kkcar_health',title:'网络守护',description:'多目标检测、故障记录与受控恢复 · 区分线路、隧道和解析',
+   status:this.updated,actions:[this.checkButton]
+  });
  },
  fill:function(data){
   this.revision=data.revision;

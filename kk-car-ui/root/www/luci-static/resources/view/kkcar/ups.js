@@ -2,6 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
+'require view.kkcar.console as consoleUI';
 'require view.kkcar.battery_history as batteryHistory';
 
 var get=rpc.declare({object:'kkups',method:'status',expect:{}});
@@ -38,18 +39,6 @@ return view.extend({
         this.updated=E('span',{'class':'ku-updated'});
         this.refresh=E('button',{'class':'ku-button',type:'button',click:function(){self.refresh.disabled=true;get().then(function(r){self.paint(r);}).catch(function(){self.showError('无法读取 UPS 状态');}).finally(function(){self.refresh.disabled=false;});}},'立即刷新');
         var root=E('div',{'class':'ku-shell'},[
-            E('aside',{'class':'ku-sidebar'},[
-                E('div',{'class':'ku-brand'},[E('b',{},'KK'),E('span',{},'CAR CONTROL')]),
-                E('div',{'class':'ku-nav'},[
-                    nav(L.url('admin/kkcar'),'行车总览',false),
-                    nav(L.url('admin/kkcar_connections'),'连接设置',false),
-                    nav(L.url('admin/kkcar_health'),'网络守护',false),
-                    nav(L.url('admin/kkcar_dji'),'蜂窝与通信',false),
-                    nav(L.url('admin/kkcar_ups'),'电源与设备',true),
-                    nav(L.url('admin/kkcar_notifications'),'通知中心',false),
-                    nav(L.url('admin/kkcar_settings'),'设置中心',false)]),
-                E('p',{'class':'ku-sidebar-note'},'52Pi UPS Plus · EP-0136\n树莓派 3B+ / OpenWrt')
-            ]),
             E('main',{'class':'ku-main'},[
                 E('header',{'class':'ku-header'},[E('div',{},[E('span',{'class':'ku-eyebrow'},'POWER SYSTEM / 01'),E('h1',{},'UPS 电源管理'),E('p',{},'实时查看输入、电池、树莓派供电与控制器状态')]),E('div',{'class':'ku-header-actions'},[this.updated,this.refresh])]),
                 this.notice,
@@ -63,7 +52,10 @@ return view.extend({
         ]);
         this.paint(data);
         poll.add(function(){return get().then(function(r){self.paint(r);}).catch(function(){self.showError('UPS 状态暂时无法读取');});},10);
-        return root;
+        return consoleUI.mount(root, {
+            page:'kkcar_ups',title:'电源与设备',description:'UPS 输入、电池与供电 · 充放电曲线、硬件诊断和电源控制',
+            status:this.updated,actions:[this.refresh]
+        });
     },
     showError:function(message){this.hero.replaceChildren(E('div',{'class':'ku-error'},message));this.warnings.replaceChildren();this.metrics.replaceChildren();this.quickControls.replaceChildren();this.controls.replaceChildren();this.controlsReady=false;this.updated.textContent='读取失败';},
     message:function(text,error){this.notice.hidden=false;this.notice.className='ku-notice'+(error?' error':'');this.notice.textContent=text;},

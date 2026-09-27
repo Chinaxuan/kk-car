@@ -2,6 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
+'require view.kkcar.console as consoleUI';
 
 var getNetwork = rpc.declare({object:'kkcar',method:'status',expect:{}});
 var getDji = rpc.declare({object:'kkdji',method:'status',expect:{}});
@@ -100,7 +101,7 @@ return view.extend({
         this.root=E('div',{'class':'kk-app kk-studio kk-dji'},[
             E('header',{'class':'kk-header'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'DJ'),E('div',{},[E('h1',{},'DJI 4G 模块'),E('p',{},'蜂窝线路 · 信号、连接与模块控制')])]),
-                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-dji-update'},'读取中'),E('a',{href:L.url('admin/kkcar')},'行车总览'),E('a',{href:L.url('admin/kkcar_connections')},'连接设置'),E('a',{href:L.url('admin/kkcar_health')},'网络守护'),E('a',{'class':'active','aria-current':'page',href:L.url('admin/kkcar_dji')},'蜂窝与通信'),E('a',{href:L.url('admin/kkcar_ups')},'电源与设备'),E('a',{href:L.url('admin/kkcar_notifications')},'通知中心'),E('a',{href:L.url('admin/kkcar_settings')},'设置中心')])
+                E('span',{id:'kk-dji-update'},'读取中')
             ]),
             this.notice,
             E('section',{'class':'kk-dji-hero'},[
@@ -208,7 +209,10 @@ return view.extend({
         Promise.resolve().then(function(){return self.readPhoneData();});
         Promise.resolve().then(function(){return self.checkVoice();});
         Promise.resolve().then(function(){return self.readGps(false);});
-        return this.root;
+        return consoleUI.mount(this.root, {
+            page:'kkcar_dji',title:'蜂窝与通信',description:'DJI 4G · 网络参数、短信、电话、流量与定位',
+            status:this.el('kk-dji-update'),actions:[this.refreshButton],localNav:'.kk-dji-side-nav'
+        });
     },
     el:function(id){return this.root.querySelector('#'+id);},
     initSections:function(){
