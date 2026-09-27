@@ -4,16 +4,64 @@ import os
 import sys
 import time
 import unittest
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, os.environ.get('EPAPER_SOURCE_DIR') or
                 str(Path(__file__).resolve().parents[1] / 'root/etc/kk-car'))
 import epaper  # noqa: E402
+import device_settings
 from PIL import Image
 
 
 class EpaperTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        root = Path(self.temp.name)
+        self.patches = [patch.object(device_settings, 'SETTINGS', root / 'settings.json'),
+                        patch.object(device_settings, 'LEGACY', root / 'legacy.json')]
+        for item in self.patches: item.start()
+
+    def tearDown(self):
+        for item in self.patches: item.stop()
+        self.temp.cleanup()
+
+    def test_rotation_menu_persists_and_web_reload_works(self):
+        console = epaper.Console()
+        console.view = 'menu'
+        console.selected = [item[0] for item in epaper.MENU].index('rotation')
+        self.assertEqual(console.handle(3, .1, {}), 'gray')
+        self.assertEqual(console.settings['rotation'], 0)
+        self.assertEqual(device_settings.snapshot()['settings']['rotation'], 0)
+        result = device_settings.save({'rotation': 180, 'refresh_seconds': 60}, console.revision)
+        self.assertTrue(result['ok'])
+        self.assertTrue(console.reload_settings())
+        self.assertEqual((console.settings['rotation'], console.refresh), (180, 60))
+
+    def test_rotation_applies_to_mono_and_gray_frames(self):
+        image = Image.new('L', (264, 176), 255)
+        image.paste(0, (0, 0, 10, 15))
+        self.assertEqual(epaper.Paper.portrait(image, 0).size, (176, 264))
+        self.assertEqual(epaper.Paper.portrait(image, 0).rotate(180).tobytes(),
+                         epaper.Paper.portrait(image, 180).tobytes())
+        self.assertNotEqual(epaper.Paper.gray_planes(image, 0), epaper.Paper.gray_planes(image, 180))
+
+    def test_rotation_invalidates_partial_cache(self):
+        paper = epaper.Paper.__new__(epaper.Paper)
+        paper.rotation = 180
+        paper.sleep = lambda: setattr(paper, 'last', None)
+        paper.last = Image.new('1', (176, 264))
+        self.assertTrue(paper.configure(dict(device_settings.DEFAULTS, rotation=0)))
+        self.assertIsNone(paper.last)
+        self.assertEqual(paper.rotation, 0)
+
+    def test_black_white_and_start_page_settings(self):
+        self.assertTrue(device_settings.save({'grayscale': False, 'start_page': 4}, 0)['ok'])
+        console = epaper.Console()
+        self.assertEqual(console.page, 3)
+        self.assertTrue(set(epaper.render(console, {}, {}).tobytes()).issubset({0, 255}))
+
     def test_four_gray_planes(self):
         image = Image.new('L', (epaper.WIDTH, epaper.HEIGHT), 255)
         image.putpixel((0, 0), 0)
@@ -85,7 +133,7 @@ class EpaperTests(unittest.TestCase):
     def test_setting_needs_long_confirmation(self):
         console = epaper.Console()
         console.view = 'menu'
-        console.selected = 3  # VPN pause/start
+        console.selected = [item[0] for item in epaper.MENU].index('vpn_toggle')
         self.assertEqual(console.handle(3, .1, {}), 'fast')
         self.assertEqual(console.view, 'confirm')
         with patch.object(epaper, 'perform', return_value={'ok': True, 'accepted': True}) as do:

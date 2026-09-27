@@ -20,7 +20,9 @@
       "path": "kkcar/overview"
     },
     "depends": {
-      "acl": ["luci-app-kkcar"]
+      "acl": [
+        "luci-app-kkcar"
+      ]
     }
   },
   "admin/kkcar_notifications": {
@@ -57,7 +59,22 @@
       "path": "kkcar/ups"
     },
     "depends": {
-      "acl": ["luci-app-kkcar"]
+      "acl": [
+        "luci-app-kkcar"
+      ]
+    }
+  },
+  "admin/kkcar_settings": {
+    "title": "设置中心",
+    "order": 6,
+    "action": {
+      "type": "view",
+      "path": "kkcar/settings"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-kkcar"
+      ]
     }
   }
 }

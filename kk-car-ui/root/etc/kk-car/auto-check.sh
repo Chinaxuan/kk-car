@@ -8,7 +8,12 @@ interval=600
 last_started=0
 state=waiting
 now_up() { read -r seconds rest < /proc/uptime; echo "${seconds%.*}"; }
+read_interval() {
+    value=$(jsonfilter -i /etc/kk-car/private/device-settings.json -e '@.check_interval_seconds' 2>/dev/null)
+    case "$value" in 300|600|900|1800|3600) echo "$value" ;; *) echo 600 ;; esac
+}
 started=$(now_up)
+last_up=0
 next=$((started + 15))
 [ "$next" -ge 60 ] || next=60
 publish() {
@@ -27,11 +32,17 @@ publish() {
 }
 while :; do
     now=$(now_up)
+    configured=$(read_interval)
+    if [ "$configured" -ne "$interval" ]; then
+        interval=$configured
+        [ "$last_up" -eq 0 ] || next=$((last_up + interval))
+    fi
     if [ "$now" -ge "$next" ]; then
-        reply=$(ubus -t 5 call kkcar action '{"action":"diagnose"}' 2>/dev/null)
+        reply=$(ubus -t 5 call kkcar action '{"action":"diagnose"}' 9>&- 2>/dev/null)
         accepted=$(printf '%s' "$reply" | jsonfilter -e '@.accepted' 2>/dev/null)
         if [ "$accepted" = true ]; then
             last_started=$(date +%s)
+            last_up=$now
             next=$((now + interval))
             state=waiting
         elif [ -d /tmp/kk-car-ui-lock ]; then
@@ -43,5 +54,6 @@ while :; do
         fi
     fi
     publish
-    sleep 15
+    # A child sleep must not keep the instance lock after procd stops its parent.
+    sleep 15 9>&-
 done

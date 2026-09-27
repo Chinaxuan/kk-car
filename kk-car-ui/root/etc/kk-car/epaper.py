@@ -17,12 +17,23 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 from epaper_lut import LUT_DATA_4GRAY
+from device_settings import snapshot, save as save_settings
 
 WIDTH, HEIGHT = 264, 176
 DISPLAY_ROTATION = 180  # Physical mounting direction; key roles stay unchanged.
 KEYS = (5, 6, 13, 19)  # KEY1=home/back, KEY2=up, KEY3=down, KEY4=menu/confirm
 PAGES = ('OVERVIEW', 'CELLULAR', 'VPN', 'SMS / DATA', 'UPS / POWER', 'SYSTEM')
 MENU = (
+    ('rotation', 'Screen direction'),
+    ('refresh', 'Screen refresh time'),
+    ('grayscale', 'Gray separators'),
+    ('fast_refresh', 'Fast key refresh'),
+    ('partial_refresh', 'Partial menu refresh'),
+    ('clean_after', 'Clean after key updates'),
+    ('sleep_seconds', 'Panel sleep delay'),
+    ('start_page', 'Page on startup'),
+    ('auto_page_seconds', 'Automatic page turn'),
+    ('clean_screen', 'Clean screen now'),
     ('diagnose', 'Run network check'),
     ('modem_refresh', 'Refresh LTE status'),
     ('vpn_restart', 'Reconnect VPN'),
@@ -30,12 +41,16 @@ MENU = (
     ('vpn_auto', 'VPN auto on boot'),
     ('wifi_band', 'Wi-Fi 2.4 / 5 GHz'),
     ('port_mode', 'Ethernet LAN / WAN'),
-    ('refresh', 'Screen refresh time'),
 )
 REFRESH_CHOICES = (60, 180, 300, 600)
 MAX_QUICK_UPDATES = 3  # clean sooner than the vendor's five-update upper guidance
 STATUS_PATH = Path('/tmp/kk-car-epaper-status.json')
 SETTINGS_PATH = Path('/etc/kk-car/private/epaper-settings.json')
+SCREEN_KEYS = ('rotation', 'grayscale', 'fast_refresh', 'partial_refresh',
+               'clean_after', 'sleep_seconds', 'start_page', 'auto_page_seconds')
+SCREEN_CHOICES = {'rotation': (0, 180), 'clean_after': (1, 2, 3),
+                  'sleep_seconds': (18, 30, 60), 'start_page': tuple(range(1, 7)),
+                  'auto_page_seconds': (0, 60, 180, 300)}
 
 
 def ubus(method, payload=None, timeout=8):
@@ -82,19 +97,13 @@ def read_aux():
 
 
 def load_refresh():
-    try:
-        value = json.loads(SETTINGS_PATH.read_text()).get('refresh_seconds')
-        return value if value in REFRESH_CHOICES else 180
-    except (OSError, ValueError, TypeError):
-        return 180
+    return snapshot()['settings']['refresh_seconds']
 
 
 def save_refresh(value):
-    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    staging = SETTINGS_PATH.with_suffix('.tmp')
-    staging.write_text(json.dumps({'refresh_seconds': value}) + '\n')
-    staging.chmod(0o600)
-    staging.replace(SETTINGS_PATH)
+    result = save_settings({'refresh_seconds': value}, snapshot()['revision'])
+    if not result.get('ok'):
+        raise OSError(result.get('error'))
 
 
 def number(v, suffix='', decimals=0):
@@ -230,7 +239,20 @@ def metrics(page, car, ups, rates, aux=None):
     )
 
 
-def label_for(item, car, refresh):
+def label_for(item, car, refresh, settings=None):
+    settings = settings or snapshot()['settings']
+    if item in SCREEN_KEYS:
+        value = settings[item]
+        labels = {'rotation': 'Direction', 'grayscale': 'Gray rules',
+                  'fast_refresh': 'Fast refresh', 'partial_refresh': 'Partial refresh',
+                  'clean_after': 'Clean after', 'sleep_seconds': 'Sleep delay',
+                  'start_page': 'Startup page', 'auto_page_seconds': 'Auto pages'}
+        shown = ('ON' if value else 'OFF') if isinstance(value, bool) else str(value)
+        if item == 'rotation': shown += ' deg'
+        if item == 'clean_after': shown += ' updates'
+        if item == 'sleep_seconds': shown += ' s'
+        if item == 'auto_page_seconds': shown = f'{value // 60} min' if value else 'OFF'
+        return labels[item] + ': ' + shown
     if item == 'vpn_toggle':
         return 'Pause VPN' if (car.get('vpn') or {}).get('running') else 'Start VPN'
     if item == 'vpn_auto':
@@ -245,6 +267,17 @@ def label_for(item, car, refresh):
 
 
 def perform(item, car, refresh):
+    if item == 'clean_screen':
+        return {'ok': True, 'message': 'Full clean requested', 'clean': True}
+    if item in SCREEN_KEYS:
+        current = snapshot()
+        value = current['settings'][item]
+        choices = SCREEN_CHOICES.get(item)
+        target = choices[(choices.index(value) + 1) % len(choices)] if choices else not value
+        result = save_settings({item: target}, current['revision'])
+        if result.get('ok'):
+            result['message'] = label_for(item, car, refresh, result['settings'])
+        return result
     if item == 'refresh':
         next_value = REFRESH_CHOICES[(REFRESH_CHOICES.index(refresh) + 1) % len(REFRESH_CHOICES)]
         save_refresh(next_value)
@@ -285,7 +318,18 @@ class Console:
         self.item = None
         self.notice = ''
         self.pending = None
-        self.refresh = load_refresh()
+        current = snapshot()
+        self.settings = current['settings']
+        self.revision = current['revision']
+        self.refresh = self.settings['refresh_seconds']
+        self.page = self.settings['start_page'] - 1
+
+    def reload_settings(self):
+        current = snapshot()
+        changed = current['settings'] != self.settings
+        self.settings, self.revision = current['settings'], current['revision']
+        self.refresh = self.settings['refresh_seconds']
+        return changed
 
     def sync_pending(self, car):
         if self.view != 'pending' or not self.pending:
@@ -329,7 +373,7 @@ class Console:
                 self.selected = (self.selected + (-1 if key == 1 else 1)) % len(MENU)
                 return 'partial'
             self.item = MENU[self.selected][0]
-            if self.item in ('diagnose', 'modem_refresh', 'refresh'):
+            if self.item in ('diagnose', 'modem_refresh', 'refresh', 'clean_screen') + SCREEN_KEYS:
                 return self.execute(car)
             self.view = 'confirm'
             return 'fast'
@@ -379,6 +423,7 @@ class Console:
             result = {'ok': False, 'error': 'Could not save screen setting'}
         if 'refresh' in result:
             self.refresh = result['refresh']
+        self.reload_settings()
         if result.get('ok') and result.get('pending') and self.item in ('wifi_band', 'port_mode'):
             self.pending = {'item': self.item, 'target': result['target'], 'started': time.time(),
                             'deadline': result['pending']['deadline']}
@@ -388,7 +433,7 @@ class Console:
             self.notice = str(result.get('message') or result.get('error') or
                               ('Job started' if result.get('accepted') else 'Setting saved'))
             self.view = 'result'
-        return 'fast'
+        return 'gray' if self.item in SCREEN_KEYS + ('clean_screen', 'refresh') else 'fast'
 
 
 @lru_cache(maxsize=8)
@@ -503,7 +548,7 @@ def render(console, car, ups, rates=None, aux=None):
     draw.text((WIDTH - 7 - draw.textlength(charge, font=font(14)), 2), charge,
               fill=255, font=font(14))
     draw.text((7, 18), fitted(draw, title, small, 205), fill=255, font=small)
-    page_no = f'{console.page + 1} / {len(PAGES)}' if console.view == 'pages' else 'SET'
+    page_no = f'{console.page + 1} / {len(PAGES)}' if console.view == 'pages' else f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
     draw.text(((WIDTH - draw.textlength(page_no, font=small)) / 2, 18), page_no,
               fill=255, font=small)
     draw.text((WIDTH - 7 - draw.textlength(state, font=small), 18), state,
@@ -536,7 +581,7 @@ def render(console, car, ups, rates=None, aux=None):
             draw.text((9, y), '>' if selected else f'{index + 1}.',
                       fill=0, font=value_font)
             item = MENU[index][0]
-            draw.text((31, y), fitted(draw, label_for(item, car, console.refresh), value_font, 224),
+            draw.text((31, y), fitted(draw, label_for(item, car, console.refresh, console.settings), value_font, 224),
                       fill=0, font=value_font)
         footer = '1 BACK  2 UP  3 DOWN  4 OK'
         controls = ('1 BACK', '2 UP', '3 DOWN', '4 OK')
@@ -586,6 +631,8 @@ def render(console, car, ups, rates=None, aux=None):
             draw.text((x, 160), label, fill=255, font=small)
     else:
         draw.text((7, 160), fitted(draw, footer, small, 249), fill=255, font=small)
+    if not console.settings['grayscale']:
+        image = image.point(lambda shade: 255 if shade >= 160 else 0)
     return image
 
 
@@ -613,6 +660,18 @@ class Paper:
         self.partials = 0
         self.fast_prepared = False
         self.touched = 0
+        self.rotation = DISPLAY_ROTATION
+        self.clean_after = MAX_QUICK_UPDATES
+        self.sleep_seconds = 18
+
+    def configure(self, settings):
+        changed = self.rotation != settings['rotation']
+        if changed:
+            self.sleep()  # invalidate the old orientation's partial-frame cache
+        self.rotation = settings['rotation']
+        self.clean_after = settings['clean_after']
+        self.sleep_seconds = settings['sleep_seconds']
+        return changed
 
     def pin(self, number, active):
         self.gpio.set_value(number, self.Value.ACTIVE if active else self.Value.INACTIVE)
@@ -688,13 +747,13 @@ class Paper:
         self.fast_prepared = True
 
     @staticmethod
-    def portrait(image):
+    def portrait(image, rotation=DISPLAY_ROTATION):
         # The controller needs a portrait frame in addition to the mounting rotation.
-        return image.rotate(90 + DISPLAY_ROTATION, expand=True)
+        return image.rotate(90 + rotation, expand=True)
 
     @staticmethod
-    def gray_planes(image):
-        pixels = Paper.portrait(image).convert('L').tobytes()
+    def gray_planes(image, rotation=DISPLAY_ROTATION):
+        pixels = Paper.portrait(image, rotation).convert('L').tobytes()
         assert len(pixels) == 176 * 264
         one = bytearray(len(pixels) // 8)
         two = bytearray(len(pixels) // 8)
@@ -711,7 +770,7 @@ class Paper:
 
     def display_gray(self, image):
         self.init_gray()
-        one, two = self.gray_planes(image)
+        one, two = self.gray_planes(image, getattr(self, 'rotation', DISPLAY_ROTATION))
         self.command(0x24, one)
         self.command(0x26, two)
         self.update(0xC7)
@@ -721,7 +780,7 @@ class Paper:
     def full_mono(self, image):
         if self.mode != 'mono' or self.partials:
             self.init_mono()
-        frame = self.portrait(image).convert('1')
+        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1')
         self.command(0x24, frame.tobytes())
         self.command(0x26, frame.tobytes())
         self.update(0xF7)
@@ -731,10 +790,10 @@ class Paper:
         return 'full'
 
     def display_fast(self, image):
-        if self.mode != 'mono' or self.partials >= MAX_QUICK_UPDATES:
+        if self.mode != 'mono' or self.partials >= getattr(self, 'clean_after', MAX_QUICK_UPDATES):
             return self.full_mono(image)
         self.prepare_fast()
-        frame = self.portrait(image).convert('1')
+        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1')
         self.command(0x24, frame.tobytes())
         self.command(0x26, frame.tobytes())
         self.update(0xC7)
@@ -744,9 +803,9 @@ class Paper:
         return 'fast'
 
     def display_partial(self, image):
-        if self.mode != 'mono' or self.last is None or self.partials >= MAX_QUICK_UPDATES:
+        if self.mode != 'mono' or self.last is None or self.partials >= getattr(self, 'clean_after', MAX_QUICK_UPDATES):
             return self.display_fast(image)
-        frame = self.portrait(image).convert('1')
+        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1')
         box = ImageChops.difference(frame.convert('L'), self.last.convert('L')).getbbox()
         if box is None:
             return 'unchanged'
@@ -789,7 +848,7 @@ class Paper:
             self.partials = 0
 
     def sleep_if_idle(self, now):
-        if self.mode and now - self.touched > 18:
+        if self.mode and now - self.touched > self.sleep_seconds:
             self.sleep()
 
     def close(self):
@@ -805,7 +864,8 @@ def write_status(console, state, mode, paper=None, error=None, key_counts=None):
     payload = {'view': console.view, 'page': console.page + 1,
                'selected': console.selected + 1 if console.view == 'menu' else None,
                'refresh_seconds': console.refresh, 'refresh_mode': mode,
-               'rotation': DISPLAY_ROTATION,
+               'rotation': console.settings['rotation'], 'settings_revision': console.revision,
+               'settings': console.settings,
                'partial_count': paper.partials if paper else 0,
                'state': state, 'updated': int(time.time()), 'error': error,
                'key_counts': key_counts or [0, 0, 0, 0]}
@@ -830,13 +890,14 @@ def rates_from(car, last_counters, now):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--preview', metavar='PNG')
-    parser.add_argument('--page', type=int, choices=range(1, len(PAGES) + 1), default=1)
+    parser.add_argument('--page', type=int, choices=range(1, len(PAGES) + 1))
     parser.add_argument('--view', choices=('pages', 'menu', 'confirm', 'pending', 'result'), default='pages')
     parser.add_argument('--once', action='store_true')
     parser.add_argument('--mode', choices=('gray', 'fast'), default='gray')
     args = parser.parse_args()
     console = Console()
-    console.page = args.page - 1
+    if args.page is not None:
+        console.page = args.page - 1
     console.view = args.view
     if console.view == 'confirm':
         console.item = 'wifi_band'
@@ -845,7 +906,7 @@ def main():
                            'started': time.time() - 25, 'deadline': time.time() + 100}
     if args.preview:
         car, ups = read_status()
-        render(console, car, ups, aux=read_aux()).rotate(DISPLAY_ROTATION).save(args.preview)
+        render(console, car, ups, aux=read_aux()).rotate(console.settings['rotation']).save(args.preview)
         return
     paper = Paper()
     counts = [0, 0, 0, 0]
@@ -854,12 +915,27 @@ def main():
     redraw = 'gray'
     last_periodic = 0
     last_pending_read = 0
+    last_settings_read = 0
+    last_navigation = time.monotonic()
+    refresh_request = ''
     last_counters = None
     rates = {}
     car, ups, aux = {}, {}, {}
     try:
         while True:
             now = time.monotonic()
+            if now - last_settings_read >= 1:
+                if console.reload_settings():
+                    redraw = 'gray'
+                    last_navigation = now
+                try:
+                    request = Path('/tmp/kk-car-epaper-refresh').read_text()
+                except OSError:
+                    request = ''
+                if request != refresh_request:
+                    redraw = 'gray'
+                    refresh_request = request
+                last_settings_read = now
             for index, pin in enumerate(KEYS):
                 level = paper.gpio.get_value(pin).value
                 if level == 0 and levels[pin] == 1:
@@ -869,12 +945,18 @@ def main():
                     held[pin] = None
                     if duration >= .04:
                         counts[index] += 1
+                        last_navigation = now
                         car, ups = read_status()
                         requested = console.handle(index, duration, car)
                         if requested:
                             redraw = requested
                 levels[pin] = level
             periodic = now - last_periodic >= console.refresh
+            auto_page = console.settings['auto_page_seconds']
+            if auto_page and console.view == 'pages' and now - last_navigation >= auto_page:
+                console.page = (console.page + 1) % len(PAGES)
+                last_navigation = now
+                redraw = 'gray'
             pending_poll = console.view == 'pending' and now - last_pending_read >= 15
             pending_changed = False
             if pending_poll:
@@ -887,6 +969,14 @@ def main():
                 aux = read_aux()
                 image = render(console, car, ups, rates, aux)
                 mode = 'gray' if periodic and console.view == 'pages' else redraw or 'partial'
+                if paper.configure(console.settings):
+                    mode = 'gray'
+                if mode == 'gray' and not console.settings['grayscale']:
+                    mode = 'full'
+                if mode == 'partial' and not console.settings['partial_refresh']:
+                    mode = 'fast'
+                if mode in ('fast', 'partial') and not console.settings['fast_refresh']:
+                    mode = 'full'
                 if args.once:
                     mode = args.mode
                 try:

@@ -8,6 +8,7 @@
 - [验证与限制](../docs/VALIDATION.md)
 - [备份与恢复](../docs/BACKUP.md)
 - [UPS 电源适配](../docs/UPS.md)
+- [显示与服务设置中心](../docs/SETTINGS.md)
 
 `root/` 映射到设备绝对路径；认证资料与实际 UCI 配置不随源码发布。
 

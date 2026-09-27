@@ -20,6 +20,9 @@
         ],
         "kkups": [
           "status"
+        ],
+        "kksettings": [
+          "status"
         ]
       }
     },
@@ -54,6 +57,11 @@
           "save_policy",
           "rtc_sync",
           "power_action"
+        ],
+        "kksettings": [
+          "save",
+          "service_set",
+          "refresh_screen"
         ]
       }
     }

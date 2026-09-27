@@ -6,6 +6,7 @@ const C={bg:0x101720,panel:0x18232f,line:0x304150,white:0xe8eff6,muted:0x9aabba,
  blue:0x89bfff,green:0x77ddba,purple:0xbaacff,cyan:0x6edbdc,amber:0xf2c477,red:0xff909b};
 function fail(s){die('KK-Car HDMI: '+s+'\n');}
 function numfile(p){return +(trim(readfile(p)||'0'));}
+function refreshSeconds(){let value=5;try{value=json(readfile('/etc/kk-car/private/device-settings.json')||'{}').hdmi_refresh_seconds;}catch(e){}return index([5,10,15,30,60],value)>=0?value:5;}
 function repeat(s,n){let out='';while(n-->0)out+=s;return out;}
 function pixel(c){return chr(c&255,(c>>8)&255,(c>>16)&255,255);}
 function fresh(t,now,limit){return t!=null && t<=now && now-t<=limit;}
@@ -115,7 +116,8 @@ while(true){let started=+(split(readfile('/proc/uptime')||'0',' ')[0]);let s=bus
  text(1510,1045,preview?'1080p 布局预览':width+' x '+height+' / 5 秒刷新',C.muted,18,C.bg,375);
  let data=join('',canvas);fb.seek(0);if(fb.write(data)!=length(data)||!fb.flush())fail('framebuffer write failed');frames++;
  let elapsed=+(split(readfile('/proc/uptime')||'0',' ')[0])-started;
- atomic({timestamp:now,uptime:s.uptime,frames,width,height,stride,format:'BGRA',render_seconds:elapsed,cpu_percent:cpu,memory_percent:mem,download_mbps:down,upload_mbps:up,vpn_connected:s.vpn.connected,latency_ms:latency,rsrp_dbm:signal,wifi_clients:s.wifi.clients,simulated:simulate,layout:'dense-1080-zh'});
- previous=s;if(maxFrames&&frames>=maxFrames)break;sleep(int(max(1000,5000-elapsed*1000)));
+ let refresh=refreshSeconds();
+ atomic({timestamp:now,uptime:s.uptime,frames,width,height,stride,format:'BGRA',render_seconds:elapsed,cpu_percent:cpu,memory_percent:mem,download_mbps:down,upload_mbps:up,vpn_connected:s.vpn.connected,latency_ms:latency,rsrp_dbm:signal,wifi_clients:s.wifi.clients,simulated:simulate,layout:'dense-1080-zh',refresh_seconds:refresh});
+ previous=s;if(maxFrames&&frames>=maxFrames)break;sleep(int(max(1000,refresh*1000-elapsed*1000)));
 }
 fb.close();

@@ -9,7 +9,9 @@ from pathlib import Path
 p=Path(os.environ['CASE_ROOT']); now=int((p/'uptime').read_text().split('.')[0]); mode=os.environ['CASE_MODE']; name=Path(sys.argv[0]).name
 if name=='flock': sys.exit(0)
 if name=='date': print(1700000000+now+(100000 if mode=='clock_jump' and now>400 else 0))
-elif name=='jsonfilter': print('true' if json.loads(sys.stdin.read() or '{}').get('accepted') else 'false')
+elif name=='jsonfilter':
+ if '-i' in sys.argv:print('300' if mode=='interval_change' and now>=400 else '42' if mode=='invalid_interval' else '600')
+ else:print('true' if json.loads(sys.stdin.read() or '{}').get('accepted') else 'false')
 elif name=='ubus':
  assert sys.argv[1:]==['-t','5','call','kkcar','action','{"action":"diagnose"}']
  log=p/'calls'; calls=log.read_text().splitlines() if log.exists() else []
@@ -38,6 +40,6 @@ def run_case(mode,start,expected):
   calls=list(map(int,(p/'calls').read_text().splitlines()))
   assert calls==expected,(mode,calls,expected)
   return mode+': '+str(calls)
-cases=[('normal',100,[115,715,1315]),('busy',100,[115,130,730,1330]),('rpc_error',100,[115,175,775,1375]),('clock_jump',100,[115,715,1315]),('boot',0,[60,660,1260])]
+cases=[('normal',100,[115,715,1315]),('busy',100,[115,130,730,1330]),('rpc_error',100,[115,175,775,1375]),('clock_jump',100,[115,715,1315]),('boot',0,[60,660,1260]),('interval_change',100,[115,415,715,1015,1315]),('invalid_interval',100,[115,715,1315])]
 with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
  for line in pool.map(lambda args:run_case(*args),cases):print('PASS',line)
