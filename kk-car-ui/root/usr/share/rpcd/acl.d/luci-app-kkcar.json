@@ -58,6 +58,7 @@
         ],
         "kkups": [
           "set_option",
+          "save_battery",
           "save_policy",
           "rtc_sync",
           "power_action"

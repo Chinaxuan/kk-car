@@ -53,3 +53,15 @@ body:has(.ku-shell) .container{max-width:none;width:100%;padding:8px 10px 0}
 @media(max-width:1250px){.ku-history-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.ku-history-summary strong{font-size:18px}.ku-history-status{width:100%;margin:0}}
 @media(max-width:900px){.ku-history-plots{grid-template-columns:1fr;gap:12px}}
 @media(max-width:700px){.ku-history{padding:15px 12px}.ku-history-heading{align-items:start}.ku-history-heading h2{font-size:17px}.ku-history-heading .ku-button{max-width:120px}.ku-history-toolbar select{max-width:none}.ku-history-dates label{flex:1;min-width:210px}.ku-history-dates input{flex:1}.ku-history-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.ku-history-summary>div{padding-right:5px}.ku-history-summary strong{font-size:17px}.ku-history-legend{gap:7px 14px;font-size:11px}.ku-history-mode-key{width:100%}}
+/* Battery edits retain their own state while telemetry continues updating. */
+.ku-battery-settings .ku-battery-current{padding:9px 11px;border-left:3px solid #89c7ef;background:#183044;font-variant-numeric:tabular-nums;color:#dcedf7}
+.ku-mv-input{display:flex;gap:6px;align-items:center;min-width:0}
+.ku-mv-input input{width:96px!important;min-width:72px}
+.ku-mv-input span{color:#abc1d0;font-size:11px}
+.ku-battery-buttons{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px}
+.ku-battery-result{padding:10px 12px;border:1px solid #3a5266;border-radius:6px;line-height:1.5}
+.ku-battery-result.good{color:#a7e5c5;border-color:#3b725a}
+.ku-battery-result.error{color:#ffc2c2;border-color:#985b63}
+.ku-battery-settings .ku-setting select{max-width:230px}
+.ku-battery-settings .ku-setting{grid-template-columns:minmax(0,1fr) auto}
+@media(max-width:600px){.ku-battery-settings .ku-setting{grid-template-columns:1fr auto}.ku-battery-settings .ku-setting select{max-width:190px}.ku-battery-buttons .ku-button{flex:1 1 auto}}

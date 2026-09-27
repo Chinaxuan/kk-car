@@ -1,7 +1,7 @@
 'use strict';
 import { sample } from '/etc/kk-car/ups-read.uc';
 import { readfile, popen } from 'fs';
-import { policy,save_policy,set_option,rtc_sync,power_action } from '/etc/kk-car/ups-control.uc';
+import { policy,save_policy,set_option,save_battery,rtc_sync,power_action } from '/etc/kk-car/ups-control.uc';
 
 function status() {
     let data=sample();
@@ -35,6 +35,9 @@ return { 'kkups': {
     }},
     set_option: {args:{key:'',value:0,expected:0,confirm:''},call:function(req) {
         let a=req.args;return set_option(a.key,a.value,a.expected,a.confirm);
+    }},
+    save_battery: {args:{full_mv:0,empty_mv:0,protect_mv:0,manual:false,expected:'',confirm:''},call:function(req) {
+        let a=req.args;return save_battery(a.full_mv,a.empty_mv,a.protect_mv,a.manual,a.expected,a.confirm);
     }},
     save_policy: {args:{enabled:false,shutdown_mv:3550},call:function(req) {
         let a=req.args;return save_policy(a.enabled,a.shutdown_mv);

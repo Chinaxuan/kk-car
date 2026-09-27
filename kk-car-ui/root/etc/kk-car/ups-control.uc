@@ -71,6 +71,117 @@ function battery_voltage_error(key,value,b) {
     return null;
 }
 
+function battery_settings(data) {
+    let b=data.battery || {};
+    return {full_mv:b.configured_full_mv,empty_mv:b.configured_empty_mv,
+        protect_mv:b.configured_protect_mv,manual:b.user_programmed===true};
+}
+
+function battery_revision(v) {
+    return sprintf('%d:%d:%d:%d',v.full_mv,v.empty_mv,v.protect_mv,v.manual?1:0);
+}
+
+function battery_expected_matches(old,expected) {
+    let parts=split(expected,':');
+    return old.protect_mv==+parts[2] && (old.manual?1:0)==+parts[3] &&
+        (!old.manual || battery_revision(old)==expected);
+}
+
+function battery_settings_error(v) {
+    if (type(v.full_mv)!='int' || type(v.empty_mv)!='int' ||
+        type(v.protect_mv)!='int' || type(v.manual)!='bool') return '请输入整数电压和有效参数模式';
+    if (v.protect_mv<2750 || v.protect_mv>3900) return '保护电压须为 2750–3900 mV';
+    // Learned full/empty values are not writable targets when returning to auto.
+    if (!v.manual) return null;
+    if (v.full_mv<4000 || v.full_mv>4500 || v.empty_mv<2500 || v.empty_mv>3900)
+        return '满电基准须为 4000–4500 mV，空电基准须为 2500–3900 mV';
+    if (v.empty_mv>=v.protect_mv || v.protect_mv>=v.full_mv-100)
+        return '手动模式需要：空电基准 < 保护电压 < 满电基准 − 100 mV';
+    return null;
+}
+
+function battery_matches(a,b) {
+    return a.manual==b.manual && a.protect_mv==b.protect_mv &&
+        (!b.manual || a.full_mv==b.full_mv && a.empty_mv==b.empty_mv);
+}
+
+// Injectable I/O allows failure and firmware-learning cases to be tested without
+// accessing the actual battery. The application lock spans the entire sequence.
+function battery_transaction(next,before,io) {
+    let old=battery_settings(before), after;
+    function apply(v) {
+        if (v.manual) {
+            // The vendor firmware ignores full/empty writes in auto mode. Give
+            // it time to adopt manual mode before writing all six voltage bytes.
+            if (!io.mode(1)) return false;
+            io.wait();
+            return io.voltages(v);
+        }
+        return io.protection(v.protect_mv) && io.mode(0);
+    }
+    function verified(v) {
+        for (let n=0;n<2;n++) {
+            io.wait();after=io.read();
+            if (!after.ok || !battery_matches(battery_settings(after),v)) return false;
+        }
+        return true;
+    }
+    let applied=false;
+    try {applied=apply(next) && verified(next);} catch(e) {}
+    if (applied) return {ok:true,status:after,settings:battery_settings(after)};
+    let restored=false;
+    try {
+        // Restore baselines before restoring automatic mode. Auto can then
+        // legitimately relearn them; only its mode/protection are fixed targets.
+        let restore={...old,manual:true};
+        restored=apply(restore) && (old.manual || io.mode(0)) && verified(old);
+    } catch(e) {}
+    return {ok:false,rollback_verified:restored,
+        error:restored?'电池参数读回不一致，已恢复原参数模式及保护电压；你的输入已保留':
+            '电池参数写入失败，恢复未能确认；请保持外部供电并重新读取设备',
+        status:after};
+}
+
+function save_battery(full_mv,empty_mv,protect_mv,manual,expected,confirm) {
+    let next={full_mv,empty_mv,protect_mv,manual};
+    let invalid=battery_settings_error(next);
+    if (invalid) return {ok:false,error:invalid};
+    if (type(expected)!='string' || !match(expected,/^\d+:\d+:\d+:[01]$/))
+        return {ok:false,error:'设备参数版本无效，请重新读取'};
+    if (confirm!='修改电池参数') return {ok:false,error:'电池参数需要明确确认'};
+    return locked(function() {
+        let before=sample();
+        if (!before.ok) return {ok:false,error:'UPS 当前无法读取，未写入'};
+        let old=battery_settings(before);
+        // Full/empty are volatile in automatic learning mode, not concurrent edits.
+        if (!battery_expected_matches(old,expected))
+            return {ok:false,error:'设备参数已被其他操作修改，请先重新读取；你的输入已保留',settings:old};
+        if (!before.input.external) return {ok:false,error:'修改电池参数必须保持外部供电'};
+        if (before.controller.shutdown_countdown_s || before.controller.restart_countdown_s)
+            return {ok:false,error:'UPS 电源倒计时正在运行，未修改电池参数'};
+        if (battery_matches(old,next)) return {ok:true,unchanged:true,status:before,settings:old};
+        let backup='/etc/kk-car/private/ups-battery-before-save.json';
+        if (!writefile(backup,sprintf('%J',{timestamp:time(),settings:old})))
+            return {ok:false,error:'无法保存原电池参数，未写入'};
+        chmod(backup,0600);
+        let result=battery_transaction(next,before,{
+            mode:(v)=>write_reg(0x2a,v),
+            protection:(v)=>write_u16(0x11,v),
+            voltages:function(v) {
+                // One bus transfer prevents the firmware observing half-written
+                // 16-bit values between separate i2cset processes.
+                return system(sprintf('/usr/sbin/i2ctransfer -y 1 w7@0x17 0x0d %d %d %d %d %d %d >/dev/null 2>&1',
+                    v.full_mv&255,v.full_mv>>8,v.empty_mv&255,v.empty_mv>>8,
+                    v.protect_mv&255,v.protect_mv>>8))==0;
+            },
+            wait:function() {system('/bin/sleep 0.2');},read:()=>sample()
+        });
+        record_event(result.ok?'battery_settings_saved':'battery_settings_failed',
+            {before:old,requested:next,after:result.settings,rollback_verified:result.rollback_verified});
+        return result;
+    });
+}
+
 function set_option(key,value,expected,confirm) {
     let regs={sample_minutes:0x15,auto_start_on_ac:0x19,full_mv:0x0d,
         empty_mv:0x0f,protect_mv:0x11,user_programmed:0x2a};
@@ -93,6 +204,8 @@ function set_option(key,value,expected,confirm) {
         if (value==old) return {ok:true,unchanged:true,status:before};
         if (battery && !before.input.external) return {ok:false,error:'修改电池参数必须保持外部供电'};
         let b=before.battery;
+        if ((key=='full_mv'||key=='empty_mv') && !b.user_programmed)
+            return {ok:false,error:'自动学习模式会覆盖电池基准，请用整组电池参数保存并启用手动模式'};
         let invalid=battery_voltage_error(key,value,b);
         if (invalid) return {ok:false,error:invalid};
         let reg=regs[key], ok=(key=='auto_start_on_ac'||key=='user_programmed') ?
@@ -181,4 +294,5 @@ function power_action(action,confirm) {
     });
 }
 
-export { policy,save_policy,set_option,battery_voltage_error,rtc_sync,power_action };
+export { policy,save_policy,set_option,battery_voltage_error,battery_settings,
+    battery_revision,battery_expected_matches,battery_settings_error,battery_transaction,save_battery,rtc_sync,power_action };

@@ -174,3 +174,10 @@ UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC�
 七个路由页共用 `view/kkcar/console.js` 和 `console.css`：全局侧栏、页头与更新时间、操作按钮、输入、提示和手机功能菜单。DJI 页内功能改为第二层横向栏，UPS/设置不再单独创建全局导航。现有控件原节点移入框架，保留监听器、输入、唯一 ID 与 RPC；未修改网络、电话音频或电源控制后端。
 
 这次更新只部署前端：`console.js`、`console.css`、`overview.js`、`dji-console-v2.js`、`ups.js`、`settings.js`、`notifications.js` 和 `network-health.js`。JS/CSS 为 0644。把两个新共用资源加入 `/etc/sysupgrade.conf`，保留原列表；不重启网络、VPN、DHCP、UPS 或整机，也不需要刷新 RPC 服务。若浏览器仍显示旧框架，刷新 LuCI 静态资源版本并重新加载页面；备份和回退方法见 [统一界面](CONSOLE-UI.md)。
+
+
+### 电池参数写入接口更新
+
+更新 `ups-control.uc`、RPC 模块 `kkups.uc`、`luci-app-kkcar.json` ACL、UPS 页面及样式。新增管理员写接口 `kkups.save_battery`，部署后重载 rpcd 并重新登录；不重启网络、无线、VPN 或 UPS。原单项接口在自动模式拒绝直接改满电/空电，避免被固件覆盖；新页面使用整组接口。失败恢复和对固件自动学习的模拟回归为 `kk-car-ui/tests/ups-battery.uc`，测试使用注入的模拟 I/O，不写实物电池。
+
+恢复代码时可回滚上述五个文件并重载 rpcd；不会自动回滚硬件参数。硬件原值在设备私有 `ups-battery-before-save.json` 中；仅保持外电供电时，通过新的整组接口按所需模式恢复。
