@@ -43,6 +43,7 @@ return view.extend({
                 E('div',{'class':'ku-nav'},[
                     nav(L.url('admin/kkcar'),'行车总览',false),
                     nav(L.url('admin/kkcar_connections'),'连接设置',false),
+                    nav(L.url('admin/kkcar_health'),'网络守护',false),
                     nav(L.url('admin/kkcar_dji'),'蜂窝与通信',false),
                     nav(L.url('admin/kkcar_ups'),'电源与设备',true),
                     nav(L.url('admin/kkcar_notifications'),'通知中心',false),

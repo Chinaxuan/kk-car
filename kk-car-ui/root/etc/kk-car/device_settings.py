@@ -18,7 +18,7 @@ CHOICES = dict(rotation=(0, 180), refresh_seconds=(60, 180, 300, 600),
                auto_page_seconds=(0, 60, 180, 300), hdmi_refresh_seconds=(5, 10, 15, 30, 60),
                check_interval_seconds=(300, 600, 900, 1800, 3600))
 SERVICES = ('epaper', 'hdmi', 'auto-check', 'diagnostics', 'modem', 'vpn-ping',
-            'notify', 'dji-sms-forward', 'voice-runtime', 'voice-gateway')
+            'notify', 'dji-sms-forward', 'voice-runtime', 'voice-gateway', 'network-health')
 JOB = Path('/tmp/kk-car-settings-job.json')
 SERVICE_LOCK = Path('/tmp/kk-car-settings-service-lock')
 

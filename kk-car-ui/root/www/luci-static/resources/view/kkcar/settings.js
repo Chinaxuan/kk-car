@@ -26,6 +26,7 @@ var fields=[
  ['check_interval_seconds','自动网络检查周期',[[300,'5 分钟'],[600,'10 分钟'],[900,'15 分钟'],[1800,'30 分钟'],[3600,'60 分钟']],'服务开启时生效，包含网络连通性及 ChatGPT / Gemini 区域检查。']
 ];
 var serviceInfo={
+ 'network-health':['网络守护','持续检测上网线路、VPN 和 DNS；暂停后不会自动恢复连接，已有连接保持。'],
  'epaper':['电子纸与四键','暂停后画面保留，屏幕按键失效；可在后台重新启动。'],
  'hdmi':['HDMI 状态看板','只影响本地显示，暂停后恢复文字控制台。'],
  'auto-check':['自动网络检查','关闭后不再定时检查；手动网络检查仍可使用。'],
@@ -63,6 +64,7 @@ return view.extend({
    E('section',{'class':'ku-panel'},[E('h2',{},'HDMI 与自动检查')].concat(fields.slice(9).map(formField),[E('div',{'class':'ks-readback'},[E('strong',{},'设置如何生效'),E('p',{},'方向、灰阶和刷新设置在当前写屏结束后应用；开机首页在下次显示服务启动时生效。HDMI 周期在下一帧应用，自动检查周期最多等待 15 秒。')]),
     E('h3',{},'常用控制'),this.quick=E('div',{'class':'ks-quick'}),E('p',{'class':'ku-helper'},'UPS 电池基准、保护电压和低电策略使用电源页原有的读回与确认。')]))]);
   var catalogue=[
+   ['kkcar_health','网络守护','多目标探测、故障分类、VPN 自动恢复与可选 4G 重拨；设置连续轮数、冷却和每小时限额。'],
    ['kkcar_connections','网络与连接','VPN 启停与重连、开机自动连接、Wi-Fi 名称与密码、2.4 / 5 GHz、LAN / WAN、网络检查和维护。'],
    ['kkcar_dji','蜂窝与通信','GPS 启停、定位刷新、数据网络重连、短信发送 / 归档 / 删除、联系人与通话、运营商查询命令与每日流量校正。'],
    ['kkcar_ups','UPS 电源','来电自启、采样周期、RTC 校时、低电策略、满电 / 空电 / 保护电压、用户电池参数、重启 / 关机与倒计时。'],
@@ -70,7 +72,7 @@ return view.extend({
   ];
   var root=E('div',{'class':'ku-shell ks-shell'},[
    E('aside',{'class':'ku-sidebar'},[E('div',{'class':'ku-brand'},[E('b',{},'KK'),E('span',{},'CAR CONTROL')]),E('nav',{'class':'ku-nav','aria-label':'KK-Car 页面'},[
-    nav('kkcar','行车总览'),nav('kkcar_connections','连接设置'),nav('kkcar_dji','蜂窝与通信'),nav('kkcar_ups','电源与设备'),nav('kkcar_notifications','通知中心'),nav('kkcar_settings','设置中心',true)]),E('p',{'class':'ku-sidebar-note'},'设置共享 · 实时读回\n屏幕 / 服务 / 各模块')]),
+    nav('kkcar','行车总览'),nav('kkcar_connections','连接设置'),nav('kkcar_health','网络守护'),nav('kkcar_dji','蜂窝与通信'),nav('kkcar_ups','电源与设备'),nav('kkcar_notifications','通知中心'),nav('kkcar_settings','设置中心',true)]),E('p',{'class':'ku-sidebar-note'},'设置共享 · 实时读回\n屏幕 / 服务 / 各模块')]),
    E('main',{'class':'ku-main'},[E('header',{'class':'ku-header'},[E('div',{},[E('span',{'class':'ku-eyebrow'},'DEVICE SETTINGS'),E('h1',{},'设置中心'),E('p',{},'显示、诊断、后台服务与各模块控制')]),E('div',{'class':'ku-header-actions'},[this.reloadButton,this.cleanButton])]),this.notice,this.summary,controls,
     E('div',{'class':'ks-save-bar'},[this.saveButton,E('span',{},'仅保存修改的字段；不会重启网络、Wi-Fi 或 VPN。')]),
     E('section',{'class':'ku-panel'},[E('div',{'class':'ku-panel-title'},[E('h2',{},'后台服务'),E('span',{},'运行状态与开机启动独立设置')]),this.job=E('p',{'class':'ku-helper','aria-live':'polite'}),this.services]),

@@ -163,3 +163,7 @@ UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC�
 ## 电池历史分析增量更新
 
 部署 `ups_history.py`、`battery_history.js` 以及更新的 `kkups.uc`、ACL、`ups.js`、`ups.css`。Python 文件 0755，其余 0644；将 helper 加入 sysupgrade 保留列表。只 reload rpcd，刷新浏览器，核对 `ubus call kkups history` 与实际曲线。不要重启网络、UPS 或记录服务；先备份待替换代码并保留私有日志。详见 [电池历史分析](BATTERY-HISTORY.md)。
+
+## 网络守护增量更新
+
+新增 Python 网络守护、init、kkhealth RPC 与前端，更新菜单、ACL、总览状态、各页导航、设置中心服务白名单和分钟诊断。只刷新管理组件及对应采集服务，不重启网络、VPN 或整机；保留设备私有设置。本轮正常探测、页面保存与关闭/重新启用已验证，原网络配置哈希不变；实际断线恢复尚未现场验收。具体步骤及回退见 [网络守护](NETWORK-HEALTH.md)。

@@ -76,5 +76,18 @@
         "luci-app-kkcar"
       ]
     }
+  },
+  "admin/kkcar_health": {
+    "title": "网络守护",
+    "order": 2.5,
+    "action": {
+      "type": "view",
+      "path": "kkcar/network-health"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-kkcar"
+      ]
+    }
   }
 }

@@ -45,7 +45,7 @@ return view.extend({
         this.settingsPage=window.location.pathname.endsWith('/kkcar_connections');
         this.previous=null; this.requesting=false; this.historyRange='1h'; this.historyRequest=0; this.historyFetched=0;
         document.title='KK-Car · '+(this.settingsPage?'连接设置':'行车总览');
-        if(!document.getElementById('kk-style')) document.head.appendChild(E('link',{id:'kk-style',rel:'stylesheet',href:L.resource('view/kkcar/overview.css')+'?v=20260925-ui5'}));
+        if(!document.getElementById('kk-style')) document.head.appendChild(E('link',{id:'kk-style',rel:'stylesheet',href:L.resource('view/kkcar/overview.css')+'?v=20260927-health1'}));
         this.root=E('div',{'class':'kk-app'});
         var refresh=button('刷新状态',function(){self.refresh();});
         var diag=button('检查网络',function(){self.perform('diagnose');},'primary');
@@ -74,7 +74,7 @@ return view.extend({
         this.root.append(
             E('div',{'class':'kk-header',role:'banner'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'KK'),E('div',{},[E('h1',{},this.settingsPage?'连接设置':'行车总览'),E('p',{},'KK-Car · 连接、通信与供电')])]),
-                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{'class':this.settingsPage?'':'active','aria-current':this.settingsPage?null:'page',href:L.url('admin/kkcar')},'行车总览'),E('a',{'class':this.settingsPage?'active':'','aria-current':this.settingsPage?'page':null,href:L.url('admin/kkcar_connections')},'连接设置'),E('a',{href:L.url('admin/kkcar_dji')},'蜂窝与通信'),E('a',{href:L.url('admin/kkcar_ups')},'电源与设备'),E('a',{href:L.url('admin/kkcar_notifications')},'通知中心'),E('a',{href:L.url('admin/kkcar_settings')},'设置中心'),E('a',{'class':'kk-nav-utility',href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{'class':'kk-nav-utility',href:L.url('admin/logout')},'退出')])
+                E('nav',{'class':'kk-header-links kk-global-nav','aria-label':'KK-Car 页面'},[E('span',{id:'kk-refreshed'},'正在读取'),E('a',{'class':this.settingsPage?'':'active','aria-current':this.settingsPage?null:'page',href:L.url('admin/kkcar')},'行车总览'),E('a',{'class':this.settingsPage?'active':'','aria-current':this.settingsPage?'page':null,href:L.url('admin/kkcar_connections')},'连接设置'),E('a',{href:L.url('admin/kkcar_health')},'网络守护'),E('a',{href:L.url('admin/kkcar_dji')},'蜂窝与通信'),E('a',{href:L.url('admin/kkcar_ups')},'电源与设备'),E('a',{href:L.url('admin/kkcar_notifications')},'通知中心'),E('a',{href:L.url('admin/kkcar_settings')},'设置中心'),E('a',{'class':'kk-nav-utility',href:L.url('admin/status/overview')},'高级管理 ↗'),E('a',{'class':'kk-nav-utility',href:L.url('admin/logout')},'退出')])
             ]),
             E('div',{id:'kk-message','class':'kk-notice',role:'status','aria-live':'polite',hidden:true}),
             E('div',{id:'kk-pending','class':'kk-notice warning',hidden:true},[
@@ -374,6 +374,7 @@ return view.extend({
         columns.replaceWith(workspace);
         this.root.classList.add('kk-console','kk-fullscreen','kk-studio');
         this.root.classList.add(this.settingsPage?'kk-connection-page':'kk-home-page');
+        top.append(E('a',{id:'kk-health-link','class':'kk-health-link',href:L.url('admin/kkcar_health')},[E('span',{},'网络守护'),E('strong',{id:'kk-health-brief'},'等待检测'),E('span',{},'详情与策略 →')]));
         if(this.settingsPage){
             workspace.querySelector('.kk-monitor').hidden=true;
             top.after(E('div',{'class':'kk-page-intro'},[
@@ -548,6 +549,12 @@ return view.extend({
             E('div',{},[E('strong',{},peer.name),E('span',{},peer.ip)]),
             E('span',{'class':'kk-device-state '+(peer.wireless?'online':'')},peer.wireless?'Wi-Fi 已连接':'地址租约')
         ]));});
+        var health=d.network_health||{}, hg=health.groups||{}, hu=health.uptime_s;
+        var hf=health.timestamp && hu!=null && d.uptime>=hu && d.uptime-hu<=(health.next_in_seconds||30)+25;
+        var hn={healthy:'正常',degraded:'部分目标无响应',failed:'连续无响应',unavailable:'接口未就绪',paused:'已暂停',unknown:'待确认',disabled:'已关闭'};
+        var hs=!hf?'unknown':(hg[health.active]?.state==='failed'||hg.vpn?.state==='failed'?'failed':'healthy');
+        this.el('kk-health-link').dataset.state=hs;
+        this.text('kk-health-brief',!hf?'服务未更新':health.error?'采集异常':!health.enabled?'已关闭':('出口 '+(hn[hg[health.active]?.state]||'待确认')+' · VPN '+(hn[hg.vpn?.state]||'待确认')+' · DNS '+(hn[health.dns?.state]||'待确认')));
         var result=d.diagnostics, autoCheck=d.diagnostics_auto || {};
         var autoActive=autoCheck.enabled && d.timestamp>=autoCheck.updated && d.timestamp-autoCheck.updated<=45;
         var autoLabel=autoActive?'每10分钟自动检查':'手动检查';

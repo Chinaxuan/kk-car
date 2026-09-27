@@ -3,7 +3,7 @@ import { readfile, writefile, popen, access, mkdir, rmdir, chmod, lsdir } from '
 import { connect } from 'ubus';
 
 const services=['epaper','hdmi','auto-check','diagnostics','modem','vpn-ping',
-    'notify','dji-sms-forward','voice-runtime','voice-gateway'];
+    'notify','dji-sms-forward','voice-runtime','voice-gateway','network-health'];
 function filejson(p){try{return json(readfile(p)||'{}');}catch(e){return {};}}
 function quote(s){return "'"+replace(s,/'/g,"'\\''")+"'";}
 function config(operation, input){

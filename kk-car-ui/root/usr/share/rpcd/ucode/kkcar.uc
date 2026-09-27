@@ -118,7 +118,8 @@ return { 'kkcar': {
             wifi_pending: pending.deadline ? {deadline:pending.deadline, ssid:pending.ssid} : null,
             port_pending: portpending.deadline ? {deadline:portpending.deadline, mode:portpending.mode} : null,
             diagnostics:jsonfile('/tmp/kk-car-ui-diagnostics.json'),
-            diagnostics_auto:jsonfile('/tmp/kk-car-auto-check.json')
+            diagnostics_auto:jsonfile('/tmp/kk-car-auto-check.json'),
+            network_health:jsonfile('/tmp/kk-car-network-health.json')
         };
     }},
     action: { args:{action:''}, call:function(req) {

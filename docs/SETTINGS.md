@@ -47,3 +47,7 @@
 增量复制新 `device_settings.py`、更新后的 `epaper.py`、`auto-check.sh`、`hdmi.uc`、`kksettings.uc`、菜单和 ACL，以及 `settings.js/settings.css` 和各页面新导航。Python helper 与 shell 脚本设为可执行；重载 rpcd、清理 LuCI 菜单缓存并刷新页面，只重启电子纸、HDMI 和检查调度器。无需重启 network、dnsmasq、Wi-Fi、VPN 或整机。
 
 把新增程序、菜单/ACL、前端、字体及私有 `device-settings.json` 加入 `/etc/sysupgrade.conf`，与旧的配置保留条目一起保存。配置仅放在加密/私有设备备份，不发布真实文件。回退代码时同时恢复电子纸及 helper 依赖；恢复旧版后由旧 `epaper-settings.json` 控制刷新，新的方向配置不会被旧代码读取。通用 Linux/macOS 可运行配置持久化测试；电子纸测试需要 Pillow，实屏仍须单独检查。
+
+## 网络守护服务
+
+设置中心增加第十一个后台服务「网络守护」，可启停和配置开机启动。检测/恢复开关、探测目标、连续轮数、冷却与动作限额在独立网络守护页；关闭守护不会停止现有网络。见 [网络守护](NETWORK-HEALTH.md)。

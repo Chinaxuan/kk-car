@@ -275,3 +275,6 @@ html:has(.kk-studio),body:has(.kk-studio){background:oklch(18% .022 255);color:o
 .kk-studio .kk-chart-cursor{stroke:oklch(85% .02 255);stroke-width:1;stroke-dasharray:3 3}
 @media(max-width:1300px){.kk-studio .kk-traffic-numbers{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:680px){.kk-studio .kk-traffic-numbers{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.kk-studio .kk-traffic-numbers>div.kk-kpi{min-height:60px;padding:6px 9px}.kk-studio .kk-traffic-numbers .kk-kpi-value strong{font-size:20px}.kk-studio .kk-chart-heading .kk-history-ranges{width:100%;margin:2px 0}.kk-studio .kk-chart-heading .kk-history-ranges .kk-button{flex:1;min-width:0;padding:3px 4px;font-size:9px}.kk-studio #kk-graph-scale{font-size:9px}.kk-studio .kk-ping-strip{flex-wrap:wrap;gap:5px 14px}.kk-studio .kk-combined-chart{height:178px;min-height:178px}}
+
+/* Persistent network monitor entry. */
+.kk-app .kk-health-link{display:flex;align-items:center;gap:10px;padding:5px 9px;border:1px solid var(--line);border-radius:6px;color:var(--muted);text-decoration:none;font-size:10px;margin-top:5px}.kk-health-link strong{color:#85d8b7}.kk-health-link[data-state=failed] strong{color:#ff8295}.kk-health-link[data-state=unknown] strong{color:#b9c9d9}

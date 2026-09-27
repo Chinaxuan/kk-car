@@ -156,3 +156,7 @@ VPN 累计错/丢是内核接口历史计数；实时 Ping 丢包率是本轮检
 ## 电池历史查询
 
 `diagnostics.py` 既有每分钟快照 → 私有轮转 JSONL → 只读 `ups_history.py` → 管理员 `kkups.history` → 本地 canvas。查询处理单位、有效性、连续段与积分；客户端只负责绘图/筛选/CSV 下载，不直读私有文件，不新增公开接口。
+
+## 独立网络健康监控
+
+`network_health.py` / `kk-car-network-health` 约每 30 秒多目标、接口绑定探测，`kkhealth` 提供只读状态与有版本校验的私有策略保存。它不选择路由，由已有 uplink 服务唯一管理出口。自动动作取得现有 UI 锁，受启动等待、出口稳定期、暂停与通话保护、单调时钟冷却和限额约束；DNS 不触发恢复。独立事件日志最多 1 MiB，分钟诊断另存分类快照。见 [网络守护](NETWORK-HEALTH.md)。

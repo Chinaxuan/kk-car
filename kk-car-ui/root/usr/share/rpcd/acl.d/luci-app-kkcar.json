@@ -24,6 +24,9 @@
         ],
         "kksettings": [
           "status"
+        ],
+        "kkhealth": [
+          "status"
         ]
       }
     },
@@ -63,6 +66,10 @@
           "save",
           "service_set",
           "refresh_screen"
+        ],
+        "kkhealth": [
+          "save",
+          "check"
         ]
       }
     }

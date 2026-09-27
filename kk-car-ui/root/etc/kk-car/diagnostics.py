@@ -227,6 +227,15 @@ def snapshot():
     data = select_snapshot(ups, read_json('/tmp/kk-car-modem.json'), read_json('/tmp/kk-car-dji-at.json'),
                            read_json('/tmp/kk-car-uplink.json'), read_json('/tmp/kk-car-vpn-ping.json'),
                            read_json('/tmp/kk-car-ups-watch.json'), wan, current['timestamp'])
+    health = read_json('/tmp/kk-car-network-health.json')
+    interval = number(health.get('next_in_seconds'), 30, 300) or 30
+    if fresh(health, current['timestamp'], interval + 25):
+        states = {'healthy', 'degraded', 'failed', 'unavailable', 'paused', 'unknown', 'disabled'}
+        data['network_health'] = {name: {'state': enum(row.get('state'), states),
+            'good': number(row.get('good'), 0, 100), 'bad': number(row.get('bad'), 0, 100),
+            'responding': number(row.get('responding'), 0, 4)}
+            for name, row in health.get('groups', {}).items() if name in {'cellular', 'ethernet', 'vpn'} and isinstance(row, dict)}
+        data['network_health']['dns'] = enum(health.get('dns', {}).get('state'), states)
     counts = error_counts(command(['logread'], 5))
     previous = read_json(COUNTS)
     old = previous.get('counts', {}) if previous.get('boot') == current['boot'] else {}
