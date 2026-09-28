@@ -15,7 +15,7 @@ DEFAULTS = dict(rotation=180, refresh_seconds=180, grayscale=True, fast_refresh=
                 auto_page_seconds=0, hdmi_refresh_seconds=5, check_interval_seconds=600,
                 battery_capacity_mah=3000)
 CHOICES = dict(rotation=(0, 180), refresh_seconds=(60, 180, 300, 600),
-               clean_after=(1, 2, 3, 4, 5), sleep_seconds=(18, 30, 60), start_page=tuple(range(1, 7)),
+               clean_after=tuple(range(1, 11)), sleep_seconds=(18, 30, 60), start_page=tuple(range(1, 7)),
                auto_page_seconds=(0, 60, 180, 300), hdmi_refresh_seconds=(5, 10, 15, 30, 60),
                check_interval_seconds=(300, 600, 900, 1800, 3600),
                battery_capacity_mah=tuple(range(500, 10001, 100)))
