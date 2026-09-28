@@ -141,6 +141,41 @@ class EpaperTests(unittest.TestCase):
         self.assertEqual(sum(v.bit_count() for v in one), 2)
         self.assertEqual(sum(v.bit_count() for v in two), 2)
 
+    def test_fast_mono_keeps_dark_gray_rules_and_strokes(self):
+        image = Image.new('L', (264, 176), 255)
+        image.putpixel((0, 0), 0)
+        image.putpixel((1, 0), 128)
+        image.putpixel((2, 0), 192)
+        fast = epaper.Paper.mono_frame(image).rotate(-270, expand=True)
+        self.assertEqual([fast.getpixel((x, 0)) for x in range(4)], [0, 0, 255, 255])
+        for page in range(len(epaper.PAGES)):
+            console = epaper.Console()
+            console.page = page
+            frame = epaper.render(console, {}, {})
+            fast = epaper.Paper.mono_frame(frame).rotate(-270, expand=True)
+            rule = (0, 116) if page == 0 else (7, 65)
+            self.assertEqual(frame.getpixel(rule), 128 if page == 0 else 0)
+            self.assertEqual(fast.getpixel(rule), 0)
+            if page:
+                for y in (65, 87, 110, 133, 158):
+                    self.assertTrue(all(frame.getpixel((x, y)) == 0
+                                        for x in range(epaper.WIDTH)))
+                    self.assertTrue(all(fast.getpixel((x, y)) == 0
+                                        for x in range(epaper.WIDTH)))
+                self.assertTrue(all(frame.getpixel((132, y)) == 0
+                                    for y in range(32, 159)))
+                self.assertTrue(all(fast.getpixel((132, y)) == 0
+                                    for y in range(32, 159)))
+
+    def test_fast_or_gray_refresh_choice(self):
+        settings = epaper.Console().settings
+        self.assertEqual(epaper.select_refresh_mode(settings, 'fast'), 'fast')
+        self.assertEqual(epaper.select_refresh_mode(settings, 'fast', periodic=True), 'gray')
+        settings['fast_refresh'] = False
+        self.assertEqual(epaper.select_refresh_mode(settings, 'fast'), 'gray')
+        settings['grayscale'] = False
+        self.assertEqual(epaper.select_refresh_mode(settings, 'fast'), 'full')
+
     def test_layout_and_key_navigation(self):
         console = epaper.Console()
         self.assertEqual(console.handle(2, .1, {}), 'fast')
@@ -164,6 +199,26 @@ class EpaperTests(unittest.TestCase):
             self.assertEqual((frame.size, frame.mode), ((264, 176), 'L'))
             self.assertEqual(frame.getpixel((240, 171)), 0)  # solid high-contrast footer
             self.assertTrue(set(frame.tobytes()).issubset({0, 128, 192, 255}))
+
+    def test_all_detail_pages_keep_last_row_clear_of_footer(self):
+        console = epaper.Console()
+        calls = []
+        original = epaper.CrispDraw.text
+
+        def record(target, xy, content, **kwargs):
+            calls.append((xy, str(content), kwargs.get('font')))
+            return original(target, xy, content, **kwargs)
+
+        with patch.object(epaper.CrispDraw, 'text', record):
+            for page in range(1, len(epaper.PAGES)):
+                console.page = page
+                calls.clear()
+                epaper.render(console, {}, {})
+                content_calls = [(xy, text, face) for xy, text, face in calls
+                                 if 33 <= xy[1] < 159]
+                self.assertEqual(len(content_calls), 20)
+                self.assertLessEqual(max(y + face.getbbox(text)[3]
+                                         for (x, y), text, face in content_calls), 156)
 
     def test_home_uses_distinct_fresh_sources_and_unread_badge(self):
         now = time.time()

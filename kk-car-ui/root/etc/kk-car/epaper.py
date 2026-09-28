@@ -564,7 +564,7 @@ def render_home(draw, data):
     earfcn = data['earfcn']
     draw.text((220, 49), fitted(draw, 'E' + str(earfcn) if earfcn is not None else '--', font(12), 42), fill=0, font=font(12))
     draw.line((0, 78, 263, 78), fill=0)
-    draw.line((132, 32, 132, 78), fill=192)
+    draw.line((132, 32, 132, 78), fill=128)
     unread = data['unread']
     if isinstance(unread, int) and unread > 0:
         draw.rectangle((6, 82, 105, 99), fill=0)
@@ -583,7 +583,7 @@ def render_home(draw, data):
     row_face = font(12)
     for row, pair in enumerate(rows):
         y = 103 + row * 14
-        draw.line((0, y + 13, 263, y + 13), fill=192)
+        draw.line((0, y + 13, 263, y + 13), fill=128)
         for column, (label, result) in enumerate(pair):
             x = 6 + 132 * column
             right = x + 120
@@ -592,7 +592,7 @@ def render_home(draw, data):
             shown = fitted(draw, result, row_face, value_width)
             value_x = right - draw.textlength(shown, font=row_face)
             draw.text((value_x, y - 1), shown, fill=0, font=row_face)
-    draw.line((132, 79, 132, 158), fill=192)
+    draw.line((132, 79, 132, 158), fill=128)
 
 
 def render(console, car, ups, rates=None, aux=None):
@@ -625,15 +625,17 @@ def render(console, car, ups, rates=None, aux=None):
         else:
             for i, (label, value) in enumerate(items):
                 row, col = divmod(i, 2)
-                x, y = 7 + col * 130, 33 if row == 0 else 67 + (row - 1) * 23
+                x, y = 7 + col * 130, 33 if row == 0 else 64 + (row - 1) * 23
                 draw.text((x, y if row == 0 else y + 1), fitted(draw, label, small, 120), fill=0, font=small)
                 face = font(17) if row == 0 and label == 'LOAD 1/5/15' else font(20) if row == 0 else font(13)
-                draw.text((x, y + (8 if row == 0 else 10)),
+                draw.text((x, y + (8 if row == 0 else 9)),
                           fitted(draw, value, face, 119), fill=0, font=face,
                           smooth=row == 0 and any(char.isdigit() for char in str(value)))
-                if row < 4:
-                    rule_y = 65 if row == 0 else y + 23
-                    draw.line((x, rule_y, x + 120, rule_y), fill=192)
+            # Match the overview's continuous grid. The former two short,
+            # gray column rules looked broken after monochrome page turns.
+            for rule_y in (65, 87, 110, 133, 158):
+                draw.line((0, rule_y, WIDTH - 1, rule_y), fill=0)
+            draw.line((132, 32, 132, 158), fill=0)
         footer = '1 HOME  2 UP  3 DOWN  4 SET'
         controls = ('1 HOME', '2 UP', '3 DOWN', '4 SET')
     elif console.view == 'menu':
@@ -697,7 +699,7 @@ def render(console, car, ups, rates=None, aux=None):
     else:
         draw.text((7, 160), fitted(draw, footer, small, 249), fill=255, font=small)
     if not console.settings['grayscale']:
-        image = image.point(lambda shade: 255 if shade >= 128 else 0)
+        image = image.point(lambda shade: 255 if shade >= 160 else 0)
     return image
 
 
@@ -817,6 +819,13 @@ class Paper:
         return image.rotate(90 + rotation, expand=True)
 
     @staticmethod
+    def mono_frame(image, rotation=DISPLAY_ROTATION):
+        # Map dark-gray strokes and rules to ink in fast monochrome mode.
+        # Pillow's default 1-bit threshold would drop shade 128 entirely.
+        portrait = Paper.portrait(image, rotation).convert('L')
+        return portrait.point(lambda shade: 255 if shade >= 160 else 0).convert('1', dither=Image.Dither.NONE)
+
+    @staticmethod
     def gray_planes(image, rotation=DISPLAY_ROTATION):
         pixels = Paper.portrait(image, rotation).convert('L').tobytes()
         assert len(pixels) == 176 * 264
@@ -845,7 +854,7 @@ class Paper:
     def full_mono(self, image):
         if self.mode != 'mono' or self.partials:
             self.init_mono()
-        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1', dither=Image.Dither.NONE)
+        frame = self.mono_frame(image, getattr(self, 'rotation', DISPLAY_ROTATION))
         self.command(0x24, frame.tobytes())
         self.command(0x26, frame.tobytes())
         self.update(0xF7)
@@ -858,7 +867,7 @@ class Paper:
         if self.mode != 'mono' or self.partials >= getattr(self, 'clean_after', MAX_QUICK_UPDATES):
             return self.full_mono(image)
         self.prepare_fast()
-        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1', dither=Image.Dither.NONE)
+        frame = self.mono_frame(image, getattr(self, 'rotation', DISPLAY_ROTATION))
         self.command(0x24, frame.tobytes())
         self.command(0x26, frame.tobytes())
         self.update(0xC7)
@@ -870,7 +879,7 @@ class Paper:
     def display_partial(self, image):
         if self.mode != 'mono' or self.last is None or self.partials >= getattr(self, 'clean_after', MAX_QUICK_UPDATES):
             return self.display_fast(image)
-        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1', dither=Image.Dither.NONE)
+        frame = self.mono_frame(image, getattr(self, 'rotation', DISPLAY_ROTATION))
         box = ImageChops.difference(frame.convert('L'), self.last.convert('L')).getbbox()
         if box is None:
             return 'unchanged'
@@ -968,6 +977,19 @@ def rates_from(car, last_counters, now):
     return rates, counters
 
 
+def select_refresh_mode(settings, redraw, periodic=False, view='pages', reconfigured=False):
+    mode = 'gray' if periodic and view == 'pages' else redraw or 'partial'
+    if reconfigured:
+        mode = 'gray'
+    if mode == 'gray' and not settings['grayscale']:
+        mode = 'full'
+    if mode == 'partial' and not settings['partial_refresh']:
+        mode = 'fast'
+    if mode in ('fast', 'partial') and not settings['fast_refresh']:
+        mode = 'gray' if settings['grayscale'] else 'full'
+    return mode
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--preview', metavar='PNG')
@@ -1049,15 +1071,8 @@ def main():
                 rates, last_counters = rates_from(car, last_counters, now)
                 aux = read_aux()
                 image = render(console, car, ups, rates, aux)
-                mode = 'gray' if periodic and console.view == 'pages' else redraw or 'partial'
-                if paper.configure(console.settings):
-                    mode = 'gray'
-                if mode == 'gray' and not console.settings['grayscale']:
-                    mode = 'full'
-                if mode == 'partial' and not console.settings['partial_refresh']:
-                    mode = 'fast'
-                if mode in ('fast', 'partial') and not console.settings['fast_refresh']:
-                    mode = 'full'
+                mode = select_refresh_mode(console.settings, redraw, periodic,
+                                           console.view, paper.configure(console.settings))
                 if args.once:
                     mode = args.mode
                 try:
