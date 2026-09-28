@@ -10,6 +10,7 @@ import base64
 import fcntl
 import io
 import json
+import math
 import os
 import struct
 import subprocess
@@ -464,6 +465,50 @@ class CrispDraw:
         self.image.paste(fill, (0, 0), mask.point(lambda value: 255 if value >= 128 else 0).convert('1'))
 
 
+def valid_number(value, minimum, maximum):
+    return (isinstance(value, (int, float)) and not isinstance(value, bool) and
+            math.isfinite(value) and minimum <= value <= maximum)
+
+
+def battery_eta(ups, state):
+    """Rough runtime from nominal capacity and voltage, never the UPS percentage."""
+    battery = ups.get('battery') or {}
+    sensor = ups.get('sensors') or {}
+    input_external = (ups.get('input') or {}).get('external')
+    capacity = battery.get('nominal_capacity_mah')
+    voltage = battery.get('millivolts')
+    full = battery.get('configured_full_mv')
+    protect = battery.get('configured_protect_mv')
+    if not (valid_number(capacity, 500, 10000) and
+            valid_number(voltage, 2500, 4600) and
+            valid_number(full, 3000, 4600) and
+            valid_number(protect, 2500, 4300) and full - protect >= 300):
+        return '--'
+    fraction = max(0, min(1, (voltage - protect) / (full - protect)))
+    if state == 'CHARGING' and input_external is True:
+        current_sensor = sensor.get('battery') or {}
+        current = current_sensor.get('current_ma')
+        if (not current_sensor.get('detected') or current_sensor.get('overflow') or
+                not valid_number(current, 150, 10000) or fraction >= .98):
+            return '--'
+        # The end of a charge cycle tapers; this factor is only a planning margin.
+        seconds = capacity * (1 - fraction) / current * 3600 * 1.25
+    elif state in ('DISCHARGE', 'ON BAT') and input_external is False:
+        power_sensor = sensor.get('pi_supply') or {}
+        power = power_sensor.get('power_mw')
+        if (fraction < .05 or not power_sensor.get('detected') or
+                power_sensor.get('overflow') or not valid_number(power, 500, 30000)):
+            return '--'
+        seconds = capacity / 1000 * 3.7 * .85 * fraction / (power / 1000) * 3600
+    else:
+        return '--'
+    if not 300 <= seconds <= 24 * 3600:
+        return '--'
+    minutes = max(5, round(seconds / 300) * 5)
+    hours, remainder = divmod(minutes, 60)
+    return f'~{hours}h{remainder:02d}' if hours else f'~{minutes}m'
+
+
 def battery_header(ups):
     if not ups.get('ok'):
         return '--', 'POWER --'
@@ -478,6 +523,8 @@ def battery_header(ups):
     else:
         external = (ups.get('input') or {}).get('external')
         state = 'EXT POWER' if external is True else 'ON BAT' if external is False else 'POWER --'
+    if state in ('CHARGING', 'DISCHARGE', 'ON BAT'):
+        state += ' ' + battery_eta(ups, state)
     return level, state
 
 

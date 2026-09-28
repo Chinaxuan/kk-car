@@ -140,12 +140,45 @@ class EpaperTests(unittest.TestCase):
     def test_battery_header_uses_current_direction(self):
         ups = {'ok': True, 'battery': {'percent': 85},
                'sensors': {'battery': {'detected': True, 'current_ma': -210}}}
-        self.assertEqual(epaper.battery_header(ups), ('85%', 'DISCHARGE'))
+        self.assertEqual(epaper.battery_header(ups), ('85%', 'DISCHARGE --'))
         ups['sensors']['battery']['current_ma'] = 480
-        self.assertEqual(epaper.battery_header(ups), ('85%', 'CHARGING'))
+        self.assertEqual(epaper.battery_header(ups), ('85%', 'CHARGING --'))
         ups['battery']['percent_calibration_unverified'] = True
-        self.assertEqual(epaper.battery_header(ups), ('~85%', 'CHARGING'))
+        self.assertEqual(epaper.battery_header(ups), ('~85%', 'CHARGING --'))
         self.assertEqual(epaper.battery_header({}), ('--', 'POWER --'))
+
+    def test_battery_header_estimates_charge_and_discharge_without_percentage(self):
+        ups = {'ok': True,
+               'battery': {'percent': 90, 'percent_calibration_unverified': True,
+                           'millivolts': 3600, 'configured_full_mv': 4200,
+                           'configured_protect_mv': 3000, 'nominal_capacity_mah': 3000},
+               'input': {'external': False},
+               'sensors': {'battery': {'detected': True, 'current_ma': -500},
+                           'pi_supply': {'detected': True, 'power_mw': 6000}}}
+        self.assertEqual(epaper.battery_header(ups), ('~90%', 'DISCHARGE ~45m'))
+        ups['input']['external'] = True
+        ups['sensors']['battery']['current_ma'] = 500
+        self.assertEqual(epaper.battery_header(ups), ('~90%', 'CHARGING ~3h45'))
+
+    def test_battery_eta_drops_invalid_or_unsafe_readings(self):
+        ups = {'ok': True,
+               'battery': {'millivolts': 3600, 'configured_full_mv': 4200,
+                           'configured_protect_mv': 3000, 'nominal_capacity_mah': 3000},
+               'input': {'external': False},
+               'sensors': {'battery': {'detected': True, 'current_ma': -500},
+                           'pi_supply': {'detected': True, 'power_mw': 6000}}}
+        self.assertEqual(epaper.battery_eta(ups, 'DISCHARGE'), '~45m')
+        ups['sensors']['pi_supply']['overflow'] = True
+        self.assertEqual(epaper.battery_eta(ups, 'DISCHARGE'), '--')
+        ups['sensors']['pi_supply']['overflow'] = False
+        ups['battery']['millivolts'] = 3030
+        self.assertEqual(epaper.battery_eta(ups, 'DISCHARGE'), '--')
+        ups['battery']['millivolts'] = 3600
+        ups['input']['external'] = True
+        ups['sensors']['battery']['current_ma'] = 0
+        self.assertEqual(epaper.battery_eta(ups, 'CHARGING'), '--')
+        ups['sensors']['battery']['current_ma'] = float('nan')
+        self.assertEqual(epaper.battery_eta(ups, 'CHARGING'), '--')
 
     def test_setting_needs_long_confirmation(self):
         console = epaper.Console()

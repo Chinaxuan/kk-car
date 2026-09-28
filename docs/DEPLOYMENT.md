@@ -185,3 +185,7 @@ UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC�
 ## 2026-09-28 电子纸镜像、开机时长和续航估算
 
 保持当前管理入口可用，先备份待替换文件。安装 `epaper.py`、`device_settings.py`、`kksettings.uc`、`kkups.uc`、`luci-app-kkcar.json` ACL，以及 `settings.js/settings.css`、`ups.js/ups.css` 和新增的 `battery_runtime.js`；Python 程序为 0755，其余为 0644。先放齐文件再重载 rpcd，最后只重启电子纸服务并刷新浏览器；不重启 network、Wi-Fi、DHCP、VPN、UPS 或整机。RPC 重载可能要求重新登录 LuCI。后台镜像应能读回最近写入的 264×176 帧，电子纸首页应显示系统开机时长，UPS 页应给出粗估续航或明确的不可估算原因。验证前后检查管理入口、热点、WAN、VPN 和现有电池参数；如果读数或页面异常，只回退本节文件并重载管理组件。新增前端资源加入升级保留列表，运行时镜像和真实设备设置不加入公开仓库。
+
+## 2026-09-28 电子纸顶栏电池时间
+
+仅替换 `epaper.py` 并重启 `kk-car-epaper`，无需重启网络、UPS、VPN 或整机。部署前备份原文件，使用目标设备的 Python 先做语法检查；重启后从 `/tmp/kk-car-epaper-status.json` 确认写屏成功，并通过设置中心的管理员镜像查看第二行时间。电池供电时核对 `DISCHARGE ~…`，外电充电时核对 `CHARGING ~…`；若读数不充分，应显示 `--`。同时回查热点、WAN、VPN 与网络配置，异常时恢复备份并只重启电子纸服务。粗估算法及限制见 [电子纸说明](EPAPER.md)。
