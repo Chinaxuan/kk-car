@@ -451,7 +451,7 @@ def font(size):
 
 
 class CrispDraw:
-    """Keep text at solid ink levels instead of dithered anti-aliased edges."""
+    """Snap glyphs to pixels; keep dark cores with subtle four-gray edges."""
 
     def __init__(self, image):
         self.image = image
@@ -461,11 +461,14 @@ class CrispDraw:
         return getattr(self.draw, name)
 
     def text(self, xy, content, fill=0, font=None, smooth=False):
+        xy = tuple(int(math.floor(point + .5)) for point in xy)
         mask = Image.new('L', self.image.size, 0)
         ImageDraw.Draw(mask).text(xy, content, fill=255, font=font)
-        if smooth and fill == 0:
-            # A dark gray edge rounds large digits while the main strokes stay black.
-            edge = mask.point(lambda value: 0 if value >= 192 else 128)
+        if fill == 0:
+            # Preserve the black core. A sparse dark-gray edge softens stair steps
+            # on full grayscale updates and disappears on fast monochrome updates.
+            core = 192 if smooth else 128
+            edge = mask.point(lambda value: 0 if value >= core else 128)
             visible = mask.point(lambda value: 255 if value >= 80 else 0).convert('1')
             self.image.paste(edge, (0, 0), visible)
         else:

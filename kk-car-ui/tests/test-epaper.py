@@ -79,6 +79,19 @@ class EpaperTests(unittest.TestCase):
         epaper.CrispDraw(image).text((7, 35), '88', fill=0, font=epaper.font(31), smooth=True)
         self.assertTrue({0, 128, 255}.issubset(set(image.tobytes())))
 
+    def test_small_letters_keep_black_cores_and_gray_edges(self):
+        image = Image.new('L', (264, 176), 255)
+        epaper.CrispDraw(image).text((7, 35), 'SYSTEM UP', fill=0, font=epaper.font(11))
+        self.assertTrue({0, 128, 255}.issubset(set(image.tobytes())))
+
+    def test_fractional_text_coordinates_snap_to_whole_pixels(self):
+        def glyph(x):
+            image = Image.new('L', (100, 32), 255)
+            epaper.CrispDraw(image).text((x, 1), '68', fill=0, font=epaper.font(20))
+            return image.tobytes()
+        self.assertEqual(glyph(10.49), glyph(10))
+        self.assertEqual(glyph(10.51), glyph(11))
+
     def test_traffic_uses_decimal_units(self):
         self.assertEqual(epaper.size(173700000000), '173.7GB')
         self.assertEqual(epaper.size(827500000), '827.5MB')
@@ -150,7 +163,7 @@ class EpaperTests(unittest.TestCase):
             frame = epaper.render(console, {}, {})
             self.assertEqual((frame.size, frame.mode), ((264, 176), 'L'))
             self.assertEqual(frame.getpixel((240, 171)), 0)  # solid high-contrast footer
-            self.assertTrue(set(frame.tobytes()).issubset({0, 192, 255}))
+            self.assertTrue(set(frame.tobytes()).issubset({0, 128, 192, 255}))
 
     def test_home_uses_distinct_fresh_sources_and_unread_badge(self):
         now = time.time()
