@@ -12,11 +12,13 @@ SETTINGS = Path('/etc/kk-car/private/device-settings.json')
 LEGACY = Path('/etc/kk-car/private/epaper-settings.json')
 DEFAULTS = dict(rotation=180, refresh_seconds=180, grayscale=True, fast_refresh=True,
                 partial_refresh=True, clean_after=3, sleep_seconds=18, start_page=1,
-                auto_page_seconds=0, hdmi_refresh_seconds=5, check_interval_seconds=600)
+                auto_page_seconds=0, hdmi_refresh_seconds=5, check_interval_seconds=600,
+                battery_capacity_mah=3000)
 CHOICES = dict(rotation=(0, 180), refresh_seconds=(60, 180, 300, 600),
                clean_after=(1, 2, 3), sleep_seconds=(18, 30, 60), start_page=tuple(range(1, 7)),
                auto_page_seconds=(0, 60, 180, 300), hdmi_refresh_seconds=(5, 10, 15, 30, 60),
-               check_interval_seconds=(300, 600, 900, 1800, 3600))
+               check_interval_seconds=(300, 600, 900, 1800, 3600),
+               battery_capacity_mah=tuple(range(500, 10001, 100)))
 SERVICES = ('epaper', 'hdmi', 'auto-check', 'diagnostics', 'modem', 'vpn-ping',
             'notify', 'dji-sms-forward', 'voice-runtime', 'voice-gateway', 'network-health')
 JOB = Path('/tmp/kk-car-settings-job.json')

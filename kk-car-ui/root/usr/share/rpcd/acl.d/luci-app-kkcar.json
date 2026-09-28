@@ -23,7 +23,8 @@
           "history"
         ],
         "kksettings": [
-          "status"
+          "status",
+          "epaper_frame"
         ],
         "kkhealth": [
           "status"

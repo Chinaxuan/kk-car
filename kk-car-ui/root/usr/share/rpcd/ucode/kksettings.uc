@@ -46,6 +46,13 @@ function service_set(a){
 }
 return {'kksettings':{
     status:{call:function(){return status();}},
+    epaper_frame:{call:function(){
+        let frame=filejson('/tmp/kk-car-epaper-frame.json');
+        if (frame.ok!==true || frame.format!='png' || frame.width!=264 || frame.height!=176 ||
+            type(frame.data)!='string' || length(frame.data)<20 || length(frame.data)>65536)
+            return {ok:false,error:'尚无成功写入的电子纸画面'};
+        return frame;
+    }},
     save:{args:{settings:'',revision:0},call:function(req){
         let settings;try{settings=json(req.args.settings);}catch(e){return {ok:false,error:'设置格式无效'};}
         return config('save',{settings,revision:req.args.revision});

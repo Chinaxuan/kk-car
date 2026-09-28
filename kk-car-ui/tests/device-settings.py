@@ -65,5 +65,12 @@ class DeviceSettingsTests(unittest.TestCase):
         self.assertEqual(second['settings']['rotation'], 0)
         self.assertEqual(json.loads(settings.SETTINGS.read_text())['revision'], 2)
 
+    def test_nominal_capacity_is_editable_without_changing_power_settings(self):
+        self.assertEqual(settings.snapshot()['settings']['battery_capacity_mah'], 3000)
+        changed = settings.save({'battery_capacity_mah': 8000}, 0)
+        self.assertTrue(changed['ok'])
+        self.assertEqual(settings.snapshot()['settings']['battery_capacity_mah'], 8000)
+        self.assertFalse(settings.save({'battery_capacity_mah': 8050}, changed['revision'])['ok'])
+
 
 if __name__ == '__main__': unittest.main()

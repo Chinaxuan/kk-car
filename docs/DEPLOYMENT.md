@@ -181,3 +181,7 @@ UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC�
 更新 `ups-control.uc`、RPC 模块 `kkups.uc`、`luci-app-kkcar.json` ACL、UPS 页面及样式。新增管理员写接口 `kkups.save_battery`，部署后重载 rpcd 并重新登录；不重启网络、无线、VPN 或 UPS。原单项接口在自动模式拒绝直接改满电/空电，避免被固件覆盖；新页面使用整组接口。失败恢复和对固件自动学习的模拟回归为 `kk-car-ui/tests/ups-battery.uc`，测试使用注入的模拟 I/O，不写实物电池。
 
 恢复代码时可回滚上述五个文件并重载 rpcd；不会自动回滚硬件参数。硬件原值在设备私有 `ups-battery-before-save.json` 中；仅保持外电供电时，通过新的整组接口按所需模式恢复。
+
+## 2026-09-28 电子纸镜像、开机时长和续航估算
+
+保持当前管理入口可用，先备份待替换文件。安装 `epaper.py`、`device_settings.py`、`kksettings.uc`、`kkups.uc`、`luci-app-kkcar.json` ACL，以及 `settings.js/settings.css`、`ups.js/ups.css` 和新增的 `battery_runtime.js`；Python 程序为 0755，其余为 0644。先放齐文件再重载 rpcd，最后只重启电子纸服务并刷新浏览器；不重启 network、Wi-Fi、DHCP、VPN、UPS 或整机。RPC 重载可能要求重新登录 LuCI。后台镜像应能读回最近写入的 264×176 帧，电子纸首页应显示系统开机时长，UPS 页应给出粗估续航或明确的不可估算原因。验证前后检查管理入口、热点、WAN、VPN 和现有电池参数；如果读数或页面异常，只回退本节文件并重载管理组件。新增前端资源加入升级保留列表，运行时镜像和真实设备设置不加入公开仓库。

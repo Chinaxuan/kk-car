@@ -4,8 +4,11 @@
 'require poll';
 'require view.kkcar.console as consoleUI';
 'require view.kkcar.battery_history as batteryHistory';
+'require view.kkcar.battery_runtime as batteryRuntime';
 
 var get=rpc.declare({object:'kkups',method:'status',expect:{}});
+var getSettings=rpc.declare({object:'kksettings',method:'status',expect:{}});
+var saveSettings=rpc.declare({object:'kksettings',method:'save',params:['settings','revision'],expect:{}});
 var setOption=rpc.declare({object:'kkups',method:'set_option',params:['key','value','expected','confirm'],expect:{}});
 var saveBattery=rpc.declare({object:'kkups',method:'save_battery',params:['full_mv','empty_mv','protect_mv','manual','expected','confirm'],expect:{}});
 var savePolicy=rpc.declare({object:'kkups',method:'save_policy',params:['enabled','shutdown_mv'],expect:{}});
@@ -25,11 +28,11 @@ function batteryRevision(v){return [v.full_mv,v.empty_mv,v.protect_mv,v.manual?1
 
 return view.extend({
     handleSaveApply:null,handleSave:null,handleReset:null,
-    load:function(){return get();},
+    load:function(){return Promise.all([get(),getSettings().catch(function(){return {ok:false};})]);},
     render:function(data){
         document.title='KK-Car · UPS 电源';
         if(!document.getElementById('kk-ups-css'))
-            document.head.appendChild(E('link',{id:'kk-ups-css',rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260927-battery-save1'}));
+            document.head.appendChild(E('link',{id:'kk-ups-css',rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260928-runtime1'}));
         var self=this;
         this.historyPanel=batteryHistory.create();
         this.hero=E('div',{'class':'ku-hero-main'});
@@ -53,7 +56,8 @@ return view.extend({
                 E('div',{'class':'ku-foot'},[E('span',{},'电量百分比需完成至少一次完整充放电后才可校准。'),E('span',{},'本页每 10 秒更新；设置只在点击保存后写入 UPS。')])
             ])
         ]);
-        this.paint(data);
+        this.capacitySettings=data[1];
+        this.paint(data[0]);
         poll.add(function(){return get().then(function(r){self.paint(r);}).catch(function(){self.showError('UPS 状态暂时无法读取');});},10);
         return consoleUI.mount(root, {
             page:'kkcar_ups',title:'电源与设备',description:'UPS 输入、电池与供电 · 充放电曲线、硬件诊断和电源控制',
@@ -107,9 +111,36 @@ return view.extend({
         this.batteryForm=E('section',{'class':'ku-panel ku-battery-settings'},[
             E('h3',{},'电池参数'),this.batteryCurrent,E('div',{},rows),this.batteryHint,
             E('div',{'class':'ku-battery-buttons'},[this.batterySave,this.batteryReset]),this.batteryResult,
-            E('p',{'class':'ku-helper'},'保存前核对外部供电；三项电压和参数模式一起写入，连续两次设备读回一致才确认。百分比仍是电压估算，设置基准不等于容量校准。')
+            E('p',{'class':'ku-helper'},'保存前核对外部供电；三项电压和参数模式一起写入，连续两次设备读回一致才确认。百分比仍是电压估算，设置基准不等于容量校准。'),
+            E('h3',{},'续航估算参数'),
+            E('div',{'class':'ku-setting ku-capacity-setting'},[
+                E('div',{},[E('strong',{},'两节电池合计标称容量'),E('small',{},'当前为 2 × 1500 mAh；更换电池后按新电池总容量修改。只影响页面粗估，不写 UPS 保护参数。')]),
+                this.capacityInput=E('input',{type:'number',min:500,max:10000,step:100,'aria-label':'两节电池合计标称容量 mAh',input:function(){self.capacityDirty=true;self.capacitySave.disabled=false;}}),
+                E('span',{},'mAh'),
+                this.capacitySave=E('button',{'class':'ku-button',type:'button',click:function(){self.saveCapacity();}},'保存容量')
+            ]),
+            this.capacityHint=E('p',{'class':'ku-helper','aria-live':'polite'},'容量只用于续航粗估，电量百分比仍未校准。')
         ]);
         return this.batteryForm;
+    },
+    saveCapacity:function(){
+        var self=this,value=Number(this.capacityInput.value);
+        if(!Number.isInteger(value)||value<500||value>10000||value%100){this.capacityHint.textContent='请输入 500–10000 mAh，按 100 mAh 递增。';return;}
+        this.capacitySave.disabled=true;
+        getSettings().then(function(current){
+            if(!current.ok)throw Error('设置服务暂时无法读取');
+            if(!self.capacitySettings||current.revision!==self.capacitySettings.revision){self.capacitySettings=current;throw Error('设置已被其他页面修改，请核对后重新保存');}
+            return saveSettings(JSON.stringify({battery_capacity_mah:value}),current.revision);
+        }).then(function(result){
+            if(!result||!result.ok)throw Error(result&&result.error||'保存失败');
+            return Promise.all([getSettings(),get()]);
+        }).then(function(pair){
+            if(!pair[0].ok||pair[0].settings.battery_capacity_mah!==value||!pair[1].ok||pair[1].battery.nominal_capacity_mah!==value)
+                throw Error('保存后读回不一致，请刷新核对');
+            self.capacitySettings=pair[0];self.capacityDirty=false;self.paint(pair[1]);
+            self.capacityHint.textContent='容量 '+value+' mAh 已保存并读回；没有修改 UPS 硬件参数。';
+        }).catch(function(error){self.capacityHint.textContent=error.message||'保存失败；输入已保留。';})
+          .finally(function(){self.capacitySave.disabled=!self.capacityDirty;});
     },
     updateBattery:function(d){
         if(!this.batteryForm)return;
@@ -194,9 +225,13 @@ return view.extend({
         if(!d||!d.ok){this.showError(d&&d.error?d.error:'UPS 未响应');return;}
         var b=d.battery||{},i=d.input||{},o=d.output||{},c=d.controller||{},s=d.sensors||{},pi=s.pi_supply||{},bat=s.battery||{},rtc=s.rtc||{},diag=d.diagnostics||{},ref=d.voltage_reference||{};
         var pct=Number.isFinite(b.percent)?Math.min(100,Math.max(0,b.percent)):0;
+        var runtime=batteryRuntime.estimate(d),runtimeTitle=runtime.kind==='remaining'?'电池剩余粗估':runtime.kind==='full_reference'?'满电续航参考':'续航估算暂不可用';
+        var runtimeValue=runtime.seconds?duration(runtime.seconds):'—';
+        var runtimeNote=runtime.kind==='unavailable'?runtime.reason:
+            '按主控电压、保护值、'+runtime.capacity_mah+' mAh 与当前约 '+number(runtime.power_w,1)+' W 估算；未校准，不用于关机。';
         this.updated.textContent='更新于 '+new Date(d.timestamp*1000).toLocaleTimeString('zh-CN',{hour12:false});
         this.hero.replaceChildren(
-            E('div',{'class':'ku-battery'},[E('div',{'class':'ku-battery-top'},[E('span',{},'BATTERY / 电池电量估计'),E('span',{'class':'ku-pill '+(i.external?'good':'warn')},i.external?'外部供电中':'电池供电中')]),E('div',{'class':'ku-battery-value'},[E('strong',{},number(b.percent,0)),E('span',{},'%')]),E('div',{'class':'ku-gauge',role:'meter','aria-label':'电池电量估计','aria-valuemin':'0','aria-valuemax':'100','aria-valuenow':String(pct)},E('div',{style:'width:'+pct+'%'})),E('p',{},'UPS 估算值；未确认完成完整充放电校准，不据此推算续航。')]),
+            E('div',{'class':'ku-battery'},[E('div',{'class':'ku-battery-top'},[E('span',{},'BATTERY / 电池电量估计'),E('span',{'class':'ku-pill '+(i.external?'good':'warn')},i.external?'外部供电中':'电池供电中')]),E('div',{'class':'ku-battery-value'},[E('strong',{},number(b.percent,0)),E('span',{},'%')]),E('div',{'class':'ku-gauge',role:'meter','aria-label':'电池电量估计','aria-valuemin':'0','aria-valuemax':'100','aria-valuenow':String(pct)},E('div',{style:'width:'+pct+'%'})),E('p',{},'UPS 百分比未校准；续航粗估改用主控电压和当前负载。'),E('div',{'class':'ku-runtime'},[E('span',{},runtimeTitle),E('strong',{},runtimeValue),E('small',{},runtimeNote)])]),
             E('div',{'class':'ku-hero-stats'},[cell('树莓派供电',volts(o.pogo_mv),o.pi_undervoltage===true?'当前欠压':o.pi_undervoltage===false?'当前无欠压':'欠压状态未知'),cell('树莓派耗电估算',number(pi.power_mw/1000,1)+' W','来自 INA219 电压差及厂商标注电阻'),cell('电池温度',number(b.temperature_c,0)+' °C',b.temperature_c>=50?'注意散热 · 硬件保护 65°C':'硬件保护 65°C')])
         );
         this.warnings.replaceChildren.apply(this.warnings,(d.warnings||[]).map(function(w){return E('div',{'class':'ku-warning'},w);}));
@@ -207,6 +242,10 @@ return view.extend({
             section('时钟与硬件诊断',[cell('故障记录',diag.ok&&d.timestamp>=diag.timestamp&&d.timestamp-diag.timestamp<90?'每分钟保存中':'尚未更新','SD 卡保留 · 总量上限 16 MB'),cell('最近一分钟 QMI 错误',number(diag.qmi_errors,0),'超时及响应解析失败次数'),cell('本次启动未正常卸载告警',number(diag.sd_unclean,0),'启动分区 FAT 告警次数'),cell('RTC',rtc.detected?(rtc.halted?'停振 / 待校时':rtc.valid?'运行中':'时间无效'):'未检测','I²C 0x68'),cell('RTC 寄存器时间',rtc.time_register||'—','手动同步后为 UTC'),cell('UPS 主控','已连接','I²C 0x17'),cell('Pi 侧 INA219',pi.detected?'已检测':'未检测','I²C 0x40 · 校准 '+(pi.calibration??'—')),cell('电池侧 INA219',bat.detected?'已检测':'未检测','I²C 0x45 · 校准 '+(bat.calibration??'—')),cell('Pi 传感器状态',pi.overflow?'量程溢出':pi.conversion_ready?'转换完成':'等待转换','配置 0x'+(pi.config==null?'—':pi.config.toString(16))),cell('电池传感器状态',bat.overflow?'量程溢出':bat.conversion_ready?'转换完成':'等待转换','配置 0x'+(bat.config==null?'—':bat.config.toString(16))),cell('CPU 温度',number(o.cpu_temperature_c,1)+' °C'),cell('树莓派供电标志',o.power_flags==null?'未知':'0x'+o.power_flags.toString(16)),cell('当前欠压 / 降频',yesno(o.pi_undervoltage)+' / '+yesno(o.pi_throttled)),cell('当前限频 / 软温控',yesno(o.pi_frequency_capped)+' / '+yesno(o.pi_soft_temp_limit)),cell('曾欠压 / 降频',yesno(o.pi_undervoltage_history)+' / '+yesno(o.pi_throttled_history)),cell('曾限频 / 软温控',yesno(o.pi_frequency_capped_history)+' / '+yesno(o.pi_soft_temp_limit_history))],'RTC 时间可手动从系统写入；电流与功率为未外部校准的估算值')
         );
         if(!this.controlsReady)this.buildControls(d);
+        if(this.capacityInput&&!this.capacityDirty){
+            this.capacityInput.value=b.nominal_capacity_mah;
+            this.capacitySave.disabled=true;
+        }
         this.updateBattery(d);
     }
 });

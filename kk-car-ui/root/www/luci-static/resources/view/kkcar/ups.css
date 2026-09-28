@@ -63,5 +63,14 @@ body:has(.ku-shell) .container{max-width:none;width:100%;padding:8px 10px 0}
 .ku-battery-result.good{color:#a7e5c5;border-color:#3b725a}
 .ku-battery-result.error{color:#ffc2c2;border-color:#985b63}
 .ku-battery-settings .ku-setting select{max-width:230px}
+.ku-runtime{display:flex;flex-direction:column;gap:4px;margin-top:14px;padding:12px 14px;border:1px solid #417685;border-radius:9px;background:#102f3b}
+.ku-runtime span{color:#9fcbd4;font-size:11px;font-weight:700;letter-spacing:.06em}
+.ku-runtime strong{color:#b8f0e4;font-size:25px;line-height:1.12;font-variant-numeric:tabular-nums}
+.ku-runtime small{color:#a9c7cf;font-size:11px;line-height:1.5}
+.ku-capacity-setting{grid-template-columns:minmax(0,1fr) 92px auto auto!important}
+.ku-capacity-setting input{width:88px!important}
+.ku-capacity-setting span{color:#abc1d0;font-size:11px}
+.ku-capacity-setting button{white-space:nowrap}
+@media(max-width:600px){.ku-capacity-setting{grid-template-columns:minmax(0,1fr) 84px auto!important}.ku-capacity-setting button{grid-column:1/-1;justify-self:start}}
 .ku-battery-settings .ku-setting{grid-template-columns:minmax(0,1fr) auto}
 @media(max-width:600px){.ku-battery-settings .ku-setting{grid-template-columns:1fr auto}.ku-battery-settings .ku-setting select{max-width:190px}.ku-battery-buttons .ku-button{flex:1 1 auto}}

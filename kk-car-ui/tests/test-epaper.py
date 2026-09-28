@@ -1,6 +1,9 @@
 """Hardware-free checks for the four-key e-paper console."""
 
 import os
+import base64
+import io
+import json
 import sys
 import time
 import unittest
@@ -112,6 +115,7 @@ class EpaperTests(unittest.TestCase):
         fields = epaper.metrics(0, car, ups, {}, aux)
         self.assertEqual((fields['band'], fields['earfcn'], fields['unread'], fields['memory']),
                          ('B1', 300, 2, '18%'))
+        self.assertEqual(fields['system_age'], '16m 40s')
         frame = epaper.render(epaper.Console(), car, ups, aux=aux)
         self.assertEqual(frame.getpixel((7, 85)), 0)  # inverted SMS alert
         car['vpn']['connected'] = False
@@ -119,6 +123,19 @@ class EpaperTests(unittest.TestCase):
         fields = epaper.metrics(0, car, ups, {}, aux)
         self.assertIsNone(fields['vpn_ip'])
         self.assertEqual(fields['band'], '--')
+
+    def test_web_mirror_is_last_rendered_frame_and_private(self):
+        frame = Path(self.temp.name) / 'epaper-frame.json'
+        with patch.object(epaper, 'FRAME_PATH', frame):
+            console = epaper.Console()
+            image = Image.new('L', (epaper.WIDTH, epaper.HEIGHT), 255)
+            image.putpixel((7, 11), 0)
+            epaper.write_frame(console, image)
+            payload = json.loads(frame.read_text())
+        self.assertEqual(frame.stat().st_mode & 0o777, 0o600)
+        self.assertEqual((payload['width'], payload['height'], payload['page']), (264, 176, 1))
+        decoded = Image.open(io.BytesIO(base64.b64decode(payload['data'])))
+        self.assertEqual(decoded.getpixel((7, 11)), 0)
 
     def test_battery_header_uses_current_direction(self):
         ups = {'ok': True, 'battery': {'percent': 85},

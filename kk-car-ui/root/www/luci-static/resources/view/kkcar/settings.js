@@ -5,6 +5,7 @@
 'require view.kkcar.console as consoleUI';
 
 var get=rpc.declare({object:'kksettings',method:'status',expect:{}});
+var getFrame=rpc.declare({object:'kksettings',method:'epaper_frame',expect:{}});
 var save=rpc.declare({object:'kksettings',method:'save',params:['settings','revision'],expect:{}});
 var serviceSet=rpc.declare({object:'kksettings',method:'service_set',params:['name','action','expected'],expect:{}});
 var clean=rpc.declare({object:'kksettings',method:'refresh_screen',expect:{}});
@@ -49,8 +50,14 @@ return view.extend({
  render:function(data){
   var self=this;document.title='KK-Car · 设置中心';this.inputs={};this.dirty=false;this.last=data[0];this.base=data[0];
   document.head.appendChild(E('link',{rel:'stylesheet',href:L.resource('view/kkcar/ups.css')+'?v=20260927-settings'}));
-  document.head.appendChild(E('link',{rel:'stylesheet',href:L.resource('view/kkcar/settings.css')+'?v=20260927-1'}));
+  document.head.appendChild(E('link',{rel:'stylesheet',href:L.resource('view/kkcar/settings.css')+'?v=20260928-mirror1'}));
   this.notice=E('div',{'class':'ku-notice',hidden:true,role:'status','aria-live':'polite'});
+  this.mirrorImage=E('img',{alt:'电子纸最近一次成功写入的画面',hidden:true});
+  this.mirrorInfo=E('p',{'class':'ks-mirror-info','aria-live':'polite'},'正在读取墨水屏画面…');
+  this.mirrorNode=E('div',{'class':'ks-mirror'},[
+   E('div',{'class':'ks-mirror-stage'},this.mirrorImage),
+   E('div',{'class':'ks-mirror-meta'},[this.mirrorInfo,button('更新镜像',function(){self.refreshMirror();})])
+  ]);
   this.updated=E('span',{},'读取中');
   this.summary=E('div',{'class':'ks-summary'});this.services=E('div',{'class':'ks-service-list'});
   this.saveButton=button('保存显示与检查设置',function(){self.saveSettings();});
@@ -62,7 +69,7 @@ return view.extend({
    return E('label',{'class':'ks-field'},[E('span',{},[E('strong',{},f[1]),E('small',{},f[3])]),input]);
   }
   var controls=E('div',{'class':'ks-setting-grid'},[
-   E('section',{'class':'ku-panel'},[E('h2',{},'电子纸与按键'),E('p',{'class':'ku-helper'},'屏幕菜单与本页共用配置。KEY1 首页 / 返回，KEY2 上，KEY3 下，KEY4 设置 / 确认。')].concat(fields.slice(0,9).map(formField))),
+   E('section',{'class':'ku-panel'},[E('h2',{},'电子纸与按键'),E('p',{'class':'ku-helper'},'屏幕菜单与本页共用配置。KEY1 首页 / 返回，KEY2 上，KEY3 下，KEY4 设置 / 确认。'),this.mirrorNode].concat(fields.slice(0,9).map(formField))),
    E('section',{'class':'ku-panel'},[E('h2',{},'HDMI 与自动检查')].concat(fields.slice(9).map(formField),[E('div',{'class':'ks-readback'},[E('strong',{},'设置如何生效'),E('p',{},'方向、灰阶和刷新设置在当前写屏结束后应用；开机首页在下次显示服务启动时生效。HDMI 周期在下一帧应用，自动检查周期最多等待 15 秒。')]),
     E('h3',{},'常用控制'),this.quick=E('div',{'class':'ks-quick'}),E('p',{'class':'ku-helper'},'UPS 电池基准、保护电压和低电策略使用电源页原有的读回与确认。')]))]);
   var catalogue=[
@@ -78,13 +85,27 @@ return view.extend({
     E('section',{'class':'ku-panel'},[E('div',{'class':'ku-panel-title'},[E('h2',{},'后台服务'),E('span',{},'运行状态与开机启动独立设置')]),this.job=E('p',{'class':'ku-helper','aria-live':'polite'}),this.services]),
     E('section',{'class':'ks-catalogue'},catalogue.map(function(c){return E('a',{href:L.url('admin/'+c[0])},[E('strong',{},c[1]+' →'),E('p',{},c[2])]);}))])]);
   this.bind(data[0]);this.paint(data[0]);this.paintQuick(data[1],data[2]);
+  this.refreshMirror();
   poll.add(function(){return get().then(function(d){self.paint(d);}).catch(function(){self.updated.textContent='读取中断 · 保留上次状态';self.message('设备状态暂时无法读取，已有设置未改动',true);});},5);
+  poll.add(function(){return self.refreshMirror();},10);
   return consoleUI.mount(root, {
    page:'kkcar_settings',title:'设置中心',description:'屏幕、自动检查和后台服务 · 设置保存在路由器上',
    status:this.updated,actions:[this.reloadButton,this.cleanButton]
   });
  },
  message:function(text,error){this.notice.hidden=false;this.notice.className='ku-notice'+(error?' error':'');this.notice.textContent=text;},
+ refreshMirror:function(){
+  var self=this;
+  return getFrame().then(function(frame){
+   if(!frame||!frame.ok){self.mirrorImage.hidden=true;self.mirrorInfo.textContent=frame&&frame.error||'屏幕尚未生成画面';return;}
+   if(self.mirrorUpdated!==frame.updated||self.mirrorData!==frame.data){
+    self.mirrorImage.src='data:image/png;base64,'+frame.data;
+    self.mirrorImage.hidden=false;
+    self.mirrorUpdated=frame.updated;self.mirrorData=frame.data;
+   }
+   self.mirrorInfo.textContent='最近写入 '+stamp(frame.updated)+' · 第 '+frame.page+' 页 · '+(frame.view==='pages'?'状态页':'设置界面')+' · '+frame.rotation+'°';
+  }).catch(function(){self.mirrorInfo.textContent='墨水屏镜像暂时无法读取';});
+ },
  bind:function(data){if(!data.ok){this.message(data.error||'无法读取设置',true);this.saveButton.disabled=true;return;}this.base=data;this.dirty=false;this.saveButton.disabled=true;for(var k in this.inputs){var input=this.inputs[k];if(input.type==='checkbox')input.checked=data.settings[k];else input.value=data.settings[k];}this.updateDependencies();},
  updateDependencies:function(){this.inputs.partial_refresh.disabled=!this.inputs.fast_refresh.checked;this.inputs.clean_after.disabled=!this.inputs.fast_refresh.checked;},
  run:function(task,message){var self=this;if(this.busy)return Promise.resolve();this.busy=true;return task().then(function(r){if(!r||!r.ok)throw Error(r&&r.error||'操作失败');self.message(message,false);return get().then(function(d){self.paint(d);});}).catch(function(e){self.message(e.message,true);}).finally(function(){self.busy=false;});},

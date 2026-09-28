@@ -5,6 +5,12 @@ import { policy,save_policy,set_option,save_battery,rtc_sync,power_action } from
 
 function status() {
     let data=sample();
+    if (data.ok===true) {
+        let settings={};
+        try { settings=json(readfile('/etc/kk-car/private/device-settings.json') || '{}'); } catch(e) {}
+        let capacity=settings.battery_capacity_mah;
+        data.battery.nominal_capacity_mah=(type(capacity)=='int' && capacity>=500 && capacity<=10000 && capacity%100==0) ? capacity : 3000;
+    }
     data.policy=policy();
     try { data.watch=json(readfile('/tmp/kk-car-ups-watch.json') || '{}'); }
     catch(e) { data.watch={}; }

@@ -6,7 +6,9 @@ four-gray LUT is kept separately with its license notice in epaper_lut.py.
 """
 
 import argparse
+import base64
 import fcntl
+import io
 import json
 import os
 import struct
@@ -45,6 +47,7 @@ MENU = (
 REFRESH_CHOICES = (60, 180, 300, 600)
 MAX_QUICK_UPDATES = 3  # clean sooner than the vendor's five-update upper guidance
 STATUS_PATH = Path('/tmp/kk-car-epaper-status.json')
+FRAME_PATH = Path('/tmp/kk-car-epaper-frame.json')
 SETTINGS_PATH = Path('/etc/kk-car/private/epaper-settings.json')
 SCREEN_KEYS = ('rotation', 'grayscale', 'fast_refresh', 'partial_refresh',
                'clean_after', 'sleep_seconds', 'start_page', 'auto_page_seconds')
@@ -189,7 +192,7 @@ def metrics(page, car, ups, rates, aux=None):
             'ping': ping, 'modem': modem, 'band': band,
             'earfcn': radio.get('earfcn') if modem else None,
             'unread': unread, 'vpn_ip': vpn.get('ip') if vpn.get('connected') else None,
-            'vpn_age': age(vpn.get('age')) if vpn.get('connected') else '--',
+            'system_age': age(uptime),
             'load': load, 'memory': percentage(memory.get('available'), memory.get('total')),
             'temperature': temp, 'clients': number(peers), 'power': watt,
             'remaining': size(remaining), 'today': size(today_bytes),
@@ -515,7 +518,7 @@ def render_home(draw, data):
     draw.text((139, 82), fitted(draw, vpn_label, compact, 122), fill=0, font=compact)
     draw.line((0, 102, 263, 102), fill=0)
     rows = (
-        (('VPN UP', data['vpn_age']), ('LOAD', data['load'])),
+        (('SYSTEM UP', data['system_age']), ('LOAD', data['load'])),
         (('MEM', data['memory']), ('TEMP', data['temperature'])),
         (('CLIENTS', data['clients']), ('POWER', data['power'])),
         (('LEFT', data['remaining']), ('TODAY', data['today'])),
@@ -874,6 +877,22 @@ def write_status(console, state, mode, paper=None, error=None, key_counts=None):
     staging.replace(STATUS_PATH)
 
 
+def write_frame(console, image):
+    """Keep the last successfully written frame for the authenticated UI."""
+    output = io.BytesIO()
+    image.save(output, format='PNG')
+    payload = {'ok': True, 'format': 'png', 'width': WIDTH, 'height': HEIGHT,
+               'page': console.page + 1, 'view': console.view,
+               'rotation': console.settings['rotation'], 'updated': int(time.time()),
+               'data': base64.b64encode(output.getvalue()).decode('ascii')}
+    staging = FRAME_PATH.with_suffix('.tmp')
+    fd = os.open(staging, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w') as out:
+        os.fchmod(out.fileno(), 0o600)
+        json.dump(payload, out, separators=(',', ':'))
+    staging.replace(FRAME_PATH)
+
+
 def rates_from(car, last_counters, now):
     wan = car.get('wan') or {}
     counters = (wan.get('counter_source'), wan.get('rx'), wan.get('tx'), now)
@@ -982,6 +1001,10 @@ def main():
                 try:
                     actual = paper.display(image, mode)
                     write_status(console, 'ok', actual, paper, key_counts=counts)
+                    try:
+                        write_frame(console, image)
+                    except OSError:
+                        pass  # A failed web preview must never interrupt the panel.
                 except (OSError, TimeoutError, ValueError) as exc:
                     write_status(console, 'error', mode, paper, str(exc), counts)
                     raise
