@@ -44,7 +44,7 @@ class DeviceSettingsTests(unittest.TestCase):
 
     def test_invalid_values_never_write_config(self):
         for update in ({'rotation': 90}, {'rotation': True}, {'grayscale': 1},
-                       {'clean_after': 5}, {'protect_mv': 2500},
+                       {'clean_after': 6}, {'protect_mv': 2500},
                        {'check_interval_seconds': 1}, {'start_page': 7}, {}):
             self.assertFalse(settings.save(update, 0)['ok'], update)
         self.assertFalse(settings.SETTINGS.exists())
@@ -71,6 +71,12 @@ class DeviceSettingsTests(unittest.TestCase):
         self.assertTrue(changed['ok'])
         self.assertEqual(settings.snapshot()['settings']['battery_capacity_mah'], 8000)
         self.assertFalse(settings.save({'battery_capacity_mah': 8050}, changed['revision'])['ok'])
+
+    def test_fast_refresh_count_persists_at_five(self):
+        saved = settings.save({'clean_after': 5, 'sleep_seconds': 30}, 0)
+        self.assertTrue(saved['ok'])
+        self.assertEqual(settings.snapshot()['settings']['clean_after'], 5)
+        self.assertEqual(settings.snapshot()['settings']['sleep_seconds'], 30)
 
 
 if __name__ == '__main__': unittest.main()

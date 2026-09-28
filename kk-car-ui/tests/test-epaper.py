@@ -176,6 +176,31 @@ class EpaperTests(unittest.TestCase):
         settings['grayscale'] = False
         self.assertEqual(epaper.select_refresh_mode(settings, 'fast'), 'full')
 
+    def test_fast_and_partial_updates_share_the_full_refresh_limit(self):
+        paper = epaper.Paper.__new__(epaper.Paper)
+        paper.mode, paper.partials, paper.clean_after = 'mono', 0, 5
+        paper.last = epaper.Paper.mono_frame(Image.new('L', (264, 176), 255))
+        paper.rotation = 180
+        paper.prepare_fast = lambda: None
+        paper.command = lambda *args: None
+        paper.update = lambda *args: None
+        paper.reset = lambda: setattr(paper, 'partials', 0)
+        def full(_):
+            paper.partials = 0
+            return 'full'
+        paper.full_mono = full
+        image = Image.new('L', (264, 176), 255)
+        for count in range(1, 6):
+            self.assertEqual(paper.display_fast(image), 'fast')
+            self.assertEqual(paper.partials, count)
+        self.assertEqual(paper.display_fast(image), 'full')
+        image.putpixel((7, 7), 0)
+        self.assertEqual(paper.display_partial(image), 'partial')
+        self.assertEqual(paper.partials, 1)
+        image.putpixel((8, 7), 0)
+        self.assertEqual(paper.display_partial(image), 'partial')
+        self.assertEqual(paper.partials, 2)
+
     def test_layout_and_key_navigation(self):
         console = epaper.Console()
         self.assertEqual(console.handle(2, .1, {}), 'fast')

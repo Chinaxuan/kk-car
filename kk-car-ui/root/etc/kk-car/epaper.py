@@ -46,13 +46,13 @@ MENU = (
     ('port_mode', 'Ethernet LAN / WAN'),
 )
 REFRESH_CHOICES = (60, 180, 300, 600)
-MAX_QUICK_UPDATES = 3  # clean sooner than the vendor's five-update upper guidance
+MAX_QUICK_UPDATES = 5  # V2 vendor guidance: full refresh after five fast/partial updates
 STATUS_PATH = Path('/tmp/kk-car-epaper-status.json')
 FRAME_PATH = Path('/tmp/kk-car-epaper-frame.json')
 SETTINGS_PATH = Path('/etc/kk-car/private/epaper-settings.json')
 SCREEN_KEYS = ('rotation', 'grayscale', 'fast_refresh', 'partial_refresh',
                'clean_after', 'sleep_seconds', 'start_page', 'auto_page_seconds')
-SCREEN_CHOICES = {'rotation': (0, 180), 'clean_after': (1, 2, 3),
+SCREEN_CHOICES = {'rotation': (0, 180), 'clean_after': (1, 2, 3, 4, 5),
                   'sleep_seconds': (18, 30, 60), 'start_page': tuple(range(1, 7)),
                   'auto_page_seconds': (0, 60, 180, 300)}
 
@@ -910,6 +910,7 @@ class Paper:
             return self.display_fast(image)
         x0 = x0 // 8 * 8
         x1 = min(176, (x1 + 7) // 8 * 8)
+        previous_partials = self.partials
         self.reset()
         self.command(0x3C, 0x80)
         self.command(0x44, bytes((x0 // 8, x1 // 8 - 1)))
@@ -921,7 +922,7 @@ class Paper:
         self.command(0x24, section)
         self.update(0xFF)
         self.last = frame
-        self.partials += 1
+        self.partials = previous_partials + 1
         self.touched = time.monotonic()
         return 'partial'
 
