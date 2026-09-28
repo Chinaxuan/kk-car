@@ -189,3 +189,7 @@ UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC�
 ## 2026-09-28 电子纸顶栏电池时间
 
 仅替换 `epaper.py` 并重启 `kk-car-epaper`，无需重启网络、UPS、VPN 或整机。部署前备份原文件，使用目标设备的 Python 先做语法检查；重启后从 `/tmp/kk-car-epaper-status.json` 确认写屏成功，并通过设置中心的管理员镜像查看第二行时间。电池供电时核对 `DISCHARGE ~…`，外电充电时核对 `CHARGING ~…`；若读数不充分，应显示 `--`。同时回查热点、WAN、VPN 与网络配置，异常时恢复备份并只重启电子纸服务。粗估算法及限制见 [电子纸说明](EPAPER.md)。
+
+## 2026-09-28 电子纸文字清晰度优化
+
+将更新后的 `epaper.py`、`fonts/AtkinsonHyperlegibleNext-Bold.ttf` 与 `fonts/OFL-Atkinson.txt` 一起复制到设备 `/etc/kk-car/`，保留 DejaVu 与原 Blinker 字体供回退。先验证字体能由目标设备的 Pillow 载入，再只重启 `kk-car-epaper`；不要重启网络、UPS、VPN 或整机。状态应为 `ok`，管理员画面镜像应能读到新字体首页，且负载 1/5/15 数值不被截断。新版仅在较大关键数字边缘使用深灰抗锯齿；快刷和局刷禁用抖动，小字保持黑白。回退时恢复备份的 `epaper.py` 并只重启显示服务。字体和许可证需要随设备备份与升级保留；公开仓库不包含设备真实状态帧。

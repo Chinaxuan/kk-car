@@ -440,13 +440,18 @@ class Console:
         return 'gray' if self.item in SCREEN_KEYS + ('clean_screen', 'refresh') else 'fast'
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=16)
 def font(size):
-    face = Path(__file__).resolve().parent / 'fonts' / 'Blinker-SemiBold.ttf'
-    try:
-        return ImageFont.truetype(str(face), size)
-    except OSError:
-        return ImageFont.load_default(size=size)
+    faces = (('AtkinsonHyperlegibleNext-Bold.ttf', size - 1 if size < 25 else size),
+             ('DejaVuSansCondensed-Bold.ttf', size - 1 if size < 25 else size),
+             ('Blinker-SemiBold.ttf', size))
+    root = Path(__file__).resolve().parent / 'fonts'
+    for name, pixels in faces:
+        try:
+            return ImageFont.truetype(str(root / name), pixels)
+        except OSError:
+            pass
+    return ImageFont.load_default(size=size)
 
 
 class CrispDraw:
@@ -459,10 +464,16 @@ class CrispDraw:
     def __getattr__(self, name):
         return getattr(self.draw, name)
 
-    def text(self, xy, content, fill=0, font=None):
+    def text(self, xy, content, fill=0, font=None, smooth=False):
         mask = Image.new('L', self.image.size, 0)
         ImageDraw.Draw(mask).text(xy, content, fill=255, font=font)
-        self.image.paste(fill, (0, 0), mask.point(lambda value: 255 if value >= 128 else 0).convert('1'))
+        if smooth and fill == 0:
+            # A dark gray edge rounds large digits while the main strokes stay black.
+            edge = mask.point(lambda value: 0 if value >= 192 else 128)
+            visible = mask.point(lambda value: 255 if value >= 80 else 0).convert('1')
+            self.image.paste(edge, (0, 0), visible)
+        else:
+            self.image.paste(fill, (0, 0), mask.point(lambda value: 255 if value >= 128 else 0).convert('1'))
 
 
 def valid_number(value, minimum, maximum):
@@ -543,12 +554,12 @@ def render_home(draw, data):
     ping, modem = data['ping'], data['modem']
     draw.text((7, 33), 'VPN LATENCY', fill=0, font=small)
     latency = number(ping.get('avg_ms'), decimals=0)
-    draw.text((7, 39), fitted(draw, latency, font(31), 70), fill=0, font=font(31))
+    draw.text((7, 39), fitted(draw, latency, font(31), 70), fill=0, font=font(31), smooth=latency != '--')
     draw.text((83, 57), 'ms' if latency != '--' else '', fill=0, font=compact)
     draw.text((99, 34), 'LOSS', fill=0, font=font(10))
-    draw.text((99, 45), fitted(draw, number(ping.get('loss_percent'), '%'), font(17), 32), fill=0, font=font(17))
+    draw.text((99, 45), fitted(draw, number(ping.get('loss_percent'), '%'), font(17), 32), fill=0, font=font(17), smooth=ping.get('loss_percent') is not None)
     draw.text((139, 33), 'RSRP', fill=0, font=small)
-    draw.text((139, 40), fitted(draw, number(modem.get('rsrp')), font(29), 70), fill=0, font=font(29))
+    draw.text((139, 40), fitted(draw, number(modem.get('rsrp')), font(29), 70), fill=0, font=font(29), smooth=modem.get('rsrp') is not None)
     draw.text((196, 57), 'dBm' if modem.get('rsrp') is not None else '', fill=0, font=font(12))
     draw.text((226, 33), fitted(draw, data['band'], font(14), 36), fill=0, font=font(14))
     earfcn = data['earfcn']
@@ -577,7 +588,8 @@ def render_home(draw, data):
             x = 6 + 132 * column
             draw.text((x, y), label, fill=0, font=small)
             value_x = x + max(36, int(draw.textlength(label, font=small)) + 4)
-            draw.text((value_x, y), fitted(draw, result, compact, x + 126 - value_x), fill=0, font=compact)
+            face = font(12) if label == 'LOAD' else compact
+            draw.text((value_x, y), fitted(draw, result, face, x + 126 - value_x), fill=0, font=face)
     draw.line((132, 79, 132, 158), fill=192)
 
 
@@ -612,10 +624,11 @@ def render(console, car, ups, rates=None, aux=None):
             for i, (label, value) in enumerate(items):
                 row, col = divmod(i, 2)
                 x, y = 7 + col * 130, 33 if row == 0 else 67 + (row - 1) * 23
-                draw.text((x, y), fitted(draw, label, small, 120), fill=0, font=small)
-                face = font(20) if row == 0 else value_font
-                draw.text((x, y + (7 if row == 0 else 8)),
-                          fitted(draw, value, face, 119), fill=0, font=face)
+                draw.text((x, y if row == 0 else y + 1), fitted(draw, label, small, 120), fill=0, font=small)
+                face = font(17) if row == 0 and label == 'LOAD 1/5/15' else font(20) if row == 0 else font(13)
+                draw.text((x, y + (8 if row == 0 else 10)),
+                          fitted(draw, value, face, 119), fill=0, font=face,
+                          smooth=row == 0 and any(char.isdigit() for char in str(value)))
                 if row < 4:
                     rule_y = 65 if row == 0 else y + 23
                     draw.line((x, rule_y, x + 120, rule_y), fill=192)
@@ -682,7 +695,7 @@ def render(console, car, ups, rates=None, aux=None):
     else:
         draw.text((7, 160), fitted(draw, footer, small, 249), fill=255, font=small)
     if not console.settings['grayscale']:
-        image = image.point(lambda shade: 255 if shade >= 160 else 0)
+        image = image.point(lambda shade: 255 if shade >= 128 else 0)
     return image
 
 
@@ -830,7 +843,7 @@ class Paper:
     def full_mono(self, image):
         if self.mode != 'mono' or self.partials:
             self.init_mono()
-        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1')
+        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1', dither=Image.Dither.NONE)
         self.command(0x24, frame.tobytes())
         self.command(0x26, frame.tobytes())
         self.update(0xF7)
@@ -843,7 +856,7 @@ class Paper:
         if self.mode != 'mono' or self.partials >= getattr(self, 'clean_after', MAX_QUICK_UPDATES):
             return self.full_mono(image)
         self.prepare_fast()
-        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1')
+        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1', dither=Image.Dither.NONE)
         self.command(0x24, frame.tobytes())
         self.command(0x26, frame.tobytes())
         self.update(0xC7)
@@ -855,7 +868,7 @@ class Paper:
     def display_partial(self, image):
         if self.mode != 'mono' or self.last is None or self.partials >= getattr(self, 'clean_after', MAX_QUICK_UPDATES):
             return self.display_fast(image)
-        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1')
+        frame = self.portrait(image, getattr(self, 'rotation', DISPLAY_ROTATION)).convert('1', dither=Image.Dither.NONE)
         box = ImageChops.difference(frame.convert('L'), self.last.convert('L')).getbbox()
         if box is None:
             return 'unchanged'

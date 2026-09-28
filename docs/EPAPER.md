@@ -17,7 +17,9 @@
 
 设置菜单提供网络检查、更新蜂窝状态、VPN 重连、启动/暂停 VPN、VPN 开机自启、Wi-Fi 2.4/5 GHz 切换、有线口 LAN/WAN 切换，以及方向、刷新周期、灰阶、快刷、局刷、清屏次数、休眠延迟、开机首页和自动翻页。网络检查与状态更新直接执行；VPN 和网络设置需在确认画面长按 KEY4。Wi-Fi 和有线口复用原管理页的 **125 秒限时回退**，切换后先确认目标状态和连接，再在屏幕长按 KEY4 保留；不确认会由原有服务自动回退。实体按键是设备本地管理入口，能改变网络配置，请将路由器放在仅可信人员能接触的位置。热点名称、密码、VPN 密钥等自由文本仍需在 LuCI 页面设置。
 
-V2 的四级灰阶只用于浅色分隔与辅助标记；文字像素收敛为纯黑或纯白，底部操作提示用纯黑底白字，避免小字被点状灰底或灰色边缘淹没。使用的 Blinker SemiBold 字体及 SIL OFL 许可随源码提供。顶栏 `CHARGING`/`DISCHARGE` 依据 UPS 电池电流正负判断，接近零电流为 `IDLE`；传感器不可用时仅显示外部输入或电池供电，**不推断正在充电**。电流与电量均未经外部校准。第二行在 `CHARGING` 后显示预计充满时间、在 `DISCHARGE` 或仅确认电池供电时显示预计剩余时间，例如 `CHARGING ~1h20`、`DISCHARGE ~50m`。放电时间按两节电池的合计标称容量、UPS 主控电压及树莓派当前功率粗算，与后台电池页采用同一估算口径；充电时间另按当前估算充电电流和充电末段放缓系数粗算。百分比不参与计算；缺少可信读数、接近保护电压或充电末段时显示 `--`。两种时间都不代表已校准容量，也不用于关机控制。翻页在条件允许时使用快刷，设置光标移动使用小区域局刷，累计最多三次快速/局部刷新后先做全刷，返回首页也进行完整刷新。屏幕闲置约 18 秒进入休眠；唤醒后首次更新会全刷。不操作时默认每 180 秒读取一次状态并用灰阶全刷；也可在本机菜单选 1、3、5 或 10 分钟，选择后保存在私有设置中。1 分钟模式用于需要更及时状态的场景，长期频繁刷新尚未验收；默认 3 分钟频率遵循 [厂商手册](https://www.waveshare.com/wiki/2.7inch_e-Paper_HAT_Manual)对常规刷新间隔的建议。按键翻页会重新读取状态，短信后台约每 30 秒更新未查看数，但屏幕仍在按键或下一次定时全刷时才变化。电子纸刷新需要时间，刷新期间的瞬时按键可能不会记录；画面不会像 HDMI 一样逐秒变化。UPS 百分比与功率尚未外部校准；今日流量是模块网卡收发量，套餐剩余是按运营商短信锚点推算，均不是运营商实时账单。平均速率在首次采样或网卡计数器重置后显示 `--`，取得下一次有效采样才计算。
+V2 只有 264×176 像素和四级灰阶，换字体不能提高物理分辨率。当前优先使用 [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) 粗体增强英文与数字辨识度；DejaVu Sans Condensed Bold、原 Blinker SemiBold 依次作为回退，字体及许可证随源码提供。小字保持纯黑白；首页及详情页的较大关键数字以纯黑为主体，只在边缘使用一级深灰过渡。快刷和局刷关闭抖动，避免把灰边转换成点状纹理；底部操作提示保持纯黑底白字。详情行保留更宽的标签与数值间距，负载 1/5/15 三项完整显示。实物清晰度仍受屏幕刷新残影和观看距离限制。
+
+顶栏 `CHARGING`/`DISCHARGE` 依据 UPS 电池电流正负判断，接近零电流为 `IDLE`；传感器不可用时仅显示外部输入或电池供电，**不推断正在充电**。电流与电量均未经外部校准。第二行在 `CHARGING` 后显示预计充满时间、在 `DISCHARGE` 或仅确认电池供电时显示预计剩余时间，例如 `CHARGING ~1h20`、`DISCHARGE ~50m`。放电时间按两节电池的合计标称容量、UPS 主控电压及树莓派当前功率粗算，与后台电池页采用同一估算口径；充电时间另按当前估算充电电流和充电末段放缓系数粗算。百分比不参与计算；缺少可信读数、接近保护电压或充电末段时显示 `--`。两种时间都不代表已校准容量，也不用于关机控制。翻页在条件允许时使用快刷，设置光标移动使用小区域局刷，累计最多三次快速/局部刷新后先做全刷，返回首页也进行完整刷新。屏幕闲置约 18 秒进入休眠；唤醒后首次更新会全刷。不操作时默认每 180 秒读取一次状态并用灰阶全刷；也可在本机菜单选 1、3、5 或 10 分钟，选择后保存在私有设置中。1 分钟模式用于需要更及时状态的场景，长期频繁刷新尚未验收；默认 3 分钟频率遵循 [厂商手册](https://www.waveshare.com/wiki/2.7inch_e-Paper_HAT_Manual)对常规刷新间隔的建议。按键翻页会重新读取状态，短信后台约每 30 秒更新未查看数，但屏幕仍在按键或下一次定时全刷时才变化。电子纸刷新需要时间，刷新期间的瞬时按键可能不会记录；画面不会像 HDMI 一样逐秒变化。UPS 百分比与功率尚未外部校准；今日流量是模块网卡收发量，套餐剩余是按运营商短信锚点推算，均不是运营商实时账单。平均速率在首次采样或网卡计数器重置后显示 `--`，取得下一次有效采样才计算。
 
 未查看短信按管理页是否打开完整正文判断，后台加密备份和飞书转发不会将它变为已查看。首次启用时现有旧短信作基线，不追认成新消息；换短信存储区时也不把历史消息误报为新消息。缺段、短信目录读取失败或状态还未同步时显示未知，不冒充零条。屏幕只显示数量，正文仍须登录网页查看。
 
@@ -29,7 +31,7 @@ V2 的四级灰阶只用于浅色分隔与辅助标记；文字像素收敛为�
 apk add python3 python3-gpiod python3-pillow kmod-spi-dev
 ```
 
-保留原有 `/boot/config.txt`，追加 `dtparam=spi=on`，只需添加一次，然后重启。重启后确认 `/dev/spidev0.0` 存在，也确认原有 I²C/UPS、热点、WAN 和 VPN 都已恢复。把仓库中的 `kk-car-ui/root/etc/kk-car/epaper.py` 和 `epaper_lut.py` 放入设备 `/etc/kk-car/`，将 `fonts/Blinker-SemiBold.ttf` 放入设备 `/etc/kk-car/fonts/`，把 `kk-car-ui/root/etc/init.d/kk-car-epaper` 放入设备 `/etc/init.d/`；主程序与服务文件设为可执行，然后：
+保留原有 `/boot/config.txt`，追加 `dtparam=spi=on`，只需添加一次，然后重启。重启后确认 `/dev/spidev0.0` 存在，也确认原有 I²C/UPS、热点、WAN 和 VPN 都已恢复。把仓库中的 `kk-car-ui/root/etc/kk-car/epaper.py` 和 `epaper_lut.py` 放入设备 `/etc/kk-car/`，将 `fonts/AtkinsonHyperlegibleNext-Bold.ttf`、`fonts/OFL-Atkinson.txt`、`fonts/DejaVuSansCondensed-Bold.ttf`、`fonts/LICENSE-DejaVu.txt`、`fonts/Blinker-SemiBold.ttf` 和 `fonts/OFL-Blinker.txt` 放入设备 `/etc/kk-car/fonts/`，把 `kk-car-ui/root/etc/init.d/kk-car-epaper` 放入设备 `/etc/init.d/`；主程序与服务文件设为可执行，然后：
 
 ```sh
 /etc/init.d/kk-car-epaper enable
@@ -37,7 +39,7 @@ apk add python3 python3-gpiod python3-pillow kmod-spi-dev
 cat /tmp/kk-car-epaper-status.json
 ```
 
-`state` 为 `ok` 表示最近一次屏幕写入完成；`rotation` 记录画面旋转角度，`page` 为 1–6，`refresh_mode` 可为 `gray`、`full`、`fast` 或 `partial`，`key_counts` 记录本次服务启动以来四键触发次数。再到实体屏幕查看内容并逐个按键，不能只以服务启动成功代替屏幕验收。程序在显示时通过 `ubus` 读取现有 KK-Car 和 UPS 状态，蜂窝、流量及短信提示读取对应的短期状态缓存；执行设置时复用现有的 `kkcar` 操作接口。把 `/boot/config.txt`、程序、字体、服务文件、init 启动链接，以及 `/etc/kk-car/private/device-settings.json` 和兼容迁移用的旧 `/etc/kk-car/private/epaper-settings.json` 纳入设备升级保留清单；系统升级后如软件包丢失，还需重新安装依赖。若字体文件意外缺失，程序会退回 Pillow 默认字体，但小字可能再次难辨。
+`state` 为 `ok` 表示最近一次屏幕写入完成；`rotation` 记录画面旋转角度，`page` 为 1–6，`refresh_mode` 可为 `gray`、`full`、`fast` 或 `partial`，`key_counts` 记录本次服务启动以来四键触发次数。再到实体屏幕查看内容并逐个按键，不能只以服务启动成功代替屏幕验收。程序在显示时通过 `ubus` 读取现有 KK-Car 和 UPS 状态，蜂窝、流量及短信提示读取对应的短期状态缓存；执行设置时复用现有的 `kkcar` 操作接口。把 `/boot/config.txt`、程序、字体、服务文件、init 启动链接，以及 `/etc/kk-car/private/device-settings.json` 和兼容迁移用的旧 `/etc/kk-car/private/epaper-settings.json` 纳入设备升级保留清单；系统升级后如软件包丢失，还需重新安装依赖。字体加载顺序是 Atkinson、DejaVu、Blinker、Pillow 默认；缺少主字体时字宽与排版可能变化。
 
 维护时可用 `/usr/bin/python3 /etc/kk-car/epaper.py --preview /tmp/epaper-preview.png --page 1` 仅生成预览图，不占用屏幕 GPIO。`--once` 会真正写一帧；运行前先停止常驻服务，否则 GPIO 独占会导致冲突。退出后再启动服务。`/tmp/kk-car-epaper-status.json` 是运行时文件，重启后重新生成，不应当作历史记录。
 

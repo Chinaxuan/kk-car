@@ -65,6 +65,20 @@ class EpaperTests(unittest.TestCase):
         self.assertEqual(console.page, 3)
         self.assertTrue(set(epaper.render(console, {}, {}).tobytes()).issubset({0, 255}))
 
+    def test_readable_font_is_bundled(self):
+        self.assertEqual(Path(epaper.font(11).path).name, 'AtkinsonHyperlegibleNext-Bold.ttf')
+        self.assertEqual(Path(epaper.font(20).path).name, 'AtkinsonHyperlegibleNext-Bold.ttf')
+        draw = epaper.CrispDraw(Image.new('L', (264, 176), 255))
+        loads = '0.53/0.30/0.18'
+        home_width = 126 - max(36, int(draw.textlength('LOAD', font=epaper.font(11))) + 4)
+        self.assertEqual(epaper.fitted(draw, loads, epaper.font(12), home_width), loads)
+        self.assertEqual(epaper.fitted(draw, loads, epaper.font(17), 119), loads)
+
+    def test_large_digits_have_black_core_and_dark_gray_edge(self):
+        image = Image.new('L', (264, 176), 255)
+        epaper.CrispDraw(image).text((7, 35), '88', fill=0, font=epaper.font(31), smooth=True)
+        self.assertTrue({0, 128, 255}.issubset(set(image.tobytes())))
+
     def test_four_gray_planes(self):
         image = Image.new('L', (epaper.WIDTH, epaper.HEIGHT), 255)
         image.putpixel((0, 0), 0)
