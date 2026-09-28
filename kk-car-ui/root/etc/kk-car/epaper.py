@@ -123,14 +123,10 @@ def age(v):
     return f'{v // 3600}h {v % 3600 // 60}m' if v >= 3600 else f'{v // 60}m {v % 60}s'
 
 
-def mib(v):
-    return number(v / 1048576, ' MiB', 1) if isinstance(v, (int, float)) else '--'
-
-
 def size(v):
     if not isinstance(v, (int, float)) or isinstance(v, bool) or v < 0:
         return '--'
-    for unit, divisor in (('GiB', 1073741824), ('MiB', 1048576), ('KiB', 1024)):
+    for unit, divisor in (('GB', 1000000000), ('MB', 1000000), ('KB', 1000)):
         if v >= divisor:
             return f'{v / divisor:.1f}{unit}'
     return f'{v:.0f}B'
@@ -586,10 +582,13 @@ def render_home(draw, data):
         draw.line((0, y + 13, 263, y + 13), fill=192)
         for column, (label, result) in enumerate(pair):
             x = 6 + 132 * column
+            right = x + 120
             draw.text((x, y), label, fill=0, font=small)
-            value_x = x + max(36, int(draw.textlength(label, font=small)) + 4)
             face = font(12) if label == 'LOAD' else compact
-            draw.text((value_x, y), fitted(draw, result, face, x + 126 - value_x), fill=0, font=face)
+            value_width = right - x - draw.textlength(label, font=small) - 5
+            shown = fitted(draw, result, face, value_width)
+            value_x = right - draw.textlength(shown, font=face)
+            draw.text((value_x, y), shown, fill=0, font=face)
     draw.line((132, 79, 132, 158), fill=192)
 
 

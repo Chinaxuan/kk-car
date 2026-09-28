@@ -79,6 +79,39 @@ class EpaperTests(unittest.TestCase):
         epaper.CrispDraw(image).text((7, 35), '88', fill=0, font=epaper.font(31), smooth=True)
         self.assertTrue({0, 128, 255}.issubset(set(image.tobytes())))
 
+    def test_traffic_uses_decimal_units(self):
+        self.assertEqual(epaper.size(173700000000), '173.7GB')
+        self.assertEqual(epaper.size(827500000), '827.5MB')
+        self.assertEqual(epaper.size(1073741824), '1.1GB')
+
+    def test_home_values_align_to_column_edges_without_covering_labels(self):
+        image = Image.new('L', (264, 176), 255)
+        draw = epaper.CrispDraw(image)
+        data = {'ping': {}, 'modem': {}, 'band': '--', 'earfcn': None,
+                'unread': 0, 'vpn_ip': None, 'system_age': '3h 29m',
+                'load': '0.14/0.27/0.27', 'memory': '19%', 'temperature': '55 C',
+                'clients': '2', 'power': '~7.6W', 'remaining': '173.7GB',
+                'today': '827.5MB'}
+        calls = []
+        original = epaper.CrispDraw.text
+
+        def record(target, xy, content, **kwargs):
+            calls.append((xy, content, kwargs.get('font')))
+            return original(target, xy, content, **kwargs)
+
+        with patch.object(epaper.CrispDraw, 'text', record):
+            epaper.render_home(draw, data)
+        for label, value, left, right in (
+                ('SYSTEM UP', '3h 29m', 6, 126),
+                ('LOAD', '0.14/0.27/0.27', 138, 258),
+                ('LEFT', '173.7GB', 6, 126),
+                ('TODAY', '827.5MB', 138, 258)):
+            x, _ = next(xy for xy, content, face in calls if content == value)
+            face = next(face for xy, content, face in calls if content == value)
+            label_end = left + draw.textlength(label, font=epaper.font(11))
+            self.assertGreaterEqual(x, label_end + 4)
+            self.assertAlmostEqual(x + draw.textlength(value, font=face), right)
+
     def test_four_gray_planes(self):
         image = Image.new('L', (epaper.WIDTH, epaper.HEIGHT), 255)
         image.putpixel((0, 0), 0)
