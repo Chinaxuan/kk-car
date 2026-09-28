@@ -268,6 +268,36 @@ class EpaperTests(unittest.TestCase):
         self.assertEqual(epaper.battery_header(ups), ('~85%', 'CHARGING --'))
         self.assertEqual(epaper.battery_header({}), ('--', 'POWER --'))
 
+    def test_charging_power_uses_valid_battery_sensor_and_fits_header(self):
+        ups = {'ok': True, 'input': {'external': True},
+               'battery': {'percent': 95, 'percent_calibration_unverified': True},
+               'sensors': {'battery': {'detected': True, 'conversion_ready': True,
+                                       'overflow': False, 'current_ma': 534,
+                                       'power_mw': 2056.968}}}
+        self.assertEqual(epaper.charging_power(ups), '~2.1W')
+        draw = epaper.CrispDraw(Image.new('L', (264, 176), 255))
+        calls = []
+        original = epaper.CrispDraw.text
+
+        def record(target, xy, content, **kwargs):
+            calls.append((xy, content, kwargs.get('font')))
+            return original(target, xy, content, **kwargs)
+
+        with patch.object(epaper.CrispDraw, 'text', record):
+            epaper.render(epaper.Console(), {}, ups)
+        date = next((xy, text, face) for xy, text, face in calls
+                    if '/' in text and ':' in text and xy[1] == 2)
+        power = next((xy, text, face) for xy, text, face in calls
+                     if '~2.1W' in text)
+        self.assertEqual(power[1], '~2.1W ~95%')
+        self.assertGreaterEqual(power[0][0],
+                                date[0][0] + draw.textlength(date[1], font=date[2]) + 4)
+        ups['input']['external'] = False
+        self.assertIsNone(epaper.charging_power(ups))
+        ups['input']['external'] = True
+        ups['sensors']['battery']['conversion_ready'] = False
+        self.assertIsNone(epaper.charging_power(ups))
+
     def test_battery_header_estimates_charge_and_discharge_without_percentage(self):
         ups = {'ok': True,
                'battery': {'percent': 90, 'percent_calibration_unverified': True,

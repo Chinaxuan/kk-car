@@ -538,6 +538,20 @@ def battery_header(ups):
     return level, state
 
 
+def charging_power(ups):
+    """Battery-side estimate only; input voltage alone cannot give charger watts."""
+    if not ups.get('ok') or (ups.get('input') or {}).get('external') is not True:
+        return None
+    sensor = (ups.get('sensors') or {}).get('battery') or {}
+    current, power = sensor.get('current_ma'), sensor.get('power_mw')
+    if (not sensor.get('detected') or sensor.get('overflow') or
+            sensor.get('conversion_ready') is not True or
+            not valid_number(current, 100, 10000) or
+            not valid_number(power, 200, 30000)):
+        return None
+    return f'~{power / 1000:.1f}W'
+
+
 def fitted(draw, text, face, width):
     text = str(text)
     if draw.textlength(text, font=face) <= width:
@@ -609,8 +623,16 @@ def render(console, car, ups, rates=None, aux=None):
     draw.text(((WIDTH - draw.textlength(stamp, font=font(14))) / 2, 2), stamp,
               fill=255, font=font(14))
     charge, state = battery_header(ups)
-    draw.text((WIDTH - 7 - draw.textlength(charge, font=font(14)), 2), charge,
-              fill=255, font=font(14))
+    power = charging_power(ups)
+    if power:
+        charge = power + ' ' + charge
+    # A wide charging value must not run into the centered date/time.
+    stamp_right = (WIDTH + draw.textlength(stamp, font=font(14))) / 2
+    charge_font = next((face for face in (font(14), font(12), font(11))
+                        if WIDTH - 7 - draw.textlength(charge, font=face) >= stamp_right + 4),
+                       font(11))
+    draw.text((WIDTH - 7 - draw.textlength(charge, font=charge_font), 2), charge,
+              fill=255, font=charge_font)
     draw.text((7, 18), fitted(draw, title, small, 205), fill=255, font=small)
     page_no = f'{console.page + 1} / {len(PAGES)}' if console.view == 'pages' else f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
     draw.text(((WIDTH - draw.textlength(page_no, font=small)) / 2, 18), page_no,

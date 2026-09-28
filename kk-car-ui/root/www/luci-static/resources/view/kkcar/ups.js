@@ -17,6 +17,7 @@ var powerAction=rpc.declare({object:'kkups',method:'power_action',params:['actio
 function number(v,dec){return Number.isFinite(v)?Number(v).toFixed(dec):'—';}
 function volts(mv){return Number.isFinite(mv)?number(mv/1000,2)+' V':'—';}
 function millivolts(mv){return Number.isFinite(mv)?number(mv,0)+' mV':'—';}
+function chargingPower(input,sensor){return input.external===true&&sensor.detected===true&&sensor.overflow!==true&&sensor.conversion_ready===true&&Number.isFinite(sensor.current_ma)&&sensor.current_ma>100&&Number.isFinite(sensor.power_mw)&&sensor.power_mw>=200&&sensor.power_mw<=30000?sensor.power_mw/1000:null;}
 function duration(s){if(!Number.isFinite(s))return '—';var h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h>0?h+' 小时 '+m+' 分钟':m+' 分钟';}
 function yesno(v){return v==null?'未知':v?'是':'否';}
 function watchLabel(v){return ({disabled:'未启用',monitoring:'监测中',external_power:'外部供电中',on_battery:'电池供电中',low_battery_wait:'低电压复核中',low_battery:'已触发低电关机',read_error:'采样失败',invalid_voltage:'电压读数无效'})[v]||'等待首次采样';}
@@ -224,6 +225,7 @@ return view.extend({
     paint:function(d){
         if(!d||!d.ok){this.showError(d&&d.error?d.error:'UPS 未响应');return;}
         var b=d.battery||{},i=d.input||{},o=d.output||{},c=d.controller||{},s=d.sensors||{},pi=s.pi_supply||{},bat=s.battery||{},rtc=s.rtc||{},diag=d.diagnostics||{},ref=d.voltage_reference||{};
+        var chargeWatts=chargingPower(i,bat);
         var pct=Number.isFinite(b.percent)?Math.min(100,Math.max(0,b.percent)):0;
         var runtime=batteryRuntime.estimate(d),runtimeTitle=runtime.kind==='remaining'?'电池剩余粗估':runtime.kind==='full_reference'?'满电续航参考':'续航估算暂不可用';
         var runtimeValue=runtime.seconds?duration(runtime.seconds):'—';
@@ -232,7 +234,7 @@ return view.extend({
         this.updated.textContent='更新于 '+new Date(d.timestamp*1000).toLocaleTimeString('zh-CN',{hour12:false});
         this.hero.replaceChildren(
             E('div',{'class':'ku-battery'},[E('div',{'class':'ku-battery-top'},[E('span',{},'BATTERY / 电池电量估计'),E('span',{'class':'ku-pill '+(i.external?'good':'warn')},i.external?'外部供电中':'电池供电中')]),E('div',{'class':'ku-battery-value'},[E('strong',{},number(b.percent,0)),E('span',{},'%')]),E('div',{'class':'ku-gauge',role:'meter','aria-label':'电池电量估计','aria-valuemin':'0','aria-valuemax':'100','aria-valuenow':String(pct)},E('div',{style:'width:'+pct+'%'})),E('p',{},'UPS 百分比未校准；续航粗估改用主控电压和当前负载。'),E('div',{'class':'ku-runtime'},[E('span',{},runtimeTitle),E('strong',{},runtimeValue),E('small',{},runtimeNote)])]),
-            E('div',{'class':'ku-hero-stats'},[cell('树莓派供电',volts(o.pogo_mv),o.pi_undervoltage===true?'当前欠压':o.pi_undervoltage===false?'当前无欠压':'欠压状态未知'),cell('树莓派耗电估算',number(pi.power_mw/1000,1)+' W','来自 INA219 电压差及厂商标注电阻'),cell('电池温度',number(b.temperature_c,0)+' °C',b.temperature_c>=50?'注意散热 · 硬件保护 65°C':'硬件保护 65°C')])
+            E('div',{'class':'ku-hero-stats'},[cell('树莓派供电',volts(o.pogo_mv),o.pi_undervoltage===true?'当前欠压':o.pi_undervoltage===false?'当前无欠压':'欠压状态未知'),cell('树莓派耗电估算',number(pi.power_mw/1000,1)+' W','来自 INA219 电压差及厂商标注电阻'),cell('电池充电功率',chargeWatts===null?'—':'约 '+number(chargeWatts,1)+' W',chargeWatts===null?'当前未检测到有效充电':'电池侧估算，非充电器输入功率')])
         );
         this.warnings.replaceChildren.apply(this.warnings,(d.warnings||[]).map(function(w){return E('div',{'class':'ku-warning'},w);}));
         this.metrics.replaceChildren(
