@@ -84,7 +84,7 @@ class EpaperTests(unittest.TestCase):
         self.assertEqual(epaper.size(827500000), '827.5MB')
         self.assertEqual(epaper.size(1073741824), '1.1GB')
 
-    def test_home_values_align_to_column_edges_without_covering_labels(self):
+    def test_home_labels_and_values_share_top_and_column_edges(self):
         image = Image.new('L', (264, 176), 255)
         draw = epaper.CrispDraw(image)
         data = {'ping': {}, 'modem': {}, 'band': '--', 'earfcn': None,
@@ -106,11 +106,17 @@ class EpaperTests(unittest.TestCase):
                 ('LOAD', '0.14/0.27/0.27', 138, 258),
                 ('LEFT', '173.7GB', 6, 126),
                 ('TODAY', '827.5MB', 138, 258)):
-            x, _ = next(xy for xy, content, face in calls if content == value)
-            face = next(face for xy, content, face in calls if content == value)
-            label_end = left + draw.textlength(label, font=epaper.font(11))
+            label_xy, _, label_face = next(call for call in calls if call[1] == label)
+            (x, value_y), _, face = next(call for call in calls if call[1] == value)
+            label_end = left + draw.textlength(label, font=label_face)
             self.assertGreaterEqual(x, label_end + 4)
             self.assertAlmostEqual(x + draw.textlength(value, font=face), right)
+            self.assertEqual(label_face.size, face.size)
+            self.assertEqual(label_xy[1] + draw.textbbox((0, 0), label, font=label_face)[1],
+                             value_y + draw.textbbox((0, 0), value, font=face)[1])
+            if label == 'SYSTEM UP':
+                self.assertEqual(label_xy[1] + draw.textbbox((0, 0), label, font=label_face)[3],
+                                 value_y + draw.textbbox((0, 0), value, font=face)[3])
 
     def test_four_gray_planes(self):
         image = Image.new('L', (epaper.WIDTH, epaper.HEIGHT), 255)

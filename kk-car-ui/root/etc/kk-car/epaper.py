@@ -577,18 +577,18 @@ def render_home(draw, data):
         (('CLIENTS', data['clients']), ('POWER', data['power'])),
         (('LEFT', data['remaining']), ('TODAY', data['today'])),
     )
+    row_face = font(12)
     for row, pair in enumerate(rows):
         y = 103 + row * 14
         draw.line((0, y + 13, 263, y + 13), fill=192)
         for column, (label, result) in enumerate(pair):
             x = 6 + 132 * column
             right = x + 120
-            draw.text((x, y), label, fill=0, font=small)
-            face = font(12) if label == 'LOAD' else compact
-            value_width = right - x - draw.textlength(label, font=small) - 5
-            shown = fitted(draw, result, face, value_width)
-            value_x = right - draw.textlength(shown, font=face)
-            draw.text((value_x, y), shown, fill=0, font=face)
+            draw.text((x, y - 1), label, fill=0, font=row_face)
+            value_width = right - x - draw.textlength(label, font=row_face) - 5
+            shown = fitted(draw, result, row_face, value_width)
+            value_x = right - draw.textlength(shown, font=row_face)
+            draw.text((value_x, y - 1), shown, fill=0, font=row_face)
     draw.line((132, 79, 132, 158), fill=192)
 
 
