@@ -16,12 +16,12 @@ var upsOption=rpc.declare({object:'kkups',method:'set_option',params:['key','val
 
 var fields=[
  ['rotation','显示方向',[[0,'正常 0°'],[180,'反转 180°']],'改变画面方向，四个按键的功能保持不变。'],
- ['refresh_seconds','数据刷新间隔',[[60,'1 分钟'],[180,'3 分钟'],[300,'5 分钟'],[600,'10 分钟']],'定时读取最新状态并全屏刷新；电子纸断电仍保留最后一帧。'],
+ ['refresh_seconds','数据刷新间隔',[[60,'1 分钟'],[180,'3 分钟'],[300,'5 分钟'],[600,'10 分钟']],'有终端时使用此间隔；无人连接时至少 5 分钟。有终端接入会立即刷新；电子纸断电仍保留最后一帧。'],
  ['grayscale','屏幕灰阶',null,'灰阶全刷时，文字边缘和分隔线使用深灰；关闭后使用黑白全刷。'],
  ['fast_refresh','按键快速刷新',null,'开启时翻页使用黑白快刷，深灰笔画和线条会映射成黑色；关闭后按键全刷，画面更统一但等待更长。'],
  ['partial_refresh','菜单局部刷新',null,'选中标记小范围更新；仅在快速刷新开启时有效。'],
  ['clean_after','全刷前连续快刷次数',[[1,'1 次'],[2,'2 次'],[3,'3 次'],[4,'4 次'],[5,'5 次 · 厂商建议'],[6,'6 次'],[7,'7 次'],[8,'8 次'],[9,'9 次'],[10,'10 次']],'按键翻页与菜单局刷共用计数；6–10 次超出厂商建议，请观察残影。定时更新和休眠后的首次写屏仍会全刷。'],
- ['sleep_seconds','屏幕控制器休眠延迟',[[18,'18 秒'],[30,'30 秒'],[60,'60 秒']],'连续翻页间隔内保持唤醒才可快刷；闲置后休眠，下一次先全刷。1 分钟定时更新时不建议设为 60 秒。'],
+ ['sleep_seconds','屏幕控制器休眠延迟',[[18,'18 秒'],[30,'30 秒'],[60,'60 秒']],'有终端时使用此延迟；无人连接时延长至 5 分钟。灰阶全刷后会立即休眠；休眠唤醒时先全刷。'],
  ['start_page','开机首页',[[1,'行车总览'],[2,'蜂窝网络'],[3,'VPN'],[4,'短信与流量'],[5,'电源'],[6,'系统']],'下次显示服务启动时使用；KEY1 始终返回行车总览。'],
  ['auto_page_seconds','自动翻页',[[0,'关闭'],[60,'每 1 分钟'],[180,'每 3 分钟'],[300,'每 5 分钟']],'按键后重新计时；设置菜单中暂停自动翻页。'],
  ['hdmi_refresh_seconds','HDMI 刷新间隔',[[5,'5 秒'],[10,'10 秒'],[15,'15 秒'],[30,'30 秒'],[60,'60 秒']],'保持当前 1080p；较长间隔可降低显示服务占用。'],
@@ -133,10 +133,10 @@ return view.extend({
   this.updated.textContent='更新于 '+stamp(d.timestamp);
   this.last=d;if(!this.dirty&&d.revision!==this.base.revision)this.bind(d);
   var self=this,ep=d.epaper||{},hd=d.hdmi||{},epService=(d.services||[]).find(function(s){return s.name==='epaper';}),hdService=(d.services||[]).find(function(s){return s.name==='hdmi';});
-  this.quickStatus.textContent=epService&&epService.running&&ep.state==='ok'?'最近写屏：'+({fast:'快速刷新',partial:'局部刷新',full:'黑白全刷',gray:'灰阶全刷',unchanged:'画面未变化'}[ep.refresh_mode]||'未知')+' · 连续快刷 '+(ep.partial_count||0)+' / '+d.settings.clean_after+' 次':'快刷计数：等待电子纸服务状态';
+  this.quickStatus.textContent=epService&&epService.running&&ep.state==='ok'?'最近写屏：'+({fast:'快速刷新',partial:'局部刷新',full:'黑白全刷',gray:'灰阶全刷',unchanged:'画面未变化'}[ep.refresh_mode]||'未知')+' · 连续快刷 '+(ep.partial_count||0)+' / '+d.settings.clean_after+' 次'+(ep.connected_terminals===null||ep.connected_terminals===undefined?' · 终端状态待确认':' · 已连接 '+ep.connected_terminals+' 台'+(ep.idle_mode?' · 无终端慢刷新':'')):'快刷计数：等待电子纸服务状态';
   var applied=epService&&epService.running&&ep.state==='ok'&&ep.settings_revision===d.revision;
   function metric(label,value,note){return E('div',{},[E('span',{},label),E('strong',{},value),E('small',{},note)]);}
-  this.summary.replaceChildren(metric('电子纸方向',d.settings.rotation+'°',applied?'屏幕已应用 · '+stamp(ep.updated):epService&&epService.running?'等待显示服务应用':'显示服务未运行'),metric('定时数据刷新',d.settings.refresh_seconds/60+' 分钟','按键仍可即时操作'),metric('HDMI',hdService&&hdService.running?'运行中':'已暂停',hdService&&hdService.running?'最近写屏 '+stamp(hd.timestamp):'画面可能保留旧数据'),metric('自动网络检查',d.check.enabled&&(d.services||[]).some(function(s){return s.name==='auto-check'&&s.running;})?'已开启':'已暂停','设置周期 '+d.settings.check_interval_seconds/60+' 分钟'));
+  this.summary.replaceChildren(metric('电子纸方向',d.settings.rotation+'°',applied?'屏幕已应用 · '+stamp(ep.updated):epService&&epService.running?'等待显示服务应用':'显示服务未运行'),metric('定时数据刷新',(ep.effective_refresh_seconds||d.settings.refresh_seconds)/60+' 分钟',ep.idle_mode?'无终端 · 接入后立即刷新':'有终端或状态未知 · 按键即时操作'),metric('HDMI',hdService&&hdService.running?'运行中':'已暂停',hdService&&hdService.running?'最近写屏 '+stamp(hd.timestamp):'画面可能保留旧数据'),metric('自动网络检查',d.check.enabled&&(d.services||[]).some(function(s){return s.name==='auto-check'&&s.running;})?'已开启':'已暂停','设置周期 '+d.settings.check_interval_seconds/60+' 分钟'));
   this.job.textContent=d.busy?'正在执行服务操作，请等待…':d.job.state==='error'?'最近操作失败：'+d.job.error:d.job.state==='done'?'最近服务操作已完成 · '+stamp(d.job.timestamp):'暂停采集不会清空已有历史；开机启动开关不改变当前运行状态。';
   this.services.replaceChildren.apply(this.services,(d.services||[]).map(function(s){
    var meta=serviceInfo[s.name],disabled=!s.installed||!s.known||d.busy;

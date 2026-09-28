@@ -8,6 +8,7 @@ import sys
 import time
 import unittest
 import tempfile
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -175,6 +176,40 @@ class EpaperTests(unittest.TestCase):
         self.assertEqual(epaper.select_refresh_mode(settings, 'fast'), 'gray')
         settings['grayscale'] = False
         self.assertEqual(epaper.select_refresh_mode(settings, 'fast'), 'full')
+
+    def test_idle_timing_reverts_immediately_on_join_and_unknown_probe(self):
+        settings = dict(device_settings.DEFAULTS, refresh_seconds=60, sleep_seconds=30)
+        self.assertEqual(epaper.display_timing(settings, 0), (300, 300, True))
+        self.assertEqual(epaper.display_timing(settings, 1), (60, 30, False))
+        self.assertEqual(epaper.display_timing(settings, None), (60, 30, False))
+        self.assertTrue(epaper.joined_since(0, 1))
+        self.assertFalse(epaper.joined_since(None, 1))
+        self.assertFalse(epaper.joined_since(1, 2))
+        settings['refresh_seconds'] = 600
+        self.assertEqual(epaper.display_timing(settings, 0), (600, 300, True))
+
+    def test_only_authorized_wifi_or_live_lan_counts_as_terminal(self):
+        stations = {'one': {'authorized': True}, 'two': {'authorized': False}}
+        replies = [SimpleNamespace(returncode=0, stdout=json.dumps({'clients': stations})),
+                   SimpleNamespace(returncode=0, stdout='0\n')]
+        with patch.object(epaper.subprocess, 'run', side_effect=replies), \
+             patch.object(epaper.Path, 'read_text', return_value='1\n'):
+            self.assertEqual(epaper.connected_terminals(), 2)
+        replies = [SimpleNamespace(returncode=0, stdout=json.dumps({'clients': {'pending': {'authorized': False}}})),
+                   SimpleNamespace(returncode=0, stdout='1\n')]
+        with patch.object(epaper.subprocess, 'run', side_effect=replies):
+            self.assertEqual(epaper.connected_terminals(), 0)
+        with patch.object(epaper.subprocess, 'run', return_value=SimpleNamespace(returncode=1, stdout='')):
+            self.assertIsNone(epaper.connected_terminals())
+
+    def test_idle_sleep_waits_five_minutes_but_normal_delay_is_preserved(self):
+        paper = epaper.Paper.__new__(epaper.Paper)
+        paper.mode, paper.touched, paper.sleep_seconds = 'mono', 0, 30
+        paper.sleep = lambda: setattr(paper, 'mode', None)
+        paper.sleep_if_idle(31, 300)
+        self.assertEqual(paper.mode, 'mono')
+        paper.sleep_if_idle(301, 300)
+        self.assertIsNone(paper.mode)
 
     def test_fast_and_partial_updates_share_the_full_refresh_limit(self):
         paper = epaper.Paper.__new__(epaper.Paper)

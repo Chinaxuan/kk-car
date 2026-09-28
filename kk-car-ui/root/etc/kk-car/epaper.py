@@ -47,6 +47,8 @@ MENU = (
 )
 REFRESH_CHOICES = (60, 180, 300, 600)
 MAX_QUICK_UPDATES = 5  # conservative fallback; V2 vendor recommends full refresh after five updates
+IDLE_REFRESH_SECONDS = 300
+CLIENT_POLL_SECONDS = 2
 STATUS_PATH = Path('/tmp/kk-car-epaper-status.json')
 FRAME_PATH = Path('/tmp/kk-car-epaper-frame.json')
 SETTINGS_PATH = Path('/etc/kk-car/private/epaper-settings.json')
@@ -79,6 +81,40 @@ def read_status():
     except (OSError, ValueError, subprocess.SubprocessError):
         ups = {}
     return car, ups
+
+
+def connected_terminals():
+    """Count authorized AP stations and a live LAN cable; unknown means normal timing."""
+    try:
+        ap = subprocess.run(['ubus', '-t', '2', 'call', 'hostapd.phy0-ap0', 'get_clients'],
+                            capture_output=True, text=True, timeout=3)
+        if ap.returncode:
+            return None
+        stations = json.loads(ap.stdout).get('clients')
+        if not isinstance(stations, dict):
+            return None
+        count = sum(isinstance(item, dict) and item.get('authorized') is True
+                    for item in stations.values())
+        mode = subprocess.run(['uci', '-q', 'get', 'network.kk_ethwan.auto'],
+                              capture_output=True, text=True, timeout=2)
+        if mode.returncode:
+            return None
+        if mode.stdout.strip() != '1' and Path('/sys/class/net/eth0/carrier').read_text().strip() == '1':
+            count += 1
+        return count
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def display_timing(settings, clients):
+    """Keep explicit longer periods; never enter idle mode on a failed probe."""
+    idle = clients == 0
+    return (max(settings['refresh_seconds'], IDLE_REFRESH_SECONDS) if idle else settings['refresh_seconds'],
+            max(settings['sleep_seconds'], IDLE_REFRESH_SECONDS) if idle else settings['sleep_seconds'], idle)
+
+
+def joined_since(previous, current):
+    return previous == 0 and isinstance(current, int) and current > 0
 
 
 def read_aux():
@@ -944,8 +980,8 @@ class Paper:
             self.fast_prepared = False
             self.partials = 0
 
-    def sleep_if_idle(self, now):
-        if self.mode and now - self.touched > self.sleep_seconds:
+    def sleep_if_idle(self, now, delay=None):
+        if self.mode and now - self.touched > (self.sleep_seconds if delay is None else delay):
             self.sleep()
 
     def close(self):
@@ -957,7 +993,7 @@ class Paper:
             self.gpio.release()
 
 
-def write_status(console, state, mode, paper=None, error=None, key_counts=None):
+def write_status(console, state, mode, paper=None, error=None, key_counts=None, presence=None):
     payload = {'view': console.view, 'page': console.page + 1,
                'selected': console.selected + 1 if console.view == 'menu' else None,
                'refresh_seconds': console.refresh, 'refresh_mode': mode,
@@ -966,9 +1002,25 @@ def write_status(console, state, mode, paper=None, error=None, key_counts=None):
                'partial_count': paper.partials if paper else 0,
                'state': state, 'updated': int(time.time()), 'error': error,
                'key_counts': key_counts or [0, 0, 0, 0]}
+    if presence:
+        payload.update(presence)
     staging = STATUS_PATH.with_suffix('.tmp')
     staging.write_text(json.dumps(payload))
     staging.replace(STATUS_PATH)
+
+
+def write_presence_status(presence):
+    """Expose a timing transition without pretending the display was redrawn."""
+    try:
+        payload = json.loads(STATUS_PATH.read_text())
+        if not isinstance(payload, dict):
+            return
+        payload.update(presence)
+        staging = STATUS_PATH.with_suffix('.tmp')
+        staging.write_text(json.dumps(payload))
+        staging.replace(STATUS_PATH)
+    except (OSError, ValueError, TypeError):
+        pass
 
 
 def write_frame(console, image):
@@ -1042,6 +1094,10 @@ def main():
     last_periodic = 0
     last_pending_read = 0
     last_settings_read = 0
+    last_client_poll = -CLIENT_POLL_SECONDS
+    clients = None
+    last_known_clients = None
+    last_presence = None
     last_navigation = time.monotonic()
     refresh_request = ''
     last_counters = None
@@ -1050,6 +1106,27 @@ def main():
     try:
         while True:
             now = time.monotonic()
+            joined = False
+            if now - last_client_poll >= CLIENT_POLL_SECONDS:
+                detected = connected_terminals()
+                if detected is not None:
+                    joined = joined_since(last_known_clients, detected)
+                    if joined:
+                        redraw = 'gray'
+                        last_navigation = now
+                    clients = detected
+                    last_known_clients = detected
+                else:
+                    clients = None
+                last_client_poll = now
+                effective_refresh, effective_sleep, idle = display_timing(console.settings, clients)
+                presence = {'connected_terminals': clients, 'idle_mode': idle,
+                            'effective_refresh_seconds': effective_refresh,
+                            'effective_sleep_seconds': effective_sleep}
+                presence_state = (clients, effective_refresh, effective_sleep)
+                if presence_state != last_presence:
+                    write_presence_status(presence)
+                    last_presence = presence_state
             if now - last_settings_read >= 1:
                 if console.reload_settings():
                     redraw = 'gray'
@@ -1077,9 +1154,10 @@ def main():
                         if requested:
                             redraw = requested
                 levels[pin] = level
-            periodic = now - last_periodic >= console.refresh
+            effective_refresh, effective_sleep, idle = display_timing(console.settings, clients)
+            periodic = now - last_periodic >= effective_refresh
             auto_page = console.settings['auto_page_seconds']
-            if auto_page and console.view == 'pages' and now - last_navigation >= auto_page:
+            if auto_page and not idle and console.view == 'pages' and now - last_navigation >= auto_page:
                 console.page = (console.page + 1) % len(PAGES)
                 last_navigation = now
                 redraw = 'gray'
@@ -1100,20 +1178,20 @@ def main():
                     mode = args.mode
                 try:
                     actual = paper.display(image, mode)
-                    write_status(console, 'ok', actual, paper, key_counts=counts)
+                    write_status(console, 'ok', actual, paper, key_counts=counts, presence=presence)
                     try:
                         write_frame(console, image)
                     except OSError:
                         pass  # A failed web preview must never interrupt the panel.
                 except (OSError, TimeoutError, ValueError) as exc:
-                    write_status(console, 'error', mode, paper, str(exc), counts)
+                    write_status(console, 'error', mode, paper, str(exc), counts, presence)
                     raise
                 redraw = None
-                if periodic:
+                if periodic or joined:
                     last_periodic = time.monotonic()
                 if args.once:
                     return
-            paper.sleep_if_idle(time.monotonic())
+            paper.sleep_if_idle(time.monotonic(), effective_sleep)
             time.sleep(.06)
     finally:
         paper.close()
