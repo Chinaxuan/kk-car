@@ -654,9 +654,9 @@ def render(console, car, ups, rates=None, aux=None):
     draw.rectangle((0, 0, WIDTH - 1, 31), fill=0)
     title = PAGES[console.page] if console.view == 'pages' else {
         'menu': 'SETTINGS', 'confirm': 'CONFIRM', 'pending': 'PENDING', 'result': 'RESULT'}[console.view]
-    # Three visual columns: page identity, time, and power. Center both lines
-    # in the first two columns; keep the power lines on one right edge.
-    page_center, time_center = 42, 128
+    # Three visual columns: a shared left edge for the page label and markers,
+    # a centered clock/date, and one right edge for the power lines.
+    page_left, time_center = 4, 128
     clock = time.strftime('%H:%M')
     clock_face = font(26)
     draw.text((time_center - draw.textlength(clock, font=clock_face) / 2, -7),
@@ -664,22 +664,19 @@ def render(console, car, ups, rates=None, aux=None):
     date = time.strftime('%Y/%m/%d')
     draw.text((time_center - draw.textlength(date, font=small) / 2, 17),
               date, fill=255, font=small)
-    page_title = fitted(draw, title, font(12), 74)
-    draw.text((page_center - draw.textlength(page_title, font=font(12)) / 2, 3),
-              page_title, fill=255, font=font(12))
+    title_face = font(13)
+    page_title = fitted(draw, title, title_face, 80)
+    draw.text((page_left, 3), page_title, fill=255, font=title_face)
     if console.view == 'pages':
         # Filled current page, hollow others: hard black/white edges survive fast refresh.
-        dot_size, dot_gap = 6, 4
-        dot_span = len(PAGES) * dot_size + (len(PAGES) - 1) * dot_gap
-        dot_start = page_center - dot_span // 2
+        dot_size, dot_gap = 7, 5
         for index in range(len(PAGES)):
-            x = dot_start + index * (dot_size + dot_gap)
-            draw.rectangle((x, 22, x + dot_size - 1, 27),
+            x = page_left + index * (dot_size + dot_gap)
+            draw.rectangle((x, 21, x + dot_size - 1, 27),
                            fill=255 if index == console.page else 0, outline=255)
     else:
         page_no = f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
-        draw.text((page_center - draw.textlength(page_no, font=small) / 2, 17),
-                  page_no, fill=255, font=small)
+        draw.text((page_left, 17), page_no, fill=255, font=small)
     charge, state = battery_header(ups)
     power = charging_power(ups)
     if power:
