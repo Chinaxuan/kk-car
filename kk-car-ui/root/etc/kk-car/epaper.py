@@ -650,31 +650,34 @@ def render(console, car, ups, rates=None, aux=None):
     rates, aux = rates or {}, aux or {}
     image = Image.new('L', (WIDTH, HEIGHT), 255)
     draw = CrispDraw(image)
-    small, value_font, title_font = font(11), font(14), font(19)
+    small, value_font = font(11), font(14)
     draw.rectangle((0, 0, WIDTH - 1, 31), fill=0)
     title = PAGES[console.page] if console.view == 'pages' else {
         'menu': 'SETTINGS', 'confirm': 'CONFIRM', 'pending': 'PENDING', 'result': 'RESULT'}[console.view]
-    draw.text((7, 0), 'KK-CAR', fill=255, font=title_font)
-    stamp = time.strftime('%m/%d %H:%M')
-    draw.text(((WIDTH - draw.textlength(stamp, font=font(14))) / 2, 2), stamp,
-              fill=255, font=font(14))
+    # Three fixed header columns keep time, page identity and power separate.
+    clock = time.strftime('%H:%M')
+    draw.text((7, -3), clock, fill=255, font=font(23))
+    draw.text((7, 17), time.strftime('%Y/%m/%d'), fill=255, font=small)
+    middle_x, middle_width = 76, 91
+    page_title = fitted(draw, title, font(12), middle_width)
+    draw.text((middle_x + (middle_width - draw.textlength(page_title, font=font(12))) / 2, 0),
+              page_title, fill=255, font=font(12))
+    page_no = f'{console.page + 1} / {len(PAGES)}' if console.view == 'pages' else f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
+    draw.text((middle_x + (middle_width - draw.textlength(page_no, font=small)) / 2, 17),
+              page_no, fill=255, font=small)
     charge, state = battery_header(ups)
     power = charging_power(ups)
     if power:
         charge = power + ' ' + charge
-    # A wide charging value must not run into the centered date/time.
-    stamp_right = (WIDTH + draw.textlength(stamp, font=font(14))) / 2
-    charge_font = next((face for face in (font(14), font(12), font(11))
-                        if WIDTH - 7 - draw.textlength(charge, font=face) >= stamp_right + 4),
-                       font(11))
-    draw.text((WIDTH - 7 - draw.textlength(charge, font=charge_font), 2), charge,
-              fill=255, font=charge_font)
-    draw.text((7, 18), fitted(draw, title, small, 205), fill=255, font=small)
-    page_no = f'{console.page + 1} / {len(PAGES)}' if console.view == 'pages' else f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
-    draw.text(((WIDTH - draw.textlength(page_no, font=small)) / 2, 18), page_no,
-              fill=255, font=small)
-    draw.text((WIDTH - 7 - draw.textlength(state, font=small), 18), state,
-              fill=255, font=small)
+    right_width = 86
+    charge_font = next((face for face in (font(12), small, font(10))
+                        if draw.textlength(charge, font=face) <= right_width), font(10))
+    charge = fitted(draw, charge, charge_font, right_width)
+    draw.text((WIDTH - 7 - draw.textlength(charge, font=charge_font), 1),
+              charge, fill=255, font=charge_font)
+    state = fitted(draw, state, font(10), right_width)
+    draw.text((WIDTH - 7 - draw.textlength(state, font=font(10)), 18),
+              state, fill=255, font=font(10))
     controls = None
     if console.view == 'pages':
         items = metrics(console.page, car, ups, rates, aux)

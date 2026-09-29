@@ -345,18 +345,43 @@ class EpaperTests(unittest.TestCase):
 
         with patch.object(epaper.CrispDraw, 'text', record):
             epaper.render(epaper.Console(), {}, ups)
-        date = next((xy, text, face) for xy, text, face in calls
-                    if '/' in text and ':' in text and xy[1] == 2)
+        page_title = next((xy, text, face) for xy, text, face in calls
+                          if text == 'OVERVIEW' and xy[1] == 0)
         power = next((xy, text, face) for xy, text, face in calls
                      if '~2.1W' in text)
         self.assertEqual(power[1], '~2.1W ~95%')
         self.assertGreaterEqual(power[0][0],
-                                date[0][0] + draw.textlength(date[1], font=date[2]) + 4)
+                                page_title[0][0] + draw.textlength(page_title[1], font=page_title[2]) + 4)
         ups['input']['external'] = False
         self.assertIsNone(epaper.charging_power(ups))
         ups['input']['external'] = True
         ups['sensors']['battery']['conversion_ready'] = False
         self.assertIsNone(epaper.charging_power(ups))
+
+    def test_header_has_large_time_full_date_and_centered_page(self):
+        calls = []
+        original = epaper.CrispDraw.text
+
+        def record(target, xy, content, **kwargs):
+            calls.append((xy, content, kwargs.get('font')))
+            return original(target, xy, content, **kwargs)
+
+        with patch.object(epaper.time, 'strftime', side_effect=lambda fmt: {
+                '%H:%M': '23:59', '%Y/%m/%d': '2026/09/30'}[fmt]), \
+                patch.object(epaper.CrispDraw, 'text', record):
+            for page in range(len(epaper.PAGES)):
+                console = epaper.Console()
+                console.page = page
+                epaper.render(console, {}, {})
+            console.view = 'menu'
+            epaper.render(console, {}, {})
+        clock = next((xy, content, face) for xy, content, face in calls if content == '23:59')
+        date = next((xy, content, face) for xy, content, face in calls if content == '2026/09/30')
+        self.assertEqual((clock[0], date[0]), ((7, -3), (7, 17)))
+        self.assertGreater(clock[2].size, date[2].size)
+        self.assertLessEqual(7 + epaper.CrispDraw(Image.new('L', (264, 176))).textlength(date[1], font=date[2]), 75)
+        self.assertTrue(any(text == 'SETTINGS' and xy[1] == 0 for xy, text, _ in calls))
+        self.assertTrue(any(text == '6 / 6' and xy[1] == 17 for xy, text, _ in calls))
 
     def test_battery_header_estimates_charge_and_discharge_without_percentage(self):
         ups = {'ok': True,
