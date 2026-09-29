@@ -377,11 +377,21 @@ class EpaperTests(unittest.TestCase):
             epaper.render(console, {}, {})
         clock = next((xy, content, face) for xy, content, face in calls if content == '23:59')
         date = next((xy, content, face) for xy, content, face in calls if content == '2026/09/30')
-        self.assertEqual((clock[0], date[0]), ((7, -3), (7, 17)))
+        self.assertEqual((clock[0], date[0]), ((2, -7), (7, 17)))
         self.assertGreater(clock[2].size, date[2].size)
         self.assertLessEqual(7 + epaper.CrispDraw(Image.new('L', (264, 176))).textlength(date[1], font=date[2]), 75)
-        self.assertTrue(any(text == 'SETTINGS' and xy[1] == 0 for xy, text, _ in calls))
-        self.assertTrue(any(text == '6 / 6' and xy[1] == 17 for xy, text, _ in calls))
+        draw = epaper.CrispDraw(Image.new('L', (264, 176)))
+        titles = [(xy, text, face) for xy, text, face in calls
+                  if xy[1] == 0 and text in epaper.PAGES + ('SETTINGS',)]
+        self.assertEqual(len(titles), len(epaper.PAGES) + 1)
+        for xy, text, face in titles:
+            self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, epaper.WIDTH / 2)
+            self.assertLess(xy[0] + draw.textlength(text, font=face), 171)
+        numbers = [(xy, text, face) for xy, text, face in calls
+                   if xy[1] == 17 and (text.endswith(' / 6') or text == '1/17')]
+        self.assertEqual(len(numbers), len(epaper.PAGES) + 1)
+        for xy, text, face in numbers:
+            self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, epaper.WIDTH / 2)
 
     def test_battery_header_estimates_charge_and_discharge_without_percentage(self):
         ups = {'ok': True,

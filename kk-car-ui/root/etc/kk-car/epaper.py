@@ -654,16 +654,15 @@ def render(console, car, ups, rates=None, aux=None):
     draw.rectangle((0, 0, WIDTH - 1, 31), fill=0)
     title = PAGES[console.page] if console.view == 'pages' else {
         'menu': 'SETTINGS', 'confirm': 'CONFIRM', 'pending': 'PENDING', 'result': 'RESULT'}[console.view]
-    # Three fixed header columns keep time, page identity and power separate.
+    # Keep the clock near the edge and center page identity on the actual panel.
     clock = time.strftime('%H:%M')
-    draw.text((7, -3), clock, fill=255, font=font(23))
+    draw.text((2, -7), clock, fill=255, font=font(26))
     draw.text((7, 17), time.strftime('%Y/%m/%d'), fill=255, font=small)
-    middle_x, middle_width = 76, 91
-    page_title = fitted(draw, title, font(12), middle_width)
-    draw.text((middle_x + (middle_width - draw.textlength(page_title, font=font(12))) / 2, 0),
+    page_title = fitted(draw, title, font(12), 74)
+    draw.text(((WIDTH - draw.textlength(page_title, font=font(12))) / 2, 0),
               page_title, fill=255, font=font(12))
     page_no = f'{console.page + 1} / {len(PAGES)}' if console.view == 'pages' else f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
-    draw.text((middle_x + (middle_width - draw.textlength(page_no, font=small)) / 2, 17),
+    draw.text(((WIDTH - draw.textlength(page_no, font=small)) / 2, 17),
               page_no, fill=255, font=small)
     charge, state = battery_header(ups)
     power = charging_power(ups)
