@@ -10,7 +10,7 @@ cb869b6eb9d2999495a78aafac78f3b62b6058c9dbe87339459039639926aae2  docs/DEPLOYMEN
 5888e864abaceb7b135ac32823e4648ae73f2cfda47d7d7955515ae273bf3330  docs/DJI-BENCHMARK.md
 2cd7829df2137b75041654fd5865740b65c0f7cf7fcfd22b8b1db99d440c60eb  docs/DJI-CONTROL.md
 981f18e9cdd432a4b7f28f2bc58edf1b71314220bee5ed542e53f084a2692709  docs/DJI-QMI.md
-b4397edc0a1a892b184b3f60cdd7e231c05fe0c79dfaabe23163872e07e57046  docs/EPAPER.md
+b032902efbc2d9f0450e168a8de12b9823f89a3334570903742e085122831a51  docs/EPAPER.md
 39cfc530045e0d099820069b87e652a60e186dbcb47e779ba3ba129cae1191b4  docs/FAULT-LOG.md
 615a35f0efd9f3b904304a6ef19395467cc40ee28f13c8ddce5e43535b0b65b5  docs/HDMI.md
 8451cf1db445fddab2a73d163961789d9207ff4c270c2bf71e67a123f8f5a3af  docs/NETWORK-HEALTH.md
@@ -19,7 +19,7 @@ b4397edc0a1a892b184b3f60cdd7e231c05fe0c79dfaabe23163872e07e57046  docs/EPAPER.md
 004f0e8740746e61ef20b9e705132724f63e85a368ecd3ab32658b2eb8105f6f  docs/SETTINGS.md
 821afc7b593bacf4987af0dbe70bea628eaa514096968f3e3847a2fc1ac573cd  docs/UPS.md
 c7bfe787e96657e8dddbf65bc96e6694fc124340c3614db01bb8bc0301396d9b  docs/USAGE.md
-954338800e6b730094aaeb2337f2c6681000518a1138908ee0af994d8c3cfe53  docs/VALIDATION.md
+b21d3086c16e5db63b6ac88785dee9795eddeec206259cac26980dd6c50df30e  docs/VALIDATION.md
 9a8ae85e5fcd0506c0adf8ba25a3f3801ffb1a7bc1c103b35f837ec33049782b  docs/VOICE-CALLS.md
 2744e4500a9a765b282c5d05c667dfa5ace2dd4371b3cc059908cd413e743d09  docs/packages-reference.txt
 4608a04c02d05fda7b6b965c12ce65e69a1a55f060f98770cdd3740678dc979b  kk-car-ui/README.md
@@ -62,7 +62,7 @@ b5f78b3ce2dc8076600fe232b654284730419fef5367353c6e87a1656e18fdfc  kk-car-ui/root
 6b4f83aa8989d58543dac5147fdd2f74708a2e3ab1a9cfc1fe091a6c526ad8d8  kk-car-ui/root/etc/kk-car/dji-voice-prepare.sh
 e1311a2ed4c785b65a83d92b4370db4e9e8bb574f06f54a3ad6c2123c909fb66  kk-car-ui/root/etc/kk-car/dji-voice-route.sh
 d736b29bbf94f2ef134f3a054b975eda52850bc7b77cbe75863a4f137bb43e46  kk-car-ui/root/etc/kk-car/dji-voice-watch.sh
-28acbea6eebe6a8536855976d9ad313cdd1561c6b75cb6d2fecde702e09627c0  kk-car-ui/root/etc/kk-car/epaper.py
+a9c0730c2d29ec3e505d589713d0a85e0b5c14c4c647d51c14bddf7633bef7be  kk-car-ui/root/etc/kk-car/epaper.py
 579bc3190d5c5d6edd4dae94d347c9fcaf3b4a65cb4ea1c10657559a3870533d  kk-car-ui/root/etc/kk-car/epaper_lut.py
 994414047df66bb4998d01c1cb1eeb4a2ddc4622d1aa56bbb8adbeca7645b041  kk-car-ui/root/etc/kk-car/fonts/AtkinsonHyperlegibleNext-Bold.ttf
 a9a701eb18cbd5f786f28f986c16895ffc0d0337e4a9a63131b619d9542e07d4  kk-car-ui/root/etc/kk-car/fonts/Blinker-SemiBold.ttf
@@ -144,7 +144,7 @@ be86dd4bf718319490ef38a7011034b8a7409399b041a742f7f40677610d1af1  kk-car-ui/test
 0739da6863a69e2db858d91782d0a1146c2521d55af9fe7b02aa81e175b22434  kk-car-ui/tests/notifications.py
 ab054429cecfd237e2f7d3d2c5394c9afab52a5bd85ecb6037659c5c8a99f5d9  kk-car-ui/tests/test-battery-runtime.js
 85e5d8ff0361bcf6b5bf305d9bc4a9fc92624bb2a8865beb5413637532734086  kk-car-ui/tests/test-diagnostics.py
-cf3b4919ee9e543c62e48bc26bcd01639bf0ac0d65c7f939cdc05f2992e126b5  kk-car-ui/tests/test-epaper.py
+0d19782c2f66d7934ca0db984096240a08e0508c710e952b31007d148a83bcd0  kk-car-ui/tests/test-epaper.py
 4a223ef74b6af237b2873e9332d668385522ee91e79da35289c4d98ad5ec7410  kk-car-ui/tests/test-network-health.py
 a23704c4fb548a604e48c8e2e98518d634fe7f83d05efe94d1e22c3dd8abe3e6  kk-car-ui/tests/test-ups-history.py
 ebd45ff9dbe843d0864ed09b0621f3e2e0da1ad1ec03119b3bfafc7ca6002052  kk-car-ui/tests/uplink-model.py

@@ -657,18 +657,18 @@ def render(console, car, ups, rates=None, aux=None):
     # Keep the clock near the edge and center page identity on the actual panel.
     clock = time.strftime('%H:%M')
     draw.text((2, -7), clock, fill=255, font=font(26))
-    draw.text((7, 17), time.strftime('%Y/%m/%d'), fill=255, font=small)
+    draw.text((2, 17), time.strftime('%Y/%m/%d'), fill=255, font=small)
     page_title = fitted(draw, title, font(12), 74)
-    draw.text(((WIDTH - draw.textlength(page_title, font=font(12))) / 2, 1),
+    draw.text(((WIDTH - draw.textlength(page_title, font=font(12))) / 2, 6),
               page_title, fill=255, font=font(12))
     if console.view == 'pages':
         # Filled current page, hollow others: hard black/white edges survive fast refresh.
-        dot_size, dot_gap = 6, 6
+        dot_size, dot_gap = 6, 4
         dot_span = len(PAGES) * dot_size + (len(PAGES) - 1) * dot_gap
         dot_start = (WIDTH - dot_span) // 2
         for index in range(len(PAGES)):
             x = dot_start + index * (dot_size + dot_gap)
-            draw.rectangle((x, 22, x + dot_size - 1, 27),
+            draw.rectangle((x, 21, x + dot_size - 1, 26),
                            fill=255 if index == console.page else 0, outline=255)
     else:
         page_no = f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
@@ -678,15 +678,18 @@ def render(console, car, ups, rates=None, aux=None):
     power = charging_power(ups)
     if power:
         charge = power + ' ' + charge
-    right_width = 86
-    charge_font = next((face for face in (font(12), small, font(10))
-                        if draw.textlength(charge, font=face) <= right_width), font(10))
-    charge = fitted(draw, charge, charge_font, right_width)
-    draw.text((WIDTH - 7 - draw.textlength(charge, font=charge_font), 1),
+    right_edge = WIDTH - 3
+    charge_width, state_width = 91, 97
+    charge_font = next((face for face in (font(15), font(14), font(13), font(12), small, font(10))
+                        if draw.textlength(charge, font=face) <= charge_width), font(10))
+    charge = fitted(draw, charge, charge_font, charge_width)
+    draw.text((right_edge - draw.textlength(charge, font=charge_font), 0),
               charge, fill=255, font=charge_font)
-    state = fitted(draw, state, font(10), right_width)
-    draw.text((WIDTH - 7 - draw.textlength(state, font=font(10)), 18),
-              state, fill=255, font=font(10))
+    state_font = next((face for face in (font(13), font(12), small, font(10))
+                       if draw.textlength(state, font=face) <= state_width), font(10))
+    state = fitted(draw, state, state_font, state_width)
+    draw.text((right_edge - draw.textlength(state, font=state_font), 17),
+              state, fill=255, font=state_font)
     controls = None
     if console.view == 'pages':
         items = metrics(console.page, car, ups, rates, aux)
