@@ -52,7 +52,7 @@ return view.extend({
     render:function(data){
         var self=this;
         document.title='KK-Car · DJI 4G';
-        ['overview','dji-console-v2'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')+'?v=20260925-ui2'}));});
+        ['overview','dji-console-v2'].forEach(function(name){var id='kk-css-'+name;if(!document.getElementById(id))document.head.appendChild(E('link',{id:id,rel:'stylesheet',href:L.resource('view/kkcar/'+name+'.css')+'?v=20260930-gps'}));});
         this.notice=E('div',{'class':'kk-notice',role:'status','aria-live':'polite',hidden:true});
         this.summary=E('strong',{id:'kk-dji-summary'},'读取中');
         this.refreshButton=button('刷新状态',function(){self.refresh(true);});
@@ -178,8 +178,19 @@ return view.extend({
                     E('p',{'class':'kk-dji-note',id:'kk-dji-audio-quality'},'通话音频缓冲：待连接'),
                     E('p',{'class':'kk-dji-note'},'请从 HTTPS 管理页使用，并允许浏览器访问麦克风。一次 15–30 秒双向通话已通过；长期稳定性尚未验收，请勿用于紧急联络。')
                 ],'kk-dji-phone-card','kk-dji-phone-section'),
-                card('定位','定位功能取决于模块固件和天线，首次锁定可能需要一段时间。',[
-                    E('div',{'class':'kk-dji-rows'},[row('GPS 状态','kk-dji-gps-state'),row('定位结果','kk-dji-gps-fix'),row('经纬度','kk-dji-gps-coords'),row('速度','kk-dji-gps-speed'),row('更新时间','kk-dji-gps-time')]),
+                card('卫星定位','显示模块实时返回的搜星、定位和逐星数据；搜到卫星不代表已经定位。',[
+                    E('div',{'class':'kk-dji-gps-highlights'},[
+                        E('div',{},[E('span',{},'本次读到卫星'),E('strong',{id:'kk-dji-gps-visible'},'—'),E('small',{id:'kk-dji-gps-reported'},'等待搜星数据')]),
+                        E('div',{},[E('span',{},'参与定位'),E('strong',{id:'kk-dji-gps-used'},'—'),E('small',{id:'kk-dji-gps-mode'},'等待 GSA 状态')]),
+                        E('div',{},[E('span',{},'最强卫星信号'),E('strong',{id:'kk-dji-gps-strongest'},'—'),E('small',{id:'kk-dji-gps-average'},'C/N₀ · dB-Hz')])
+                    ]),
+                    E('div',{'class':'kk-dji-gps-details'},[
+                        E('div',{'class':'kk-dji-rows'},[row('GNSS 状态','kk-dji-gps-state'),row('定位结果','kk-dji-gps-fix'),row('卫星系统','kk-dji-gps-systems'),row('经纬度','kk-dji-gps-coords'),row('高度','kk-dji-gps-altitude'),row('速度 / 航向','kk-dji-gps-speed'),row('HDOP / PDOP / VDOP','kk-dji-gps-dop'),row('采样时间','kk-dji-gps-time')])
+                    ]),
+                    E('div',{'class':'kk-dji-gps-sky'},[
+                        E('div',{'class':'kk-dji-gps-sky-head'},[E('h3',{},'逐星信号'),E('span',{},'编号 · C/N₀ · 仰角 · 方位角')]),
+                        E('div',{id:'kk-dji-gps-sky-list','class':'kk-dji-gps-sky-list'},'尚未读取卫星列表')
+                    ]),
                     E('div',{'class':'kk-dji-actions'},[this.gpsStartButton,this.gpsStopButton,this.gpsProbeButton]),
                     E('p',{'class':'kk-dji-note',id:'kk-dji-gps-note'},'尚未检测定位能力。')
                 ]),
@@ -407,19 +418,45 @@ return view.extend({
         this.el('kk-dji-sms-note').textContent=!smsReadAvailable&&!smsSendAvailable?'当前固件或控制服务未开放短信功能。':
             (used!=null&&capacity!=null&&Number(used)>=Number(capacity)?smsPlace+'已满，新短信可能无法接收。请先备份并清理旧短信。 ':smsPlace+'保存原件；树莓派在运行时把完整短信加密归档到 SD 卡。 ')+
             (forward.error?'归档/推送提醒：'+forward.error+'。':forward.enabled?'新短信正文转发飞书已开启'+(forward.pending?'，待重试 '+forward.pending+' 条':'')+'。':'新短信飞书转发已关闭，可在“飞书推送”中开启。');
-        var liveGps=this.liveGps || {},gpsSupported=gps.supported===true, gpsControl=caps.gps===true,
+        var liveGps=this.liveGps || {},sky=liveGps.sky || {},gpsSupported=gps.supported===true, gpsControl=caps.gps===true,
             gpsEnabled=liveGps.ok===true?liveGps.enabled===true:gps.enabled===true,
             fix=liveGps.ok===true && liveGps.fix===true;
         this.set('kk-dji-gps-state',!gpsSupported?'暂不可用':gpsEnabled?'已启动':'已关闭');
         this.set('kk-dji-gps-fix',!gpsSupported?'未检测':fix?'已定位':gpsEnabled?'等待卫星定位':'未启动');
+        this.set('kk-dji-gps-visible',gpsEnabled && sky.available===true?sky.visible_count:null);
+        this.set('kk-dji-gps-reported',gpsEnabled && sky.available===true?'模块报告 '+shown(sky.reported_visible)+' 颗'+(sky.partial?' · 列表未收齐':''):'等待 GSV 卫星列表');
+        this.set('kk-dji-gps-used',gpsEnabled?sky.used_count:null);
+        this.set('kk-dji-gps-mode',!gpsEnabled?'定位未启动':sky.fix_mode===3?'3D 定位':sky.fix_mode===2?'2D 定位':sky.fix_mode===1?'尚未定位':'等待 GSA 状态');
+        this.set('kk-dji-gps-strongest',gpsEnabled && sky.strongest_cn0_dbhz!=null?sky.strongest_cn0_dbhz+' dB-Hz':null);
+        this.set('kk-dji-gps-average',gpsEnabled && sky.average_cn0_dbhz!=null?'平均 '+metric(sky.average_cn0_dbhz,' dB-Hz',1):'C/N₀ · dB-Hz');
+        this.set('kk-dji-gps-systems',gpsEnabled && Array.isArray(sky.systems) && sky.systems.length?sky.systems.join(' / '):null);
         this.set('kk-dji-gps-coords',fix?metric(liveGps.lat,'',5)+', '+metric(liveGps.lon,'',5):null);
-        this.set('kk-dji-gps-speed',fix?metric(liveGps.speed_kmh,' km/h',1):null);
+        this.set('kk-dji-gps-altitude',fix?metric(liveGps.altitude_m,' m',1):null);
+        this.set('kk-dji-gps-speed',fix?metric(liveGps.speed_kmh,' km/h',1)+' / '+metric(liveGps.course_deg,'°',1):null);
+        this.set('kk-dji-gps-dop',gpsEnabled?metric(liveGps.hdop,'',1)+' / '+metric(sky.pdop,'',1)+' / '+metric(sky.vdop,'',1):null);
         this.set('kk-dji-gps-time',liveGps.ok===true?clock(liveGps.updated_at):null);
+        var satelliteList=this.el('kk-dji-gps-sky-list');
+        satelliteList.replaceChildren();
+        var satellites=gpsEnabled && Array.isArray(sky.satellites)?sky.satellites.slice(0,64):[];
+        satellites.sort(function(a,b){return (Number(b.cn0_dbhz)||0)-(Number(a.cn0_dbhz)||0);});
+        if(!satellites.length)satelliteList.textContent=!gpsEnabled?'启动定位后读取卫星列表。':sky.available===true?'模块尚未报告可见卫星。':'模块尚未返回 GSV 卫星数据。';
+        satellites.forEach(function(sat){
+            var cn=Number(sat.cn0_dbhz),known=sat.cn0_dbhz!=null && isFinite(cn),strength=known?Math.max(0,Math.min(100,cn/55*100)):0;
+            satelliteList.appendChild(E('div',{'class':'kk-dji-satellite'+(sat.used?' used':'')},[
+                E('div',{'class':'kk-dji-satellite-top'},[
+                    E('strong',{},shown(sat.system)+' '+shown(sat.prn)),
+                    E('span',{},sat.used?'参与定位':'可见'),
+                    E('b',{},known?cn+' dB-Hz':'无信号值')
+                ]),
+                E('div',{'class':'kk-dji-satellite-meter'},[E('i',{style:'width:'+strength+'%'},'')]),
+                E('small',{},'仰角 '+metric(sat.elevation_deg,'°',0)+' · 方位角 '+metric(sat.azimuth_deg,'°',0))
+            ]));
+        });
         this.gpsStartButton.hidden=!gpsControl || gpsEnabled;
         this.gpsStopButton.hidden=!gpsControl || !gpsEnabled;
         this.gpsStartButton.disabled=this.gpsStopButton.disabled=!gpsControl || this.operating===true;
         this.gpsProbeButton.disabled=!gpsControl || this.gpsLoading===true;
-        this.el('kk-dji-gps-note').textContent=!gpsSupported?'暂未检测到可用的定位命令。':!gpsControl?'定位命令可响应，但控制接口暂不可用。':fix?'卫星 '+shown(liveGps.satellites)+' 颗 · HDOP '+metric(liveGps.hdop,'',1)+'；当前页面显示，不自动保存轨迹。':gpsEnabled?'正在等待卫星定位；需要可用的 GNSS 天线和较开阔的天空，网络信号强不代表卫星信号好。':'可手动启动定位；开启不会重启蜂窝网络。';
+        this.el('kk-dji-gps-note').textContent=!gpsSupported?'暂未检测到可用的定位命令。':!gpsControl?'定位命令可响应，但控制接口暂不可用。':fix?'位置已锁定；坐标和逐星数据只在当前管理页面显示，不自动保存轨迹。':gpsEnabled?'搜星数据来自 GNSS 天线；即使有可见卫星，参与定位为 0 时仍没有可用坐标。请放到开阔天空下观察。':'可手动启动定位；开启不会重启蜂窝网络。';
         this.set('kk-dji-parity-device',available?'已接入':'模块未连通');
         this.set('kk-dji-parity-sms',smsReadAvailable?'已接入 · 点击单条读取':'当前不可用');
         this.set('kk-dji-parity-reconnect',caps.reconnect===true?'已接入':'当前不可用');

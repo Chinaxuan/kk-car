@@ -25,7 +25,13 @@ while IFS= read -r -d "$cr" command; do
             else printf '\r\n+QGPS: 0\r\n\r\nOK\r\n'; fi ;;
         'AT+QGPS=1') : > "$KK_CAR_SMS_MOCK_GPS"; printf '\r\nOK\r\n' ;;
         'AT+QGPSEND') rm -f "$KK_CAR_SMS_MOCK_GPS"; printf '\r\nOK\r\n' ;;
-        'AT+QGPSLOC=2') printf '\r\n+QGPSLOC: 061951.0,31.84537,117.19882,0.7,62.2,3,0.0,45.5,24.5,110513,09\r\n\r\nOK\r\n' ;;
+        'AT+QGPSGNMEA="GSV"') printf '\r\n+QGPSGNMEA: $GPGSV,1,1,04,38,50,120,34,40,35,220,34,41,65,080,35,50,42,310,34,1*00\r\n\r\nOK\r\n' ;;
+        'AT+QGPSGNMEA="GSA"')
+            if [ -f "$KK_CAR_SMS_MOCK_NOFIX" ]; then printf '\r\n+QGPSGNMEA: $GPGSA,A,1,,,,,,,,,,,,,,,,*32\r\n\r\nOK\r\n';
+            else printf '\r\n+QGPSGNMEA: $GPGSA,A,3,38,40,41,50,,,,,,,,,1.8,0.9,1.6*00\r\n\r\nOK\r\n'; fi ;;
+        'AT+QGPSLOC=2')
+            if [ -f "$KK_CAR_SMS_MOCK_NOFIX" ]; then printf '\r\n+CME ERROR: 516\r\n';
+            else printf '\r\n+QGPSLOC: 061951.0,31.84537,117.19882,0.7,62.2,3,0.0,45.5,24.5,110513,09\r\n\r\nOK\r\n'; fi ;;
         'AT+CLCC') printf '\r\n+CLCC: 1,1,0,1,1,"",128\r\n+CLCC: 2,1,4,0,0\r\n\r\nOK\r\n' ;;
         'AT+QCFG="usbcfg"') printf '\r\n+QCFG: "usbcfg",11308,293,1,1,1,1,1,0,0\r\n\r\nOK\r\n' ;;
         'AT+QCFG="ims"') printf '\r\n+QCFG: "ims",0\r\n\r\nOK\r\n' ;;
@@ -54,7 +60,7 @@ while IFS= read -r -d "$cr" command; do
 done
 EOF
 chmod 700 "$dir/mock.sh"
-export KK_CAR_SMS_MOCK_DELETE="$dir/deleted" KK_CAR_SMS_MOCK_SENT="$dir/sent" KK_CAR_SMS_MOCK_GPS="$dir/gps-on"
+export KK_CAR_SMS_MOCK_DELETE="$dir/deleted" KK_CAR_SMS_MOCK_SENT="$dir/sent" KK_CAR_SMS_MOCK_GPS="$dir/gps-on" KK_CAR_SMS_MOCK_NOFIX="$dir/gps-nofix"
 export KK_CAR_SMS_TEST_WORK="$dir/work"
 socat PTY,link="$dir/tty",raw,echo=0 EXEC:"$dir/mock.sh",pty,raw,echo=0 > "$dir/socat.log" 2>&1 & peer=$!
 attempt=0
@@ -124,6 +130,16 @@ printf '%s\n' "$gps" | grep -q '"enabled": false'
 gps=$(ucode "$script" gps_start)
 printf '%s\n' "$gps" | grep -q '"fix": true'
 printf '%s\n' "$gps" | grep -q '"speed_kmh": 45.5'
+printf '%s\n' "$gps" | grep -q '"visible_count": 4'
+printf '%s\n' "$gps" | grep -q '"used_count": 4'
+printf '%s\n' "$gps" | grep -q '"strongest_cn0_dbhz": 35'
+printf '%s\n' "$gps" | grep -q '"altitude_m": 62.2'
+: > "$KK_CAR_SMS_MOCK_NOFIX"
+gps=$(ucode "$script" gps_probe)
+printf '%s\n' "$gps" | grep -q '"fix": false'
+printf '%s\n' "$gps" | grep -q '"visible_count": 4'
+printf '%s\n' "$gps" | grep -q '"used_count": 0'
+printf '%s\n' "$gps" | grep -q '"fix_mode": 1'
 gps=$(ucode "$script" gps_stop)
 printf '%s\n' "$gps" | grep -q '"enabled": false'
 

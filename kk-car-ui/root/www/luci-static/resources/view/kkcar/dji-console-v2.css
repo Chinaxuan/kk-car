@@ -211,6 +211,33 @@
 @media(max-width:900px){.kk-dji-overview-grid{grid-template-columns:1fr 1fr}.kk-dji-overview-block:last-child{grid-column:1/-1}}
 @media(max-width:600px){.kk-dji-overview-grid{grid-template-columns:1fr}.kk-dji-overview-block:last-child{grid-column:auto}.kk-dji-overview-block{min-height:155px}}
 
+.kk-dji-gps-highlights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.kk-dji-gps-highlights>div{min-width:0;padding:16px 18px;border:1px solid #3b5f69;border-radius:9px;background:linear-gradient(145deg,#17313a,#1a2a3b)}
+.kk-dji-gps-highlights span,.kk-dji-gps-highlights small{display:block;color:#a4bdca;font-size:11px}
+.kk-dji-gps-highlights strong{display:block;margin:6px 0 3px;color:#87e6d6;font-size:27px;line-height:1.15;font-variant-numeric:tabular-nums}
+.kk-dji-gps-highlights>div:nth-child(2) strong{color:#abc8ff}
+.kk-dji-gps-highlights>div:nth-child(3) strong{color:#ebc58b}
+.kk-dji-gps-details{margin-top:14px;padding:10px 16px;border:1px solid #34495b;border-radius:9px;background:#172332}
+.kk-dji-gps-details .kk-dji-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px}
+.kk-dji-gps-sky{margin-top:14px;padding:14px 16px;border:1px solid #34495b;border-radius:9px;background:#172332}
+.kk-dji-gps-sky-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.kk-dji-gps-sky-head h3{margin:0;color:#eff6fa;font-size:14px}
+.kk-dji-gps-sky-head span{color:#8da9bb;font-size:11px}
+.kk-dji-gps-sky-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;color:#9db3c4;font-size:12px}
+.kk-dji-satellite{min-width:0;padding:10px 12px;border:1px solid #385064;border-radius:8px;background:#1b2b3b}
+.kk-dji-satellite.used{border-color:#55a18d;background:#1b3438}
+.kk-dji-satellite-top{display:flex;align-items:baseline;gap:6px}
+.kk-dji-satellite-top strong{min-width:0;margin-right:auto;color:#e9f6f8;font-size:12px;white-space:nowrap}
+.kk-dji-satellite-top span{color:#8eacbc;font-size:10px;white-space:nowrap}
+.kk-dji-satellite.used .kk-dji-satellite-top span{color:#85e2bc}
+.kk-dji-satellite-top b{color:#8ce0d3;font-size:11px;white-space:nowrap}
+.kk-dji-satellite-meter{height:4px;margin:9px 0 6px;border-radius:99px;background:#33485a;overflow:hidden}
+.kk-dji-satellite-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4fb5b9,#9bedcb)}
+.kk-dji-satellite small{color:#95aebe;font-size:10px}
+@media(max-width:1100px){.kk-dji-gps-sky-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.kk-dji-gps-sky-list{grid-template-columns:repeat(2,minmax(0,1fr))}.kk-dji-gps-details .kk-dji-rows{grid-template-columns:1fr}}
+@media(max-width:520px){.kk-dji-gps-highlights{grid-template-columns:1fr 1fr}.kk-dji-gps-highlights>div:last-child{grid-column:1/-1}.kk-dji-gps-sky-list{grid-template-columns:1fr}.kk-dji-gps-sky-head{display:block}.kk-dji-gps-sky-head span{display:block;margin-top:3px}}
+
 /* Use the available monitor width and make the first view a scannable control desk. */
 body:has(.kk-dji) .container{max-width:none;width:100%;padding-inline:10px}
 .kk-dji>.kk-header{gap:16px}

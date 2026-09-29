@@ -345,6 +345,65 @@ function call_status(raw) {
 function voice_ready() {
     return system('/etc/kk-car/dji-voice-health.sh prepared >/dev/null 2>&1') == 0;
 }
+function nmea_number(s, min, max) {
+    if (!match(s || '', /^-?[0-9]+(\.[0-9]+)?$/)) return null;
+    let n=+s;
+    return n >= min && n <= max ? n : null;
+}
+function nmea_system(talker) {
+    return {GP:'GPS',GL:'GLONASS',GA:'Galileo',GB:'北斗',BD:'北斗',PQ:'北斗',GQ:'QZSS',GN:'多系统'}[talker] || talker;
+}
+function parse_gnss_sky(gsv_raw, gsa_raw) {
+    let satellites=[],seen={},reported={},pages={},page_totals={},used={},used_count=null,
+        fix_mode=null,pdop=null,hdop=null,vdop=null,sum=0,signals=0,strongest=null;
+    for (let line in split(gsa_raw || '',/\r?\n/)) {
+        let m=match(line,/^\+QGPSGNMEA:\s*\$([A-Z]{2})GSA,([A-Z0-9,.*-]+)\*[0-9A-Fa-f]{2}$/);
+        if (!m) continue;
+        let fields=split(m[2],',');
+        if (length(fields)<17 || !match(fields[1],/^[123]$/)) continue;
+        if (fix_mode==null || +fields[1]>fix_mode) fix_mode=+fields[1];
+        for (let i=2;i<14;i++) if (match(fields[i] || '',/^[0-9]{1,3}$/)) used[+fields[i]]=true;
+        pdop=nmea_number(fields[14],0,99);hdop=nmea_number(fields[15],0,99);
+        vdop=nmea_number(fields[16],0,99);
+    }
+    if (fix_mode!=null) { used_count=0; for (let prn in used) used_count++; }
+    for (let line in split(gsv_raw || '',/\r?\n/)) {
+        let m=match(line,/^\+QGPSGNMEA:\s*\$([A-Z]{2})GSV,([0-9,.*-]+)\*[0-9A-Fa-f]{2}$/);
+        if (!m) continue;
+        let fields=split(m[2],',');
+        if (length(fields)<3) continue;
+        let total=nmea_number(fields[0],1,16),page=nmea_number(fields[1],1,16),count=nmea_number(fields[2],0,99);
+        if (total==null || page==null || page>total || count==null) continue;
+        let talker=m[1];
+        reported[talker]=count;page_totals[talker]=total;pages[talker]=pages[talker] || {};
+        pages[talker][page]=true;
+        for (let i=3;i+3<length(fields) && length(satellites)<64;i+=4) {
+            let prn=nmea_number(fields[i],1,999);
+            if (prn==null || seen[talker+':'+prn]) continue;
+            seen[talker+':'+prn]=true;
+            let cn0=nmea_number(fields[i+3],0,99);
+            push(satellites,{system:nmea_system(talker),prn,
+                elevation_deg:nmea_number(fields[i+1],0,90),
+                azimuth_deg:nmea_number(fields[i+2],0,359),cn0_dbhz:cn0,
+                used:used[prn]==true});
+            if (cn0!=null) {sum+=cn0;signals++;if (strongest==null || cn0>strongest) strongest=cn0;}
+        }
+    }
+    let system_names=[],reported_total=0,incomplete=false;
+    for (let talker in reported) {
+        push(system_names,nmea_system(talker));
+        // A GN combined report may repeat satellites from individual systems.
+        if (talker!='GN') reported_total+=reported[talker];
+        for (let i=1;i<=page_totals[talker];i++) if (!pages[talker][i]) incomplete=true;
+    }
+    if (reported.GN!=null && (reported_total==0 || reported.GN>reported_total))
+        reported_total=reported.GN;
+    return {available:length(system_names)>0,visible_count:length(system_names)>0 ? length(satellites) : null,
+        reported_visible:length(system_names)>0 ? reported_total : null,used_count,fix_mode,
+        pdop,hdop,vdop,strongest_cn0_dbhz:strongest,
+        average_cn0_dbhz:signals ? int(sum/signals*10+0.5)/10 : null,
+        systems:system_names,partial:incomplete,satellites};
+}
 function perform(session, action, param) {
     if (action == 'storage_probe') {
         let response=at(session,'AT+CPMS=?',5);
@@ -494,8 +553,15 @@ function perform(session, action, param) {
             enabled=false;
         }
         let result={ok:true,supported:true,enabled,fix:false,lat:null,lon:null,
-            speed_kmh:null,hdop:null,satellites:null,updated_at:time()};
+            speed_kmh:null,hdop:null,satellites:null,altitude_m:null,course_deg:null,
+            sky:null,updated_at:time()};
         if (!enabled) return result;
+        // GSV/GSA are useful before a position fix. Keep raw NMEA in RAM only;
+        // return bounded, validated satellite fields to the administrator UI.
+        let gsv=at(session,'AT+QGPSGNMEA="GSV"',5);
+        let gsa=at(session,'AT+QGPSGNMEA="GSA"',5);
+        result.sky=parse_gnss_sky(gsv.ok ? gsv.data : '',gsa.ok ? gsa.data : '');
+        if (result.sky.hdop!=null) result.hdop=result.sky.hdop;
         let position=at(session,'AT+QGPSLOC=2',5);
         if (!position.ok) return result;
         let line=match(position.data,/\+QGPSLOC:\s*([^\r\n]+)/);
@@ -514,6 +580,8 @@ function perform(session, action, param) {
             satellites < 0 || satellites > 99 || (fix!=2 && fix!=3)) return result;
         result.fix=true;result.lat=lat;result.lon=lon;result.hdop=hdop;
         result.speed_kmh=speed;result.satellites=satellites;
+        result.altitude_m=nmea_number(fields[4],-500,10000);
+        result.course_deg=nmea_number(fields[6],0,360);
         return result;
     }
     let format = at(session, 'AT+CMGF?', 5);
