@@ -359,7 +359,7 @@ class EpaperTests(unittest.TestCase):
         ups['sensors']['battery']['conversion_ready'] = False
         self.assertIsNone(epaper.charging_power(ups))
 
-    def test_header_has_large_time_full_date_and_centered_page(self):
+    def test_header_aligns_page_time_and_power_in_three_columns(self):
         calls = []
         original = epaper.CrispDraw.text
 
@@ -379,24 +379,26 @@ class EpaperTests(unittest.TestCase):
             epaper.render(console, {}, {})
         clock = next((xy, content, face) for xy, content, face in calls if content == '23:59')
         date = next((xy, content, face) for xy, content, face in calls if content == '2026/09/30')
-        self.assertEqual((clock[0], date[0]), ((2, -7), (2, 17)))
+        self.assertEqual((clock[0][1], date[0][1]), (-7, 17))
         self.assertGreater(clock[2].size, date[2].size)
         draw = epaper.CrispDraw(Image.new('L', (264, 176)))
-        self.assertLessEqual(2 + draw.textlength(date[1], font=date[2]), 75)
+        for xy, text, face in (clock, date):
+            self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, 128)
         titles = [(xy, text, face) for xy, text, face in calls
                   if xy[1] == 3 and text in epaper.PAGES + ('SETTINGS',)]
         self.assertEqual(len(titles), len(epaper.PAGES) + 1)
         for xy, text, face in titles:
-            self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, epaper.WIDTH / 2)
-            self.assertLess(xy[0] + draw.textlength(text, font=face), 171)
+            self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, 42)
+            self.assertGreaterEqual(xy[0], 2)
+            self.assertLessEqual(xy[0] + draw.textlength(text, font=face), 82)
         numbers = [(xy, text, face) for xy, text, face in calls
                    if xy[1] == 17 and text == '1/17']
         self.assertEqual(len(numbers), 1)
         for xy, text, face in numbers:
-            self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, epaper.WIDTH / 2)
+            self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, 42)
         for page, frame in enumerate(frames):
             for index in range(len(epaper.PAGES)):
-                x = 104 + index * 10
+                x = 14 + index * 10
                 self.assertEqual(frame.getpixel((x, 22)), 255)
                 self.assertEqual(frame.getpixel((x + 2, 23)), 255 if index == page else 0)
 
