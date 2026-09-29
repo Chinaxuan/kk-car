@@ -659,11 +659,21 @@ def render(console, car, ups, rates=None, aux=None):
     draw.text((2, -7), clock, fill=255, font=font(26))
     draw.text((7, 17), time.strftime('%Y/%m/%d'), fill=255, font=small)
     page_title = fitted(draw, title, font(12), 74)
-    draw.text(((WIDTH - draw.textlength(page_title, font=font(12))) / 2, 0),
+    draw.text(((WIDTH - draw.textlength(page_title, font=font(12))) / 2, 1),
               page_title, fill=255, font=font(12))
-    page_no = f'{console.page + 1} / {len(PAGES)}' if console.view == 'pages' else f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
-    draw.text(((WIDTH - draw.textlength(page_no, font=small)) / 2, 17),
-              page_no, fill=255, font=small)
+    if console.view == 'pages':
+        # Filled current page, hollow others: hard black/white edges survive fast refresh.
+        dot_size, dot_gap = 6, 6
+        dot_span = len(PAGES) * dot_size + (len(PAGES) - 1) * dot_gap
+        dot_start = (WIDTH - dot_span) // 2
+        for index in range(len(PAGES)):
+            x = dot_start + index * (dot_size + dot_gap)
+            draw.rectangle((x, 22, x + dot_size - 1, 27),
+                           fill=255 if index == console.page else 0, outline=255)
+    else:
+        page_no = f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'
+        draw.text(((WIDTH - draw.textlength(page_no, font=small)) / 2, 17),
+                  page_no, fill=255, font=small)
     charge, state = battery_header(ups)
     power = charging_power(ups)
     if power:

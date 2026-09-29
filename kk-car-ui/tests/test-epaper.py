@@ -346,7 +346,7 @@ class EpaperTests(unittest.TestCase):
         with patch.object(epaper.CrispDraw, 'text', record):
             epaper.render(epaper.Console(), {}, ups)
         page_title = next((xy, text, face) for xy, text, face in calls
-                          if text == 'OVERVIEW' and xy[1] == 0)
+                          if text == 'OVERVIEW' and xy[1] == 1)
         power = next((xy, text, face) for xy, text, face in calls
                      if '~2.1W' in text)
         self.assertEqual(power[1], '~2.1W ~95%')
@@ -366,32 +366,40 @@ class EpaperTests(unittest.TestCase):
             calls.append((xy, content, kwargs.get('font')))
             return original(target, xy, content, **kwargs)
 
+        frames = []
         with patch.object(epaper.time, 'strftime', side_effect=lambda fmt: {
                 '%H:%M': '23:59', '%Y/%m/%d': '2026/09/30'}[fmt]), \
                 patch.object(epaper.CrispDraw, 'text', record):
             for page in range(len(epaper.PAGES)):
                 console = epaper.Console()
                 console.page = page
-                epaper.render(console, {}, {})
+                frames.append(epaper.render(console, {}, {}))
             console.view = 'menu'
             epaper.render(console, {}, {})
         clock = next((xy, content, face) for xy, content, face in calls if content == '23:59')
         date = next((xy, content, face) for xy, content, face in calls if content == '2026/09/30')
         self.assertEqual((clock[0], date[0]), ((2, -7), (7, 17)))
         self.assertGreater(clock[2].size, date[2].size)
-        self.assertLessEqual(7 + epaper.CrispDraw(Image.new('L', (264, 176))).textlength(date[1], font=date[2]), 75)
         draw = epaper.CrispDraw(Image.new('L', (264, 176)))
+        self.assertAlmostEqual(clock[0][0] + draw.textlength(clock[1], font=clock[2]) / 2,
+                               date[0][0] + draw.textlength(date[1], font=date[2]) / 2)
+        self.assertLessEqual(7 + draw.textlength(date[1], font=date[2]), 75)
         titles = [(xy, text, face) for xy, text, face in calls
-                  if xy[1] == 0 and text in epaper.PAGES + ('SETTINGS',)]
+                  if xy[1] == 1 and text in epaper.PAGES + ('SETTINGS',)]
         self.assertEqual(len(titles), len(epaper.PAGES) + 1)
         for xy, text, face in titles:
             self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, epaper.WIDTH / 2)
             self.assertLess(xy[0] + draw.textlength(text, font=face), 171)
         numbers = [(xy, text, face) for xy, text, face in calls
-                   if xy[1] == 17 and (text.endswith(' / 6') or text == '1/17')]
-        self.assertEqual(len(numbers), len(epaper.PAGES) + 1)
+                   if xy[1] == 17 and text == '1/17']
+        self.assertEqual(len(numbers), 1)
         for xy, text, face in numbers:
             self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, epaper.WIDTH / 2)
+        for page, frame in enumerate(frames):
+            for index in range(len(epaper.PAGES)):
+                x = 99 + index * 12
+                self.assertEqual(frame.getpixel((x, 22)), 255)
+                self.assertEqual(frame.getpixel((x + 2, 24)), 255 if index == page else 0)
 
     def test_battery_header_estimates_charge_and_discharge_without_percentage(self):
         ups = {'ok': True,
