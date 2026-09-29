@@ -42,9 +42,6 @@ caaa4be5d94f42c8f48d33c73ccdd8e77fe0424d058c58a5a88b0846d12e4ed7  kk-car-ui/root
 b7d2f9aa0112843b6ae0be8bd8d1ce42ee4aee8cfa1ad79afa956c9b07b22f5b  kk-car-ui/root/etc/init.d/kk-car-voice-gateway
 d5b4fad3bdc72ed09510c25580b19260549d83a03b3fff994f43b768390787de  kk-car-ui/root/etc/init.d/kk-car-voice-runtime
 e2562169e96560e95d3c27429cc1d2c1ff84a38ee3c295a4581cf4a398a5c2e1  kk-car-ui/root/etc/init.d/kk-car-vpn-ping
-4c70c9be8a30fd8725f873a3460a80cdba0a78b6454022ec4101455d306cdd5b  kk-car-ui/root/etc/kk-car/__pycache__/device_settings.cpython-312.pyc
-1475159e59ca65386d5491e75f0070c702aa0a1a9744aac5f576861747ca8bd1  kk-car-ui/root/etc/kk-car/__pycache__/epaper.cpython-312.pyc
-db15d8c304f47cdbe23631b96e466c73721815d492e17463f5dbdd7ff550cef4  kk-car-ui/root/etc/kk-car/__pycache__/epaper_lut.cpython-312.pyc
 95a85565bcd0830e6521dc10f6bc67dad401f0a87172c82701e4489fbe21a281  kk-car-ui/root/etc/kk-car/ai-region-report.uc
 cb9591eaf4edde6f31902357160451f77b7a91e44aa6553b60a8317429c04207  kk-car-ui/root/etc/kk-car/ai-region.uc
 0055df0ce82e3811d6fcdf695a8c9f434925bcc5137800e17626831d8efb2e93  kk-car-ui/root/etc/kk-car/auto-check.sh
@@ -133,8 +130,6 @@ ad42ed0463d6186ea1ba6d5e7c5ab0aeb91e7e1d4c48cf766772f2adaef762ac  kk-car-ui/root
 399caf8de0a76e1f55526c9b7b032cbbd0266c08fa6ca901466b39d372b2aa2a  kk-car-ui/root/www/luci-static/resources/view/kkcar/ups.css
 709c90c1083c8c461c3ca0c3226f2cb579b4783431116189880c34dc316af495  kk-car-ui/root/www/luci-static/resources/view/kkcar/ups.js
 61e61bd933fedfccea88372041d32f9d9c7bfc8a66a3f8f9eb2515f294a497e0  kk-car-ui/root/www/luci-static/resources/view/kkcar/voice-worklet.js
-ba9ca2859d55c5f5c62137653174d03f39dae50dbed2c5257dd7656bbed6e568  kk-car-ui/tests/__pycache__/device-settings.cpython-312.pyc
-8916a643e220ee36a5b02c096d6fed2ad88ab39514845a2d28ca30672b6ed9c3  kk-car-ui/tests/__pycache__/test-epaper.cpython-312.pyc
 f94d254058b6f0f0bac526549d84579d7eb4db9a32e91349c6e65db806e37082  kk-car-ui/tests/ai-region.py
 f90eb085211c98dad0d63fa90170eef261fc70d1d237efc2ddfc9cbc1470f366  kk-car-ui/tests/auto-check.py
 c5404723498b33f184b1c3a782270e23abd55d47f73ecd1ac65767881c70dc9d  kk-car-ui/tests/device-settings.py
