@@ -659,7 +659,9 @@ def render(console, car, ups, rates=None, aux=None):
     draw.text((2, -7), clock, fill=255, font=font(26))
     draw.text((2, 17), time.strftime('%Y/%m/%d'), fill=255, font=small)
     page_title = fitted(draw, title, font(12), 74)
-    draw.text(((WIDTH - draw.textlength(page_title, font=font(12))) / 2, 6),
+    # Let the middle title breathe above the page markers while keeping its
+    # visible glyphs level with the right-hand power reading.
+    draw.text(((WIDTH - draw.textlength(page_title, font=font(12))) / 2, 3),
               page_title, fill=255, font=font(12))
     if console.view == 'pages':
         # Filled current page, hollow others: hard black/white edges survive fast refresh.
@@ -668,7 +670,7 @@ def render(console, car, ups, rates=None, aux=None):
         dot_start = (WIDTH - dot_span) // 2
         for index in range(len(PAGES)):
             x = dot_start + index * (dot_size + dot_gap)
-            draw.rectangle((x, 21, x + dot_size - 1, 26),
+            draw.rectangle((x, 22, x + dot_size - 1, 27),
                            fill=255 if index == console.page else 0, outline=255)
     else:
         page_no = f'{console.selected + 1}/{len(MENU)}' if console.view == 'menu' else 'SET'

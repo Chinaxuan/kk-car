@@ -346,7 +346,7 @@ class EpaperTests(unittest.TestCase):
         with patch.object(epaper.CrispDraw, 'text', record):
             epaper.render(epaper.Console(), {}, ups)
         page_title = next((xy, text, face) for xy, text, face in calls
-                          if text == 'OVERVIEW' and xy[1] == 6)
+                          if text == 'OVERVIEW' and xy[1] == 3)
         power = next((xy, text, face) for xy, text, face in calls
                      if '~2.1W' in text)
         self.assertEqual(power[1], '~2.1W ~95%')
@@ -384,7 +384,7 @@ class EpaperTests(unittest.TestCase):
         draw = epaper.CrispDraw(Image.new('L', (264, 176)))
         self.assertLessEqual(2 + draw.textlength(date[1], font=date[2]), 75)
         titles = [(xy, text, face) for xy, text, face in calls
-                  if xy[1] == 6 and text in epaper.PAGES + ('SETTINGS',)]
+                  if xy[1] == 3 and text in epaper.PAGES + ('SETTINGS',)]
         self.assertEqual(len(titles), len(epaper.PAGES) + 1)
         for xy, text, face in titles:
             self.assertAlmostEqual(xy[0] + draw.textlength(text, font=face) / 2, epaper.WIDTH / 2)
@@ -397,7 +397,7 @@ class EpaperTests(unittest.TestCase):
         for page, frame in enumerate(frames):
             for index in range(len(epaper.PAGES)):
                 x = 104 + index * 10
-                self.assertEqual(frame.getpixel((x, 21)), 255)
+                self.assertEqual(frame.getpixel((x, 22)), 255)
                 self.assertEqual(frame.getpixel((x + 2, 23)), 255 if index == page else 0)
 
     def test_battery_header_estimates_charge_and_discharge_without_percentage(self):
