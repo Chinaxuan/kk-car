@@ -22,17 +22,23 @@ case "$kind" in
         esac
         ;;
     vpn_restart|vpn_start|vpn_stop)
+        vpn_service=swanctl
+        vpn_device=ikecar
+        if [ "$(uci -q get openvpn.kkcar.enabled)" = 1 ]; then
+            vpn_service=openvpn
+            vpn_device=ovpncar
+        fi
         case "$kind" in
-            vpn_restart) /etc/init.d/swanctl restart >/dev/null 2>&1 ;;
-            vpn_start) /etc/init.d/swanctl start >/dev/null 2>&1 ;;
-            vpn_stop) /etc/init.d/swanctl stop >/dev/null 2>&1 ;;
+            vpn_restart) /etc/init.d/"$vpn_service" restart >/dev/null 2>&1 ;;
+            vpn_start) /etc/init.d/"$vpn_service" start >/dev/null 2>&1 ;;
+            vpn_stop) /etc/init.d/"$vpn_service" stop >/dev/null 2>&1 ;;
         esac
         rc=$?
         if [ "$rc" != 0 ]; then result error '操作执行失败，请检查服务'; exit 1; fi
         if [ "$kind" = vpn_stop ]; then result done 'VPN 已暂停，国外和公司内网暂时不可用'; exit; fi
         i=0
         while [ "$i" -lt 15 ]; do
-            if swanctl --list-sas 2>/dev/null | grep -q INSTALLED; then
+            if ip -o -4 addr show dev "$vpn_device" 2>/dev/null | grep -q ' inet '; then
                 /etc/kk-car/ike-route-ensure.sh
                 result done 'VPN 隧道已连接，可运行网络检查验证实际访问'
                 exit
@@ -49,6 +55,8 @@ case "$kind" in
         ;;
     diagnose)
         dir=$(mktemp -d /tmp/kk-car-check.XXXXXX) || { result error '无法创建检查任务'; exit 1; }
+        vpn_device=ikecar
+        [ "$(uci -q get openvpn.kkcar.enabled)" = 1 ] && vpn_device=ovpncar
         # Pin only the public probe endpoint; record a separate DNS check.
         direct_if=$(jsonfilter -i /tmp/kk-car-uplink.json -e '@.device' 2>/dev/null)
         valid_wan_device() {
@@ -59,13 +67,13 @@ case "$kind" in
         fi
         # An unknown/offline WAN must never fall back to an unbound request.
         (valid_wan_device "$direct_if" && curl -4 --noproxy '*' --interface "$direct_if" --connect-timeout 3 --max-time 7 -fsS https://myip.ipip.net > "$dir/domestic" 2>/dev/null) & p1=$!
-        curl -4 --noproxy '*' --interface ikecar --resolve www.cloudflare.com:443:104.16.124.96 --connect-timeout 3 --max-time 7 -fsS https://www.cloudflare.com/cdn-cgi/trace > "$dir/foreign" 2>/dev/null & p2=$!
-        curl -4 --noproxy '*' --interface ikecar --connect-timeout 3 --max-time 7 -sS -o /dev/null -w '%{http_code}' http://10.8.8.15:8080/ > "$dir/company" 2>/dev/null & p3=$!
+        curl -4 --noproxy '*' --interface "$vpn_device" --resolve www.cloudflare.com:443:104.16.124.96 --connect-timeout 3 --max-time 7 -fsS https://www.cloudflare.com/cdn-cgi/trace > "$dir/foreign" 2>/dev/null & p2=$!
+        curl -4 --noproxy '*' --interface "$vpn_device" --connect-timeout 3 --max-time 7 -sS -o /dev/null -w '%{http_code}' http://10.8.8.15:8080/ > "$dir/company" 2>/dev/null & p3=$!
         (nslookup www.google.com 127.0.0.1 > "$dir/dns" 2>/dev/null) & p4=$!
         # Public AI probes follow the VPN only. No cookies, login or API credentials.
         # Bound both response bytes and duration; no redirects to other hosts.
-        (curl -4 --noproxy '*' --interface ikecar --connect-timeout 4 --max-time 12 --max-filesize 32768 -sS -o "$dir/chatgpt.body" -w '%{http_code}' https://chatgpt.com/cdn-cgi/trace > "$dir/chatgpt.code" 2>/dev/null; echo $? > "$dir/chatgpt.rc") & p5=$!
-        (curl -4 --noproxy '*' --interface ikecar --connect-timeout 4 --max-time 12 --max-filesize 1572864 -sS -o "$dir/gemini.body" -w '%{http_code}' https://gemini.google.com/ > "$dir/gemini.code" 2>/dev/null; echo $? > "$dir/gemini.rc") & p6=$!
+        (curl -4 --noproxy '*' --interface "$vpn_device" --connect-timeout 4 --max-time 12 --max-filesize 32768 -sS -o "$dir/chatgpt.body" -w '%{http_code}' https://chatgpt.com/cdn-cgi/trace > "$dir/chatgpt.code" 2>/dev/null; echo $? > "$dir/chatgpt.rc") & p5=$!
+        (curl -4 --noproxy '*' --interface "$vpn_device" --connect-timeout 4 --max-time 12 --max-filesize 1572864 -sS -o "$dir/gemini.body" -w '%{http_code}' https://gemini.google.com/ > "$dir/gemini.code" 2>/dev/null; echo $? > "$dir/gemini.rc") & p6=$!
         # Bound the DNS query as BusyBox has no timeout utility here.
         (sleep 8; kill "$p4" 2>/dev/null) & timer=$!
         wait "$p1"; domestic_rc=$?

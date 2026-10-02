@@ -60,6 +60,12 @@ return { 'kkcar': {
         let current = uplink.active == 'ethernet' ? address(wired,'eth0') : wan;
         let sys = bus.call('system', 'info') || {};
         let ap = bus.call('hostapd.phy0-ap0', 'get_clients') || {};
+        let openvpn = c.get('openvpn','kkcar','enabled') == '1';
+        let ovpnState = openvpn ? (bus.call('network.interface.ovpncar','status') || {}) : {};
+        let ovpnAddress = match(run('/sbin/ip -o -4 addr show dev ovpncar'), /inet[ \t]+([0-9.]+)\//);
+        let ovpnAddr = ovpnAddress?.[1] || '';
+        let ovpnRun = openvpn && run('pidof openvpn') != '';
+        let ovpnServer = match(readfile('/etc/openvpn/kkcar.conf') || '', /remote[ \t]+([A-Za-z0-9.-]+)[ \t]+[0-9]+/);
         let sa = run('/usr/sbin/swanctl --list-sas');
         let virtual = match(sa, /local\s+([0-9.]+)\/32/);
         let remote = match(sa, /remote\s+[^\n]+@\s+([0-9.]+)\[/);
@@ -92,8 +98,9 @@ return { 'kkcar': {
             telemetry:{cpu:{total,idle:+(ticks[4] || 0)+ +(ticks[5] || 0),mhz:clock ? +clock[1]/1e6 : null},
                 loads:[loads[0] || null,loads[1] || null,loads[2] || null],
                 conntrack:metricfile('/proc/sys/net/netfilter/nf_conntrack_count'),conntrack_max:metricfile('/proc/sys/net/netfilter/nf_conntrack_max'),
-                wan:netmetrics(current.device),vpn:netmetrics('ikecar'),
-                cipher:cipher ? trim(cipher[1]) : null,rekey:rekey ? +rekey[1] : null},
+                wan:netmetrics(current.device),vpn:netmetrics(openvpn ? 'ovpncar' : 'ikecar'),
+                cipher:openvpn ? (ovpnAddr ? 'AES-256-GCM' : null) : (cipher ? trim(cipher[1]) : null),
+                rekey:openvpn ? null : (rekey ? +rekey[1] : null)},
             temperature:numberfile('/sys/class/thermal/thermal_zone0/temp') / 1000,
             power:{known:powerbits != null, undervoltage:powerbits != null && !!(powerbits & 1), throttled:powerbits != null && !!(powerbits & 4), historical:powerbits != null && !!(powerbits & 0x50000)},
             wan:{up:uplink.active ? uplink.active != 'none' : !!wan.up, ip:current.ip || '', device:current.device || '', uptime:current.uptime || 0,
@@ -102,11 +109,16 @@ return { 'kkcar': {
                 counter_source:wan.device+'|'+portmode},
             ethernet:{mode:portmode, carrier:trim(readfile('/sys/class/net/eth0/carrier') || '')=='1', up:!!wired.up, ip:wired['ipv4-address']?.[0]?.address || ''},
             uplink,
-            vpn:{connected: index(sa,'ESTABLISHED') >= 0 && index(sa,'INSTALLED') >= 0,
-                running: access('/var/run/charon.pid'), auto:system('/etc/init.d/swanctl enabled >/dev/null 2>&1') == 0,
-                ip:virtual?.[1] || '', server:remote?.[1] || '203.0.113.10', age:+(age?.[1] || 0),
-                rx:+(incoming?.[1] || 0), tx:+(outgoing?.[1] || 0),
-                route: index(ikeRoute,'default dev ikecar') >= 0 && !!match(ikeRule, /10000:.*fwmark 0x20000\/0xff0000.*lookup 300/)},
+            vpn:{backend:openvpn ? 'OpenVPN/TCP' : 'IKEv2',
+                connected:openvpn ? !!ovpnAddr && ovpnRun : index(sa,'ESTABLISHED') >= 0 && index(sa,'INSTALLED') >= 0,
+                running:openvpn ? ovpnRun : access('/var/run/charon.pid'),
+                auto:system(openvpn ? '/etc/init.d/openvpn enabled >/dev/null 2>&1' : '/etc/init.d/swanctl enabled >/dev/null 2>&1') == 0,
+                ip:openvpn ? ovpnAddr : (virtual?.[1] || ''),
+                server:openvpn ? (ovpnServer?.[1] || '') : (remote?.[1] || ''),
+                age:openvpn ? +(ovpnState.uptime || 0) : +(age?.[1] || 0),
+                rx:openvpn ? numberfile('/sys/class/net/ovpncar/statistics/rx_bytes') : +(incoming?.[1] || 0),
+                tx:openvpn ? numberfile('/sys/class/net/ovpncar/statistics/tx_bytes') : +(outgoing?.[1] || 0),
+                route:index(ikeRoute,openvpn ? 'default dev ovpncar' : 'default dev ikecar') >= 0 && !!match(ikeRule, /10000:.*fwmark 0x20000\/0xff0000.*lookup 300/)},
             wifi:{ssid:c.get('wireless','default_radio0','ssid'), channel:c.get('wireless','radio0','channel'),
                 width:width ? +width[1] : null,
                 band:c.get('wireless','radio0','band') || '2g', frequency:ap.freq || 0,
@@ -132,8 +144,9 @@ return { 'kkcar': {
     }},
     auto_connect: {args:{enabled:true}, call:function(req) {
         if (access('/tmp/kk-car-ui-lock')) return {ok:false,error:'请等待当前操作完成'};
-        let rc = system(req.args.enabled ? '/etc/init.d/swanctl enable' : '/etc/init.d/swanctl disable');
-        return {ok:rc == 0, enabled:system('/etc/init.d/swanctl enabled >/dev/null 2>&1') == 0};
+        let service = cursor().get('openvpn','kkcar','enabled') == '1' ? 'openvpn' : 'swanctl';
+        let rc = system('/etc/init.d/'+service+(req.args.enabled ? ' enable' : ' disable'));
+        return {ok:rc == 0, enabled:system('/etc/init.d/'+service+' enabled >/dev/null 2>&1') == 0};
     }},
     port_save: {args:{mode:''}, call:function(req) {
         let mode=req.args.mode;

@@ -8,7 +8,9 @@ flock -n 9 || exit 0
 state=/tmp/kk-car-vpn-management-sources
 current=''
 if [ "$(uci -q get firewall.kk_vpn_admin.enabled)" = 1 ]; then
-    current=$(ip -o -4 addr show dev ikecar 2>/dev/null | awk '{sub(/\/.*/, "", $4); print $4 "/32"}' | sort -u)
+    device=ikecar
+    [ "$(uci -q get openvpn.kkcar.enabled)" = 1 ] && device=ovpncar
+    current=$(ip -o -4 addr show dev "$device" 2>/dev/null | awk '{sub(/\/.*/, "", $4); print $4 "/32"}' | sort -u)
 fi
 old=$(cat "$state" 2>/dev/null)
 failed=0

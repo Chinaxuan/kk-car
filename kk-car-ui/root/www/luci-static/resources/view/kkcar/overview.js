@@ -323,9 +323,9 @@ return view.extend({
                 ['出口地址','kk-wan-ip'],['接口在线','kk-wan-uptime'],['累计收 / 发','kk-total','上网接口的累计字节数，不是套餐余量'],
                 ['包数 收 / 发','kk-packets'],['累计错误 / 丢弃','kk-errors','当前上网接口的收发错误总数 / 收发丢弃总数，累计值，不是本轮丢包率'],
                 ['出口 MTU','kk-wan-mtu'],['有线网口','kk-port-current'],['树莓派 IPv6','kk-ipv6']]),
-            group('VPN / IPsec',[
-                ['隧道地址','kk-vpn-ip'],['已连接','kk-vpn-age'],['本 SA 收 / 发','kk-vpn-total','当前 IPsec SA 的字节计数，重新换钥后会归零'],
-                ['隧道 MTU','kk-vpn-mtu'],['ESP 加密','kk-cipher'],['CHILD 换钥剩余','kk-rekey'],
+            group('VPN / 隧道',[
+                ['隧道地址','kk-vpn-ip'],['已连接','kk-vpn-age'],['隧道收 / 发','kk-vpn-total','当前 VPN 隧道的收发字节数，重连后可能归零'],
+                ['隧道 MTU','kk-vpn-mtu'],['隧道加密','kk-cipher'],['换钥剩余','kk-rekey'],
                 ['接口累计错 / 丢','kk-vpn-errors','VPN 虚拟接口累计收发错误 / 丢弃，不等于当前 Ping 丢包率'],['分流路由','kk-route']]),
             group('蜂窝 / 实时状态',[
                 ['运营商','kk-modem-operator'],['网络 / 频段','kk-modem-network'],['RSRP / RSRQ','kk-modem-rsrp'],['信号格 / SINR','kk-modem-bars'],
@@ -527,9 +527,9 @@ return view.extend({
         this.text('kk-packets',statsPair(wireStats,'rx_packets','tx_packets'));
         this.text('kk-errors',errors(wireStats));this.text('kk-vpn-errors',errors(vpnStats));
         this.text('kk-wan-mtu',wireStats.mtu==null?'未知':wireStats.mtu+' B');this.text('kk-vpn-mtu',vpnStats.mtu==null?'未知':vpnStats.mtu+' B');
-        this.text('kk-cipher',telemetry.cipher?telemetry.cipher.split('/')[0].replace('AES_CBC-','AES-')+' CBC':'未建立');
-        this.el('kk-cipher').parentElement.title=telemetry.cipher || '当前没有已建立的 CHILD SA';
-        this.text('kk-rekey',telemetry.rekey==null?'未建立':duration(telemetry.rekey));
+        this.text('kk-cipher',telemetry.cipher?(d.vpn.backend==='OpenVPN/TCP'?telemetry.cipher:telemetry.cipher.split('/')[0].replace('AES_CBC-','AES-')+' CBC'):'未建立');
+        this.el('kk-cipher').parentElement.title=telemetry.cipher || '当前 VPN 未建立';
+        this.text('kk-rekey',d.vpn.backend==='OpenVPN/TCP'?'服务端管理':telemetry.rekey==null?'未建立':duration(telemetry.rekey));
         this.text('kk-memory',bytes(d.memory && d.memory.available)+' / '+bytes(d.memory && d.memory.total));
         this.text('kk-vpn-total',bytes(d.vpn.rx)+' / '+bytes(d.vpn.tx));
         this.text('kk-total',bytes(d.wan.rx)+' / '+bytes(d.wan.tx));

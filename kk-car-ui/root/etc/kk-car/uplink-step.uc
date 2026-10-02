@@ -56,14 +56,20 @@ if (next.active=='ethernet' && ok) {
     if (index(main,'via '+wire.gateway+' dev eth0 metric 5')<0)
         ok=command('ip -4 route replace default via '+wire.gateway+' dev eth0 metric 5') && ok;
 } else if (match(main,/metric 5(\s|$)/)) command('ip -4 route del default dev eth0 metric 5');
-// netifd retains a cellular host route for the saved WireGuard endpoint.
-// Keep IKE source-address selection on the selected uplink too, before restarting it.
-let endpoint=run('ip -4 route show 203.0.113.10/32');
-if (selected && ok) {
-    let wanted='203.0.113.10 '+route_path(selected)+' metric 5';
-    if (!has_route(endpoint,wanted,trim(route_options(selected))))
-        ok=command('ip -4 route replace 203.0.113.10/32 '+route_path(selected)+' metric 5'+route_options(selected)) && ok;
-} else if (match(endpoint,/metric 5(\s|$)/)) command('ip -4 route del 203.0.113.10/32 metric 5');
+// Read the endpoint from local private configuration; no real server address
+// belongs in source or the public backup.
+let openvpn=c.get('openvpn','kkcar','enabled')=='1';
+let profile=readfile(openvpn ? '/etc/openvpn/kkcar.conf' : '/etc/swanctl/conf.d/kk-car.conf') || '';
+let target=openvpn ? match(profile,/remote[ \t]+([0-9.]+)[ \t]+[0-9]+/) : match(profile,/remote_addrs[ \t]*=[ \t]*([0-9.]+)/);
+let endpoint=target?.[1] || '';
+if (endpoint && match(endpoint,/^[0-9]+(\.[0-9]+){3}$/)) {
+    let existing=run('ip -4 route show '+endpoint+'/32');
+    if (selected && ok) {
+        let wanted=endpoint+' '+route_path(selected)+' metric 5';
+        if (!has_route(existing,wanted,trim(route_options(selected))))
+            ok=command('ip -4 route replace '+endpoint+'/32 '+route_path(selected)+' metric 5'+route_options(selected)) && ok;
+    } else if (match(existing,/metric 5(\s|$)/)) command('ip -4 route del '+endpoint+'/32 metric 5');
+}
 next.timestamp=time(); next.carrier=carrier; next.wire=wire; next.cell=cell;
 next.device=selected?.device || ''; next.ready=ok;
 let identity=selected_identity(next.active,selected);
@@ -74,10 +80,19 @@ next.applied_identity=ok ? identity : previous;
 next.changed=ok && changed ? time() : prev.changed || time();
 writefile('/tmp/kk-car-uplink.json.new',sprintf('%J',next));
 rename('/tmp/kk-car-uplink.json.new','/tmp/kk-car-uplink.json');
+// PBR must use the selected live physical uplink. A disconnected cellular
+// interface cannot be its permanent uplink while the Ethernet WAN is active.
+let pbrUplink=next.active=='ethernet' ? 'kk_ethwan' : next.active=='cellular' ? 'wan' : '';
+if (ok && pbrUplink && c.get('pbr','config','uplink_interface')!=pbrUplink) {
+    c.set('pbr','config','uplink_interface',pbrUplink);
+    if (c.commit('pbr')) command('/etc/init.d/pbr restart');
+}
 if (ok && changed) {
     command('logger -t kk-car-uplink "Selected '+next.active+' uplink"');
     // Rebuild the VPN only if it was running; a user's paused VPN stays paused.
-    if (access('/var/run/charon.pid') && next.active!='none') {
+    if (openvpn && run('pidof openvpn') && next.active!='none') {
+        command('/etc/init.d/openvpn restart');
+    } else if (!openvpn && access('/var/run/charon.pid') && next.active!='none') {
         command('/usr/sbin/swanctl --terminate --ike kk-car --force --timeout 2');
         command('/usr/sbin/swanctl --initiate --child kk-car-internet --timeout 2');
     }

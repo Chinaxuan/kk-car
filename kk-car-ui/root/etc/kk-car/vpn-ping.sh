@@ -1,5 +1,5 @@
 #!/bin/sh
-# Numeric target and explicit XFRM interface: never retry over the physical WAN.
+# Numeric target and explicit tunnel interface: never retry over the physical WAN.
 umask 077
 trap 'rm -f /tmp/kk-car-vpn-ping.raw /tmp/kk-car-vpn-ping.json.new; exit' TERM INT
 while :; do
@@ -7,11 +7,19 @@ while :; do
     started=${started%%.*}
     : > /tmp/kk-car-vpn-ping.raw
     reason=probe
-    if [ ! -e /var/run/charon.pid ] || ! ip -4 addr show dev ikecar 2>/dev/null | grep -q 'inet '; then
+    device=ikecar
+    running=1
+    if [ "$(uci -q get openvpn.kkcar.enabled)" = 1 ]; then
+        device=ovpncar
+        pidof openvpn >/dev/null 2>&1 || running=0
+    else
+        [ -e /var/run/charon.pid ] || running=0
+    fi
+    if [ "$running" != 1 ] || ! ip -4 addr show dev "$device" 2>/dev/null | grep -q 'inet '; then
         reason=vpn_down
     else
         # At most 7 seconds per batch, including an unresponsive peer.
-        ping -4 -I ikecar -c 3 -W 2 -w 7 10.8.8.8 > /tmp/kk-car-vpn-ping.raw 2>&1
+        ping -4 -I "$device" -c 3 -W 2 -w 7 10.8.8.8 > /tmp/kk-car-vpn-ping.raw 2>&1
     fi
     ucode /etc/kk-car/vpn-ping-write.uc "$reason"
     ucode /etc/kk-car/history-write.uc

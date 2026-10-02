@@ -223,3 +223,7 @@ UPS 参数页更新仅替换 `ups-control.uc` 与 `ups.js` 并重载管理 RPC�
 ## 2026-09-29 无终端时降低电子纸刷新频率
 
 只更新 `epaper.py` 与后台 `settings.js`，先备份设备上的这两个文件。电子纸服务每约两秒只读查询已授权热点终端及 LAN 模式下的网口物理链路；终端数为零时，定时刷新与快刷后控制器休眠延迟均至少五分钟，暂停自动翻页。检测失败时沿用原设置；有终端从零接入时立即全刷当前页面，并恢复原设置。该功能不改写共享设置、网络、VPN 或 UPS 配置。安装后只重启 `kk-car-epaper`；读回显示状态中的 `connected_terminals`、`idle_mode`、`effective_refresh_seconds`、`effective_sleep_seconds` 和最近写屏状态。回退时恢复备份文件并只重启电子纸服务。
+
+## 2026-10-02 OpenVPN/TCP 迁移
+
+当前实机已切换为 OpenVPN/TCP；上文 IKEv2 步骤保留为历史配置与回退资料，不能原样套用当前设备。服务端与客户端参数、PBR/DNS 切换、脱敏模板和实测边界见 [OpenVPN/TCP 有线接入](OPENVPN-TCP.md)。部署前必须先核对当前 `vpn.backend`、物理上联和私有凭据文件，不能将仓库示例地址写进正在运行的设备。

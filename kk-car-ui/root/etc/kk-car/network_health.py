@@ -140,7 +140,7 @@ def interface(value):
 
 def ping(dev, target):
     # Validate again at the process boundary. Never retry without -I.
-    if dev != 'ikecar' and not interface(dev):
+    if dev not in ('ikecar', 'ovpncar') and not interface(dev):
         return dict(target=target, ok=None, latency_ms=None, reason='invalid_interface')
     code, raw = command(['ping', '-4', '-n', '-I', dev, '-c', '1', '-W', '2', '-w', '3', target], 4)
     match = re.search(r'time[=<]([0-9]+(?:\.[0-9]+)?)\s*ms', raw)
@@ -152,12 +152,21 @@ def context():
     uplink = read_json('/tmp/kk-car-uplink.json')
     modem = read_json('/tmp/kk-car-modem.json')
     wan = ubus('network.interface.wan')
-    ike = ubus('network.interface.ikecar')
-    code, raw = command(['/usr/sbin/swanctl', '--list-sas'], 3) if Path('/var/run/charon.pid').exists() else (0, '')
+    backend = command(['uci', '-q', 'get', 'openvpn.kkcar.enabled'], 2)[1].strip() == '1'
+    ike = ubus('network.interface.ovpncar' if backend else 'network.interface.ikecar')
+    if backend:
+        running = bool(command(['pidof', 'openvpn'], 2)[1].strip())
+        assigned = bool(re.search(r'\binet\s+[0-9.]+/', command(['ip', '-o', '-4', 'addr', 'show', 'dev', 'ovpncar'], 2)[1]))
+        connected = running and assigned
+        ike['up'] = connected
+        code = 0
+    else:
+        running = Path('/var/run/charon.pid').exists()
+        code, raw = command(['/usr/sbin/swanctl', '--list-sas'], 3) if running else (0, '')
+        connected = code == 0 and 'ESTABLISHED' in raw and 'INSTALLED' in raw
     return dict(**current, uplink=uplink, modem=modem, wan=wan, ike=ike,
-                running=Path('/var/run/charon.pid').exists(),
-                connected=code == 0 and 'ESTABLISHED' in raw and 'INSTALLED' in raw,
-                sa_known=code == 0)
+                running=running, connected=connected, sa_known=code == 0,
+                vpn_device='ovpncar' if backend else 'ikecar', vpn_backend='openvpn' if backend else 'ike')
 
 
 def plan_groups(ctx):
@@ -183,7 +192,7 @@ def plan_groups(ctx):
         reason = 'user_paused'
     elif not ctx['sa_known'] or not ctx['ike']:
         reason = 'status_unreadable'
-    groups['vpn'] = dict(device='ikecar', reason=reason, available=reason == 'ready',
+    groups['vpn'] = dict(device=ctx.get('vpn_device', 'ikecar'), reason=reason, available=reason == 'ready',
                          identity=str(ctx['ike'].get('ipv4-address', [])))
     return groups
 
@@ -279,6 +288,8 @@ def guarded(action, ctx, config):
 
 
 def recover(action):
+    if action.startswith('vpn_') and command(['uci', '-q', 'get', 'openvpn.kkcar.enabled'], 2)[1].strip() == '1':
+        return command(['/etc/init.d/openvpn', 'restart'], 8)[0] == 0
     if action == 'vpn_reconnect':
         code, _ = command(['/usr/sbin/swanctl', '--terminate', '--child', 'kk-car-internet', '--timeout', '3'], 5)
         if code != 0:

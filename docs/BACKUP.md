@@ -77,3 +77,7 @@ UPS 空电/保护参数修改前的寄存器和模式快照只保存在设备 `/
 `/tmp/kk-car-epaper-frame.json` 只是本次开机最近成功写入的画面，位于 RAM，重启后自动重新生成，无须备份。续航估算用的两节电池**合计标称容量**保存在已有的私有 `device-settings.json` 中，随该文件的离线加密备份与升级保留，不进入公开仓库。恢复页面时把新 `battery_runtime.js` 与 UPS、设置中心资源、两个 RPC 及 ACL 一同恢复；缺少历史日志不会影响实时粗估，但真实电池容量和低压行为仍需重新核对。
 
 电子纸字体更新后，设备恢复包还需包括 `/etc/kk-car/fonts/AtkinsonHyperlegibleNext-Bold.ttf`、`OFL-Atkinson.txt`、`DejaVuSansCondensed-Bold.ttf` 和 `LICENSE-DejaVu.txt`。原 Blinker 字体继续保留用于旧版恢复；缺少主字体时程序虽可回退显示，文字尺寸和换行可能变化。
+
+## OpenVPN/TCP 私有资料
+
+迁移或重刷前在离线私有位置备份爱快专用账号密码、CA 证书、`/etc/openvpn/kkcar.conf` 与 `.auth`、`network/firewall/pbr/dhcp/openvpn` 当前配置。本公开仓库只含脱敏示例和控制逻辑；没有这些私有资料，不能直接恢复 VPN。旧 IKEv2 文件保留用于人工回退。
