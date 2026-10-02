@@ -3909,7 +3909,7 @@ chain kk_car_china_direct {
 # restarts. Prefix matches cover USB enumeration changes before netifd is ready.
 chain kk_car_wan_policy {
     ip daddr @kk_car_china4 return
-    ip daddr 192.168.0.0/24 return
+    ip daddr 192.168.0.0/16 return
     counter reject with icmp type admin-prohibited
 }
 chain kk_car_wan_guard {

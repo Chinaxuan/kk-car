@@ -1,7 +1,7 @@
 0a5e054b15448776b86aa3387a600a2ebf665db1c5f314f038b97d39549e27b7  .gitignore
 f0c8d70d664dc4bca19fa6d16b7691351a126914a86afb0b848b89efb80dfdc5  DESIGN.md
 cd71e1ee27fba5f47592de4ab27f6ed743d2d103a2b0223266eecb45894273ae  PRODUCT.md
-7852accc8a529052cf54b6ebd89cff1793aed9b96c2dfea174d9672660cfb47c  README.md
+b1862773ddb4992941061c574be51f2f450d822ba48bee4baa2433a89ddc6ae3  README.md
 25dba761f0fcd2c40d7126efb8696f68e4e4b10c38da34236886dc18dc04b181  docs/ARCHITECTURE.md
 312efece48f031dce4355c0e52c501a39bc67f5ee6a897e4e34848f2a6f5c7c3  docs/BACKUP.md
 d24e3e8238f99c77586b44d8fedc1f7fcf0affa0322b338db6973bbaf6116496  docs/BATTERY-HISTORY.md
@@ -16,7 +16,7 @@ afc4c5919de9277295b3bcc3cae5f3abfbc41ff6ab592a5ac0c275edaff574bb  docs/DEPLOYMEN
 8451cf1db445fddab2a73d163961789d9207ff4c270c2bf71e67a123f8f5a3af  docs/NETWORK-HEALTH.md
 8d7cec914979b277167685a3b343404f03ef9c29233d7c738572a149e02feee0  docs/NETWORK-RECOVERY.md
 3d723d0a6b030c3af1504194b79018ebd340f451ff9ef3ab69dab9a5e3ce85be  docs/NOTIFICATIONS.md
-496a030b309f9a9ff7abbbe863ceae92f201d2f9b1126f201bbd7b996317ef92  docs/OPENVPN-TCP.md
+6a9d91761ef566691dffe0d5515d992d343e8c0932b9f018c652c6190ae415ff  docs/OPENVPN-TCP.md
 004f0e8740746e61ef20b9e705132724f63e85a368ecd3ab32658b2eb8105f6f  docs/SETTINGS.md
 821afc7b593bacf4987af0dbe70bea628eaa514096968f3e3847a2fc1ac573cd  docs/UPS.md
 d3ed72096df3c2f03945d2f19b465d1fe6f69eb0a06bec94ba82abe94ee774e9  docs/USAGE.md
@@ -108,7 +108,7 @@ a0888353cad79351feecfd1f3654f0f2c4c90b1010d984ce9b286a1829cf8229  kk-car-ui/root
 f1a24736fa737a44e3054196cd98c48aaf948767d877d41617a5c2af72a91aa2  kk-car-ui/root/etc/kk-car/vpn-ping-parse.uc
 93710089b134d65401a7caa5aacd93275069941ebf6e7f7832bf4611a4f824d7  kk-car-ui/root/etc/kk-car/vpn-ping-write.uc
 e371640bea54ac37d0532c4a9069ed90e85cbbddb7854c872791ab08bf20cf70  kk-car-ui/root/etc/kk-car/vpn-ping.sh
-6d02daef0da5aa5665b05f931ca65a22a733d1bff3432de73f5beb60a482bee3  kk-car-ui/root/etc/nftables.d/20-kk-car-china.nft
+94a505b45288ebe41be156efe3740a3bb195810293eba8be5cd4f768e31aaab8  kk-car-ui/root/etc/nftables.d/20-kk-car-china.nft
 cf0b15bc9c5b9f2f1274c52eeb05cb57f12329da3632ec27d3a4f8db4e1040c9  kk-car-ui/root/etc/strongswan.d/kk-car.conf
 ddb9db76285a7a5f1f2f7457a1f582aaa083c273c74df6bdf419efd76b4295d7  kk-car-ui/root/usr/share/luci/menu.d/luci-app-kkcar.json
 8e6554a69bee3bf1baabb51b1f5b38be2257264c50a2bf45282173320d771797  kk-car-ui/root/usr/share/rpcd/acl.d/luci-app-kkcar.json

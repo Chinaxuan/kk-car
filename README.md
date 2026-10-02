@@ -52,7 +52,7 @@ flowchart LR
 - 管理入口：连接 KK-Car 后访问 `http://192.168.88.1/cgi-bin/luci/admin/kkcar`。
 - Wi-Fi 与 LAN：`192.168.88.0/24`；F30A 管理地址跟随实际私有 WAN 网关，DJI 直接通过 QMI 管理。
 - `eth0` 为可切换的有线口，USB 上网接口按运行状态发现（CDC 常为 `eth1`，QMI 常为 `wwan0`），`ovpncar` 为当前 VPN 虚拟接口；旧 `ikecar` 配置保留。
-- 国内直连，公司内网与其余公网业务走 VPN；VPN 停止后，国外业务不自动回落到物理 WAN。
+- 国内与 `192.168.0.0/16` 本地私网直连，公司内网与其余公网业务走 VPN；VPN 停止后，国外业务不自动回落到物理 WAN。
 - 当前支持 **一个有线 WAN + 一个 USB 4G WAN**。尚未实现多个 USB 上网棒自动选网或带宽叠加。
 
 ## 日常使用
