@@ -2,9 +2,9 @@
 
 把闲置的树莓派 3B+ 变成车载路由器：USB 4G 上网、Wi-Fi 热点、回公司 VPN。管理台按使用场景组织为行车总览、连接设置、网络守护、蜂窝与通信、电源与设备、通知中心和设置中心；所有页面共用左侧导航、页头、深色界面和操作规范，手机从「功能」按钮切换。
 
-本仓库保存 **截至 2026-10-02 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
+本仓库保存 **截至 2026-10-07 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
 
-[使用说明](docs/USAGE.md) · [OpenVPN/TCP 有线接入](docs/OPENVPN-TCP.md) · [统一界面](docs/CONSOLE-UI.md) · [网络守护](docs/NETWORK-HEALTH.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [充放电曲线](docs/BATTERY-HISTORY.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
+[使用说明](docs/USAGE.md) · [VPN 自动选线](docs/VPN-AUTO-SELECT.md) · [OpenVPN/TCP 有线接入](docs/OPENVPN-TCP.md) · [统一界面](docs/CONSOLE-UI.md) · [网络守护](docs/NETWORK-HEALTH.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [充放电曲线](docs/BATTERY-HISTORY.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
 
 ## 它能做什么
 
@@ -12,7 +12,7 @@
 | --- | --- |
 | 实时状态面板 | 统一深色布局，电脑优先、兼容手机；下载/上传速度旁同步显示 VPN 延迟与丢包、蜂窝 RSRP/SINR、UPS 电量与输出电压，下方保留系统、出口、VPN、蜂窝和供电详细数据 |
 | VPN 备用管理 | 可选开启 VPN 通道内的管理页、SSH 和 Ping；按当前 VPN 地址维护返回路由，仍需原有管理员认证 |
-| VPN 管理 | 启动、暂停、重连当前 OpenVPN/TCP，设置开机连接；旧 IKEv2 配置保留；旧 WireGuard 配置在设备上停用保留 |
+| VPN 管理 | OpenVPN/TCP 与 WireGuard 同时待命，网络恢复后立即比较、平时每 5 分钟复测；差距明显且连续成立才切换。可暂停、启动、重连和设置开机连接；旧 IKEv2 配置保留 |
 | 流量与延迟历史 | 单张三层图共用时间轴，速度、VPN 延迟/丢包、LTE RSRP 分别使用独立刻度；支持 5 分钟、1 小时、1 天、30 天 |
 | 网络守护 | 每 30 秒对物理出口与 VPN 多目标探测，单目标失败不重连；连续失败后有限恢复，冷却与每小时限额、手动暂停和通话保护；DNS 分类、私有事件记录和后台开关 |
 | 有线 / 4G 选网 | 网口可切换 LAN 或 DHCP WAN；有线探测稳定后优先，失效后回到 4G |
@@ -35,7 +35,7 @@
 
 ## 设备与网络
 
-当前适配环境：**Raspberry Pi 3B+ · OpenWrt 25.12.5 · DJI 一代 QMI / F30A Pro USB 上网棒 · 爱快 OpenVPN/TCP 服务端**。
+当前适配环境：**Raspberry Pi 3B+ · OpenWrt 25.12.5 · DJI 一代 QMI / F30A Pro USB 上网棒 · 爱快 OpenVPN/TCP 与 WireGuard 服务端**。
 
 ```mermaid
 flowchart LR
@@ -43,7 +43,7 @@ flowchart LR
     AP --> Pi[树莓派 3B+ / OpenWrt]
     Pi --> Direct[国内 IPv4 直连]
     Direct --> WAN[有线 WAN 优先 / 4G 备用]
-    Pi --> VPN[OpenVPN/TCP]
+    Pi --> VPN[自动选择 OpenVPN/TCP 或 WireGuard]
     VPN --> Company[公司 VPN 服务端]
     Company --> LAN[公司内网]
     Company --> Intl[公司国际出口]
@@ -51,7 +51,7 @@ flowchart LR
 
 - 管理入口：连接 KK-Car 后访问 `http://192.168.88.1/cgi-bin/luci/admin/kkcar`。
 - Wi-Fi 与 LAN：`192.168.88.0/24`；F30A 管理地址跟随实际私有 WAN 网关，DJI 直接通过 QMI 管理。
-- `eth0` 为可切换的有线口，USB 上网接口按运行状态发现（CDC 常为 `eth1`，QMI 常为 `wwan0`），`ovpncar` 为当前 VPN 虚拟接口；旧 `ikecar` 配置保留。
+- `eth0` 为可切换的有线口，USB 上网接口按运行状态发现（CDC 常为 `eth1`，QMI 常为 `wwan0`），当前 VPN 在 `ovpncar` 与 `wgcar` 中自动选择；旧 `ikecar` 配置保留。
 - 国内与 `192.168.0.0/16` 本地私网直连，公司内网与其余公网业务走 VPN；VPN 停止后，国外业务不自动回落到物理 WAN。
 - 当前支持 **一个有线 WAN + 一个 USB 4G WAN**。尚未实现多个 USB 上网棒自动选网或带宽叠加。
 
@@ -70,7 +70,7 @@ flowchart LR
 | 数据 | 采集与保存 |
 | --- | --- |
 | 页面实时状态 | 每 5 秒读取路由器缓存与计数器 |
-| VPN 连通性 | 每 10 秒经当前 `ovpncar` 隧道 Ping `10.8.8.8`，每轮最多 3 次 |
+| VPN 连通性 | 每 10 秒经当前隧道 Ping 公司探测地址，每轮最多 3 次；自动选择器每 5 分钟分别探测两条隧道 |
 | 网络健康守护 | 每约 30 秒，多目标绑定接口探测；状态变化 / 恢复日志最多 1 MiB，页面显示最近 80 条 |
 | 蜂窝信号 | 每约 30 秒通过 QMI 或 ADB 只读采集一次，排除重复及过期样本 |
 | 网络历史曲线 | 每分钟汇总，约每 5 分钟批量保存，保留 30 天 |
