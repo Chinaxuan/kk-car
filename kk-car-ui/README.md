@@ -1,6 +1,6 @@
 # KK-Car 源码
 
-当前设备已启用 OpenVPN/TCP 与 WireGuard 双隧道自动选择；网络恢复后立即比较，平时每 5 分钟复测。代码、部署及验证边界见 [VPN 自动选线](../docs/VPN-AUTO-SELECT.md)。
+当前设备已启用 OpenVPN/TCP 与 WireGuard 双隧道自动选择；网络恢复后立即比较，平时每 5 分钟复测。公司 Ping、加密 DNS 与国外 HTTPS 都通过后才按延迟选线，流量路由与 DNS 上游一起切换和校验。代码、部署及验证边界见 [VPN 自动选线](../docs/VPN-AUTO-SELECT.md)。
 
 项目介绍见 [仓库首页](../README.md)。
 
