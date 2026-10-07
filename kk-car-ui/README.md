@@ -1,5 +1,7 @@
 # KK-Car 源码
 
+当前设备已启用 OpenVPN/TCP 与 WireGuard 双隧道自动选择；网络恢复后立即比较，平时每 5 分钟复测。代码、部署及验证边界见 [VPN 自动选线](../docs/VPN-AUTO-SELECT.md)。
+
 项目介绍见 [仓库首页](../README.md)。
 
 - [使用说明](../docs/USAGE.md)
