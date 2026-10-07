@@ -1,7 +1,7 @@
 0a5e054b15448776b86aa3387a600a2ebf665db1c5f314f038b97d39549e27b7  .gitignore
 f0c8d70d664dc4bca19fa6d16b7691351a126914a86afb0b848b89efb80dfdc5  DESIGN.md
 cd71e1ee27fba5f47592de4ab27f6ed743d2d103a2b0223266eecb45894273ae  PRODUCT.md
-fd76d7816c7dbeb1a2e82e0a2171223f1dec0d9f861beae8a5b1a266b1d3d2e4  README.md
+93f08563178214f50438f3c1aa67e8888135b4d4948ac24fc813a1a7ca92b944  README.md
 25dba761f0fcd2c40d7126efb8696f68e4e4b10c38da34236886dc18dc04b181  docs/ARCHITECTURE.md
 312efece48f031dce4355c0e52c501a39bc67f5ee6a897e4e34848f2a6f5c7c3  docs/BACKUP.md
 d24e3e8238f99c77586b44d8fedc1f7fcf0affa0322b338db6973bbaf6116496  docs/BATTERY-HISTORY.md
@@ -19,12 +19,12 @@ c3701ae47165a0a83fd7a025d89760325663ad5c87fa8dc39e4e8c5a596230e6  docs/NETWORK-R
 f25147cdad4520ffcc82478d04f95998547352c149a9a65cee8539c9d806c9ff  docs/OPENVPN-TCP.md
 004f0e8740746e61ef20b9e705132724f63e85a368ecd3ab32658b2eb8105f6f  docs/SETTINGS.md
 821afc7b593bacf4987af0dbe70bea628eaa514096968f3e3847a2fc1ac573cd  docs/UPS.md
-66ef64c5907a40764e6a1dfed325969aa8f5869c5bf887014883c484587b1284  docs/USAGE.md
-82d6c64e7c15300eabee9a66c42912c38adcc47d5dc05664e8e6d5fe017ab064  docs/VALIDATION.md
+0a6178e07391ec3aaee16ed61cea4ae3a005c67b33213a203f7a0337ee2e7955  docs/USAGE.md
+73e6a594898e5fac9b7124e58e88385e7bf362173f801c2a6ae33203243a4ba6  docs/VALIDATION.md
 9a8ae85e5fcd0506c0adf8ba25a3f3801ffb1a7bc1c103b35f837ec33049782b  docs/VOICE-CALLS.md
-e411a15dfd1fb8882593e6114f3396a0384612168ea2997d2a805e6b825dc95b  docs/VPN-AUTO-SELECT.md
+b9ff203f22366b4274bdb137da29005bfcbbd11f0fd8a37b687d0406b953a9e1  docs/VPN-AUTO-SELECT.md
 2744e4500a9a765b282c5d05c667dfa5ace2dd4371b3cc059908cd413e743d09  docs/packages-reference.txt
-9ff4f43340af2a953098c7032df41fcd8e881d8684757e7985cd648bafa6db39  kk-car-ui/README.md
+1e7ec59e32686e854155049f14350491c9e02c14e9e0b9e53a65ab6fc4cf567b  kk-car-ui/README.md
 0ae810cdef850b5e3229a088e7ac79beeb4d87f1b5258a4ea8b799c4bc5eab83  kk-car-ui/install-ethernet.uc
 405c18b24c585fff40f83c78ef5e18b098fb6537561bc70eae9e3aaae296f1d7  kk-car-ui/install-vpn-management.uc
 70f4e89bd1f0640ad634935d25f154ed2239b5eab94bdf4c13ec18c651a3dd9f  kk-car-ui/install-wifi-address.uc
@@ -107,7 +107,7 @@ beba60a1cd4f6ce6e3c3ffd0beba46e3d3c7a8d9c692099866da32e44332b2af  kk-car-ui/root
 f1a24736fa737a44e3054196cd98c48aaf948767d877d41617a5c2af72a91aa2  kk-car-ui/root/etc/kk-car/vpn-ping-parse.uc
 87b7636d94327376d9eabd37e89a8fbf551eafb3ec64b8a7ae6801b8b8fe0a07  kk-car-ui/root/etc/kk-car/vpn-ping-write.uc
 3fe34d7ad217d384e582c194406790f3a61256950f331e86b4f07c028006037b  kk-car-ui/root/etc/kk-car/vpn-ping.sh
-305684a07c9df71d3df895b270fff56aedfc7de878bf12e9474367058918a70a  kk-car-ui/root/etc/kk-car/vpn-select.py
+8c8f7bc08065ca5e3c2d28413ab33b5ac38c2c5e0d99f3f6b8f8e076b0d0ba57  kk-car-ui/root/etc/kk-car/vpn-select.py
 94a505b45288ebe41be156efe3740a3bb195810293eba8be5cd4f768e31aaab8  kk-car-ui/root/etc/nftables.d/20-kk-car-china.nft
 cf0b15bc9c5b9f2f1274c52eeb05cb57f12329da3632ec27d3a4f8db4e1040c9  kk-car-ui/root/etc/strongswan.d/kk-car.conf
 ddb9db76285a7a5f1f2f7457a1f582aaa083c273c74df6bdf419efd76b4295d7  kk-car-ui/root/usr/share/luci/menu.d/luci-app-kkcar.json
@@ -157,7 +157,7 @@ ef32d639a99b7a663fa6abcccaea0b3cfaec476e6a49b5dd3ea8bf929c8c894d  kk-car-ui/test
 1518911fb6e7cb346255b23758d9546a06a6c74b55c95818ff2826ba69dd7486  kk-car-ui/tests/ups.uc
 b6c2205875dab94a77c5183730b461bea130ab99356591e8e79b66694aadd0eb  kk-car-ui/tests/vpn-management.py
 3ecf0010390700bbb7c69800802226635731d9ec42d73eb6a80a22c9fe673ad5  kk-car-ui/tests/vpn-ping.py
-fef06e4e4e9298b7af013fdf74862c13ce9fb134f2fe7b86fc54c9314e8fadc5  kk-car-ui/tests/vpn-select.py
+7a55554518168510a4c9ef05d9210585f1cf2ca5d9a2373c70f5c9928085dcb6  kk-car-ui/tests/vpn-select.py
 537d9b9df14adfc34c8a7da8a12ffea21ddee44b0863b567beba4ed8778a3909  kk-car-ui/tests/wifi-safety.py
 0da064d2c11f6ef4bed311d703ea695ea633c03f47bd9fd0fabdfcb7902b33a9  kk-car-ui/tools/build-hdmi-font.py
 62040f2629f0d3eb250ccb92c942525bc3b69d157b7090b4b46c2651f5b16f0a  kk-car-ui/voice-gateway/go.mod
