@@ -458,3 +458,5 @@
 ## 2026-10-07 VPN 自动选线
 
 4G 上实际启用 OpenVPN/TCP 与 WireGuard，两条隧道强制绑定接口时都能到达公司探测地址；实机切到 WireGuard 后，PBR、DNS、表 300、公司 HTTP、国外 HTTPS、VPN Ping、LuCI 后台和两条管理回程路由均已读回。自动选择服务、网络守护与延迟采样服务均持续运行。选择决策的隔离测试覆盖明显优势、小差距、丢包、最短驻留与失效回退。尚未验收真实有线 WAN、物理断线恢复、整机重启及移动中长期稳定性；详见 [VPN 自动选线](VPN-AUTO-SELECT.md)。
+
+同日后续复查发现初版只测试公司 Ping 的漏洞：WireGuard Ping 成功，但固定地址访问 Google 与 HTTPS 加密 DNS 均超时；OpenVPN/TCP 均成功。新选择器只把公司 Ping、加密 DNS、国外 HTTPS 全通过的隧道列为健康，并在切换后验证本地 DNS 与国外 HTTPS。实机读回 OpenVPN/TCP 已选中，PBR、DNS 上游与表 300 一致，Google HTTPS 200；ChatGPT 命令行请求返回 403，证明可连接站点但不等于浏览器功能已验收。真实有线 WAN、移动长测及整机重启仍待验证。
