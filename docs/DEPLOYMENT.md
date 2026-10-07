@@ -1,5 +1,7 @@
 # 部署与更新
 
+当前设备在 2026-10-07 已启用 OpenVPN/TCP 与 WireGuard 双隧道自动选择。以下较早的 IKEv2、单 OpenVPN 部署步骤是历史资料；新部署请先读 [VPN 自动选线](VPN-AUTO-SELECT.md)，并逐项核实当前私有配置与两条隧道，不要直接复制历史参数。新的 `kk-car-vpn-select` 开机服务、脚本和 `/etc/rc.d/` 链接需加入设备的 sysupgrade 保留清单。
+
 ## 这是设备定制源码，不是通用一键固件
 
 本项目备份了已部署的页面、服务和路由维护脚本。它依赖事先配置好的 LAN、Wi-Fi、USB WAN、IKEv2、DNS 与分流。仓库不提供认证资料，也没有把实际 `/etc/config/` 和 `/etc/swanctl/` 上传。

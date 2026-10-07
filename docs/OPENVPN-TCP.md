@@ -1,5 +1,7 @@
 # 有线网络上的 OpenVPN/TCP
 
+2026-10-07 状态：此文记录 OpenVPN/TCP 单隧道的部署与验证。当前设备还运行 WireGuard 自动选线；现行策略见 [VPN 自动选线](VPN-AUTO-SELECT.md)。不要直接把下文的单隧道 PBR/DNS 设置覆盖到当前设备。
+
 2026-10-02，KK-Car 从 IKEv2 切到爱快 OpenVPN/TCP。原因是当次电信有线上联能收到 IKE 首次应答的分片前段，后续分片未到树莓派；同一上联上的 OpenVPN/TCP 已实测连通。此结论只针对当次链路，不代表 IKEv2 端口普遍被封锁。
 
 ## 工作方式
