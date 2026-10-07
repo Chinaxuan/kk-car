@@ -22,16 +22,15 @@ case "$kind" in
         esac
         ;;
     vpn_restart|vpn_start|vpn_stop)
-        vpn_service=swanctl
-        vpn_device=ikecar
-        if [ "$(uci -q get openvpn.kkcar.enabled)" = 1 ]; then
-            vpn_service=openvpn
-            vpn_device=ovpncar
-        fi
+        vpn_device=$(uci -q get pbr.kk_global.interface)
+        case "$vpn_device" in ovpncar|wgcar) ;; *) vpn_device=ovpncar ;; esac
         case "$kind" in
-            vpn_restart) /etc/init.d/"$vpn_service" restart >/dev/null 2>&1 ;;
-            vpn_start) /etc/init.d/"$vpn_service" start >/dev/null 2>&1 ;;
-            vpn_stop) /etc/init.d/"$vpn_service" stop >/dev/null 2>&1 ;;
+            vpn_restart)
+                rm -f /tmp/kk-car-vpn-paused
+                if [ "$vpn_device" = wgcar ]; then ifdown wgcar; ifup wgcar
+                else /etc/init.d/openvpn restart >/dev/null 2>&1; fi ;;
+            vpn_start) rm -f /tmp/kk-car-vpn-paused; /etc/init.d/openvpn start >/dev/null 2>&1; ifup wgcar ;;
+            vpn_stop) touch /tmp/kk-car-vpn-paused; /etc/init.d/openvpn stop >/dev/null 2>&1; ifdown wgcar ;;
         esac
         rc=$?
         if [ "$rc" != 0 ]; then result error '操作执行失败，请检查服务'; exit 1; fi
@@ -55,8 +54,8 @@ case "$kind" in
         ;;
     diagnose)
         dir=$(mktemp -d /tmp/kk-car-check.XXXXXX) || { result error '无法创建检查任务'; exit 1; }
-        vpn_device=ikecar
-        [ "$(uci -q get openvpn.kkcar.enabled)" = 1 ] && vpn_device=ovpncar
+        vpn_device=$(uci -q get pbr.kk_global.interface)
+        case "$vpn_device" in ovpncar|wgcar) ;; *) vpn_device=ovpncar ;; esac
         # Pin only the public probe endpoint; record a separate DNS check.
         direct_if=$(jsonfilter -i /tmp/kk-car-uplink.json -e '@.device' 2>/dev/null)
         valid_wan_device() {

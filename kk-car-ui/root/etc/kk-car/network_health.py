@@ -140,7 +140,7 @@ def interface(value):
 
 def ping(dev, target):
     # Validate again at the process boundary. Never retry without -I.
-    if dev not in ('ikecar', 'ovpncar') and not interface(dev):
+    if dev not in ('ikecar', 'ovpncar', 'wgcar') and not interface(dev):
         return dict(target=target, ok=None, latency_ms=None, reason='invalid_interface')
     code, raw = command(['ping', '-4', '-n', '-I', dev, '-c', '1', '-W', '2', '-w', '3', target], 4)
     match = re.search(r'time[=<]([0-9]+(?:\.[0-9]+)?)\s*ms', raw)
@@ -152,8 +152,11 @@ def context():
     uplink = read_json('/tmp/kk-car-uplink.json')
     modem = read_json('/tmp/kk-car-modem.json')
     wan = ubus('network.interface.wan')
-    backend = command(['uci', '-q', 'get', 'openvpn.kkcar.enabled'], 2)[1].strip() == '1'
-    ike = ubus('network.interface.ovpncar' if backend else 'network.interface.ikecar')
+    selected = command(['uci', '-q', 'get', 'pbr.kk_global.interface'], 2)[1].strip()
+    if selected not in ('wgcar', 'ovpncar'):
+        selected = 'ovpncar'
+    backend = selected == 'ovpncar'
+    ike = ubus('network.interface.' + selected)
     if backend:
         running = bool(command(['pidof', 'openvpn'], 2)[1].strip())
         assigned = bool(re.search(r'\binet\s+[0-9.]+/', command(['ip', '-o', '-4', 'addr', 'show', 'dev', 'ovpncar'], 2)[1]))
@@ -161,12 +164,15 @@ def context():
         ike['up'] = connected
         code = 0
     else:
-        running = Path('/var/run/charon.pid').exists()
-        code, raw = command(['/usr/sbin/swanctl', '--list-sas'], 3) if running else (0, '')
-        connected = code == 0 and 'ESTABLISHED' in raw and 'INSTALLED' in raw
+        running = not Path('/tmp/kk-car-vpn-paused').exists()
+        assigned = bool(re.search(r'\binet\s+[0-9.]+/', command(['ip', '-o', '-4', 'addr', 'show', 'dev', 'wgcar'], 2)[1]))
+        connected = running and assigned and bool(ike.get('up'))
+        ike['up'] = connected
+        ike['autostart'] = True
+        code = 0
     return dict(**current, uplink=uplink, modem=modem, wan=wan, ike=ike,
                 running=running, connected=connected, sa_known=code == 0,
-                vpn_device='ovpncar' if backend else 'ikecar', vpn_backend='openvpn' if backend else 'ike')
+                vpn_device=selected, vpn_backend='openvpn' if backend else 'wireguard')
 
 
 def plan_groups(ctx):
@@ -288,6 +294,8 @@ def guarded(action, ctx, config):
 
 
 def recover(action):
+    if action.startswith('vpn_') and command(['uci', '-q', 'get', 'pbr.kk_global.interface'], 2)[1].strip() == 'wgcar':
+        return command(['/sbin/ifup', 'wgcar'], 8)[0] == 0
     if action.startswith('vpn_') and command(['uci', '-q', 'get', 'openvpn.kkcar.enabled'], 2)[1].strip() == '1':
         return command(['/etc/init.d/openvpn', 'restart'], 8)[0] == 0
     if action == 'vpn_reconnect':

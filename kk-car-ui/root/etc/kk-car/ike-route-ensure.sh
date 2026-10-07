@@ -9,15 +9,20 @@ while [ "$rule_count" -gt 1 ]; do
     ip -4 rule del priority 10000 fwmark 0x20000/0xff0000 lookup 300 || break
     rule_count=$((rule_count - 1))
 done
-# The private OpenVPN profile is selected only when explicitly enabled.
-# Keep the unreachable default in table 300 as the VPN kill switch.
-device=ikecar
-[ "$(uci -q get openvpn.kkcar.enabled)" = 1 ] && device=ovpncar
+# The selector owns this allow-listed choice.  Keep table 300's unreachable
+# default as the kill switch whenever the chosen tunnel is absent.
+device=$(uci -q get pbr.kk_global.interface)
+case "$device" in ovpncar|wgcar) ;; *) device=ovpncar ;; esac
+for old in ovpncar wgcar ikecar; do
+    [ "$old" = "$device" ] && continue
+    ip -4 route show table 300 | grep -q "^default dev $old " &&
+        ip -4 route del default dev "$old" table 300 metric 10
+done
 if ip -o -4 addr show dev "$device" 2>/dev/null | grep -q ' inet '; then
     ip -4 route show table 300 | grep -q "^default dev $device " ||
         ip -4 route replace default dev "$device" table 300 metric 10
 else
-    for old in ikecar ovpncar; do
+    for old in ikecar ovpncar wgcar; do
         ip -4 route show table 300 | grep -q "^default dev $old " &&
             ip -4 route del default dev "$old" table 300 metric 10
     done

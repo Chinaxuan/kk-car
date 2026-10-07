@@ -1,36 +1,44 @@
 #!/bin/sh
-# Replies sourced from the assigned VPN address must return through the VPN.
-# Own only the exact rules recorded here; never flush a routing table or priority.
+# Reply over the same tunnel that received a management connection.
+# Tables 302/303 never fall back to the physical WAN.
 umask 077
-# The route watcher and IPsec up/down hook may run concurrently.
 exec 9>/var/lock/kk-car-vpn-management.lock || exit 1
 flock -n 9 || exit 0
 state=/tmp/kk-car-vpn-management-sources
-current=''
-if [ "$(uci -q get firewall.kk_vpn_admin.enabled)" = 1 ]; then
-    device=ikecar
-    [ "$(uci -q get openvpn.kkcar.enabled)" = 1 ] && device=ovpncar
-    current=$(ip -o -4 addr show dev "$device" 2>/dev/null | awk '{sub(/\/.*/, "", $4); print $4 "/32"}' | sort -u)
-fi
-old=$(cat "$state" 2>/dev/null)
-failed=0
-for source in $old; do
-    printf '%s\n' "$current" | grep -Fxq "$source" && continue
-    # A missing old rule is harmless (for example after a netifd reload).
-    while ip -4 rule show | awk -v source="$source" '$1=="9980:" && $2=="from" && ($3==source || $3 "/32"==source) && $4=="lookup" && $5=="300" {found=1} END {exit !found}'; do
-        ip -4 rule del priority 9980 from "$source" lookup 300 || { failed=1; break; }
-    done
+next=$(mktemp /tmp/kk-car-vpn-management.XXXXXX) || exit 1
+trap 'rm -f "$next"' EXIT
+
+for spec in 'ovpncar 302 9980' 'wgcar 303 9981'; do
+    set -- $spec
+    device=$1 table=$2 priority=$3
+    ip -4 route replace unreachable default table "$table" metric 32767 || exit 1
+    if ip -o -4 addr show dev "$device" 2>/dev/null | grep -q ' inet '; then
+        ip -4 route replace default dev "$device" table "$table" metric 10 || exit 1
+        if [ "$(uci -q get firewall.kk_vpn_admin.enabled)" = 1 ]; then
+            ip -o -4 addr show dev "$device" | awk '{sub(/\/.*/, "", $4); print $4 "/32"}' | sort -u |
+                while read -r source; do printf '%s %s %s\n' "$source" "$table" "$priority"; done >> "$next"
+        fi
+    else
+        ip -4 route show table "$table" | grep -q "^default dev $device " &&
+            ip -4 route del default dev "$device" table "$table" metric 10
+    fi
 done
-for source in $current; do
-    ip -4 rule show | awk -v source="$source" '$1=="9980:" && $2=="from" && ($3==source || $3 "/32"==source) && $4=="lookup" && $5=="300" {found=1} END {exit !found}' && continue
-    ip -4 rule add priority 9980 from "$source" lookup 300 || failed=1
-done
-# Retain all possibly owned rules after partial failure for later cleanup.
-next="$current"
-if [ "$failed" != 0 ]; then
-    next=$(printf '%s\n%s\n' "$old" "$current" | sed '/^$/d' | sort -u)
+
+# Migrate the former single-VPN rule (the old state stored only its source).
+if [ -f "$state" ]; then
+    while read -r source table priority; do
+        [ -n "$source" ] || continue
+        [ -n "$table" ] || table=300
+        [ -n "$priority" ] || priority=9980
+        grep -Fqx "$source $table $priority" "$next" && continue
+        ip -4 rule del priority "$priority" from "$source" lookup "$table" 2>/dev/null || true
+    done < "$state"
 fi
-if [ "$old" != "$next" ]; then
-    printf '%s\n' "$next" > "$state.new" && mv "$state.new" "$state" || failed=1
-fi
-exit "$failed"
+
+while read -r source table priority; do
+    [ -n "$source" ] || continue
+    ip -4 rule show | awk -v p="$priority:" -v s="$source" -v t="$table" \
+        '$1==p && $2=="from" && ($3==s || $3 "/32"==s) && $4=="lookup" && $5==t {f=1} END {exit !f}' && continue
+    ip -4 rule add priority "$priority" from "$source" lookup "$table" || exit 1
+done < "$next"
+mv "$next" "$state"

@@ -7,13 +7,11 @@ while :; do
     started=${started%%.*}
     : > /tmp/kk-car-vpn-ping.raw
     reason=probe
-    device=ikecar
+    device=$(uci -q get pbr.kk_global.interface)
+    case "$device" in ovpncar|wgcar) ;; *) device=ovpncar ;; esac
     running=1
-    if [ "$(uci -q get openvpn.kkcar.enabled)" = 1 ]; then
-        device=ovpncar
+    if [ "$device" = ovpncar ]; then
         pidof openvpn >/dev/null 2>&1 || running=0
-    else
-        [ -e /var/run/charon.pid ] || running=0
     fi
     if [ "$running" != 1 ] || ! ip -4 addr show dev "$device" 2>/dev/null | grep -q 'inet '; then
         reason=vpn_down
@@ -21,7 +19,7 @@ while :; do
         # At most 7 seconds per batch, including an unresponsive peer.
         ping -4 -I "$device" -c 3 -W 2 -w 7 10.8.8.8 > /tmp/kk-car-vpn-ping.raw 2>&1
     fi
-    ucode /etc/kk-car/vpn-ping-write.uc "$reason"
+    ucode /etc/kk-car/vpn-ping-write.uc "$reason" "$device"
     ucode /etc/kk-car/history-write.uc
     read ended rest < /proc/uptime
     ended=${ended%%.*}
