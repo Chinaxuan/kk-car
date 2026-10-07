@@ -7,6 +7,7 @@ table 300's unreachable fallback remain in place during a switch.
 """
 import concurrent.futures
 import fcntl
+import ipaddress
 import json
 import os
 import re
@@ -17,6 +18,8 @@ from pathlib import Path
 
 DEVICES = ('ovpncar', 'wgcar')
 TARGET = '10.8.8.8'
+DNS_NAME = 'www.google.com'
+DNS_URL = 'https://1.1.1.1/dns-query?name=www.google.com&type=A'
 STATE = Path('/tmp/kk-car-vpn-select.json')
 PAUSED = Path('/tmp/kk-car-vpn-paused')
 UPLINK = Path('/tmp/kk-car-uplink.json')
@@ -47,6 +50,41 @@ def interface_up(device):
     return code == 0 and bool(re.search(r'\binet\s+[0-9.]+/', output))
 
 
+def dns_addresses(response):
+    """Accept only complete encrypted DNS answers with public IPv4 addresses."""
+    try:
+        payload = json.loads(response)
+        if payload.get('Status') != 0:
+            return []
+        addresses = []
+        for answer in payload.get('Answer', []):
+            if answer.get('type') == 1:
+                address = ipaddress.IPv4Address(answer['data'])
+                if address.is_global:
+                    addresses.append(str(address))
+        return addresses
+    except (ValueError, KeyError, TypeError):
+        return []
+
+
+def foreign_https(device):
+    # The IP URL avoids bootstrap DNS; curl verifies the certificate for 1.1.1.1.
+    code, response = run(['curl', '-4', '--noproxy', '*', '--interface', device,
+                          '-fsS', '-m', '8', '-H', 'accept: application/dns-json',
+                          DNS_URL], 10)
+    addresses = dns_addresses(response) if code == 0 else []
+    if not addresses:
+        return False, 'encrypted_dns_failed'
+    # A real foreign HTTPS request catches tunnels that only reach the company LAN.
+    code, status = run(['curl', '-4', '--noproxy', '*', '--interface', device,
+                        '-I', '-sS', '-m', '8', '--resolve',
+                        f'{DNS_NAME}:443:{addresses[0]}', '-o', '/dev/null',
+                        '-w', '%{http_code}', f'https://{DNS_NAME}/'], 10)
+    if code != 0 or not re.fullmatch(r'[23][0-9]{2}', status.strip()):
+        return False, 'foreign_https_failed'
+    return True, 'ok'
+
+
 def probe(device):
     if device not in DEVICES or not interface_up(device):
         return {'healthy': False, 'median_ms': None, 'loss_percent': 100, 'received': 0}
@@ -55,8 +93,10 @@ def probe(device):
     received = len(rtts)
     loss = (5 - received) * 20
     median = round(statistics.median(rtts), 2) if rtts else None
-    return {'healthy': received >= 4, 'median_ms': median,
+    internet_ok, internet_reason = foreign_https(device) if received >= 4 else (False, 'company_ping_failed')
+    return {'healthy': received >= 4 and internet_ok, 'median_ms': median,
             'loss_percent': loss, 'received': received,
+            'internet_ok': internet_ok, 'internet_reason': internet_reason,
             'score_ms': round(median + (5 - received) * 30, 2) if median is not None else None}
 
 
@@ -81,6 +121,22 @@ def choice(current, results, streak, since_switch, recovery):
 
 def dns_servers(device):
     return [f'1.1.1.1@{device}', f'1.0.0.1@{device}']
+
+
+def configuration_consistent(device):
+    global_servers = [s for s in uci_get('dhcp.@dnsmasq[0].server').split()
+                      if not s.startswith('/')]
+    return (uci_get('pbr.kk_dns.interface') == device
+            and global_servers == dns_servers(device)
+            and switched_route(device))
+
+
+def local_dns_https(device):
+    # This path uses dnsmasq, unlike the encrypted candidate probe above.
+    code, status = run(['curl', '-4', '--noproxy', '*', '--interface', device,
+                        '-I', '-sS', '-m', '8', '-o', '/dev/null', '-w', '%{http_code}',
+                        f'https://{DNS_NAME}/'], 10)
+    return code == 0 and bool(re.fullmatch(r'[23][0-9]{2}', status.strip()))
 
 
 def write_dns(servers):
@@ -123,7 +179,7 @@ def switched_route(device):
 
 def switch(device):
     old = selected()
-    if device == old:
+    if device == old and configuration_consistent(device) and local_dns_https(device):
         return True
     if device not in DEVICES or not interface_up(device):
         return False
@@ -132,11 +188,13 @@ def switch(device):
         write_pbr(device)
         if not switched_route(device):
             raise RuntimeError('new route is not selected')
-        # Keep unrelated DNS rules; replace only this project's two global DNS servers.
-        preserved = [s for s in original_dns if s not in dns_servers(old) + dns_servers(device)]
+        # Keep domain-specific rules; all default DNS upstreams follow the selected VPN.
+        preserved = [s for s in original_dns if s.startswith('/')]
         write_dns(preserved + dns_servers(device))
+        if not configuration_consistent(device) or not local_dns_https(device):
+            raise RuntimeError('VPN route and local DNS failed after switching')
         if not probe(device)['healthy']:
-            raise RuntimeError('new tunnel failed after switching')
+            raise RuntimeError('new tunnel failed end-to-end probe')
         return True
     except Exception:
         try:
@@ -202,6 +260,12 @@ def main():
                 else:
                     reason = 'switch_rolled_back'
                     streak = 0
+            elif results[active]['healthy'] and (not configuration_consistent(active)
+                                                  or not local_dns_https(active)):
+                if not switch(active):
+                    reason = 'dns_route_repair_failed'
+                else:
+                    reason = 'dns_route_repaired'
             last_check = time.monotonic()
             publish({'timestamp': time.time(), 'selected': active, 'state': reason,
                      'interval_seconds': INTERVAL, 'next_check': time.time() + INTERVAL,
