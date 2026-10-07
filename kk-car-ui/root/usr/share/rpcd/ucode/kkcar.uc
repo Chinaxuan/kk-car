@@ -60,7 +60,11 @@ return { 'kkcar': {
         let current = uplink.active == 'ethernet' ? address(wired,'eth0') : wan;
         let sys = bus.call('system', 'info') || {};
         let ap = bus.call('hostapd.phy0-ap0', 'get_clients') || {};
-        let openvpn = c.get('openvpn','kkcar','enabled') == '1';
+        let selected = c.get('pbr','kk_global','interface') == 'wgcar' ? 'wgcar' : 'ovpncar';
+        let openvpn = selected == 'ovpncar';
+        let wgState = bus.call('network.interface.wgcar','status') || {};
+        let wgAddress = match(run('/sbin/ip -o -4 addr show dev wgcar'), /inet[ \t]+([0-9.]+)\//);
+        let wgAddr = wgAddress?.[1] || '';
         let ovpnState = openvpn ? (bus.call('network.interface.ovpncar','status') || {}) : {};
         let ovpnAddress = match(run('/sbin/ip -o -4 addr show dev ovpncar'), /inet[ \t]+([0-9.]+)\//);
         let ovpnAddr = ovpnAddress?.[1] || '';
@@ -98,9 +102,9 @@ return { 'kkcar': {
             telemetry:{cpu:{total,idle:+(ticks[4] || 0)+ +(ticks[5] || 0),mhz:clock ? +clock[1]/1e6 : null},
                 loads:[loads[0] || null,loads[1] || null,loads[2] || null],
                 conntrack:metricfile('/proc/sys/net/netfilter/nf_conntrack_count'),conntrack_max:metricfile('/proc/sys/net/netfilter/nf_conntrack_max'),
-                wan:netmetrics(current.device),vpn:netmetrics(openvpn ? 'ovpncar' : 'ikecar'),
-                cipher:openvpn ? (ovpnAddr ? 'AES-256-GCM' : null) : (cipher ? trim(cipher[1]) : null),
-                rekey:openvpn ? null : (rekey ? +rekey[1] : null)},
+                wan:netmetrics(current.device),vpn:netmetrics(selected),
+                cipher:openvpn ? (ovpnAddr ? 'AES-256-GCM' : null) : (wgAddr ? 'ChaCha20-Poly1305' : null),
+                rekey:null},
             temperature:numberfile('/sys/class/thermal/thermal_zone0/temp') / 1000,
             power:{known:powerbits != null, undervoltage:powerbits != null && !!(powerbits & 1), throttled:powerbits != null && !!(powerbits & 4), historical:powerbits != null && !!(powerbits & 0x50000)},
             wan:{up:uplink.active ? uplink.active != 'none' : !!wan.up, ip:current.ip || '', device:current.device || '', uptime:current.uptime || 0,
@@ -109,22 +113,23 @@ return { 'kkcar': {
                 counter_source:wan.device+'|'+portmode},
             ethernet:{mode:portmode, carrier:trim(readfile('/sys/class/net/eth0/carrier') || '')=='1', up:!!wired.up, ip:wired['ipv4-address']?.[0]?.address || ''},
             uplink,
-            vpn:{backend:openvpn ? 'OpenVPN/TCP' : 'IKEv2',
-                connected:openvpn ? !!ovpnAddr && ovpnRun : index(sa,'ESTABLISHED') >= 0 && index(sa,'INSTALLED') >= 0,
-                running:openvpn ? ovpnRun : access('/var/run/charon.pid'),
-                auto:system(openvpn ? '/etc/init.d/openvpn enabled >/dev/null 2>&1' : '/etc/init.d/swanctl enabled >/dev/null 2>&1') == 0,
-                ip:openvpn ? ovpnAddr : (virtual?.[1] || ''),
-                server:openvpn ? (ovpnServer?.[1] || '') : (remote?.[1] || ''),
-                age:openvpn ? +(ovpnState.uptime || 0) : +(age?.[1] || 0),
-                rx:openvpn ? numberfile('/sys/class/net/ovpncar/statistics/rx_bytes') : +(incoming?.[1] || 0),
-                tx:openvpn ? numberfile('/sys/class/net/ovpncar/statistics/tx_bytes') : +(outgoing?.[1] || 0),
-                route:index(ikeRoute,openvpn ? 'default dev ovpncar' : 'default dev ikecar') >= 0 && !!match(ikeRule, /10000:.*fwmark 0x20000\/0xff0000.*lookup 300/)},
+            vpn:{backend:openvpn ? 'OpenVPN/TCP' : 'WireGuard',
+                connected:openvpn ? !!ovpnAddr && ovpnRun : !!wgAddr && !!wgState.up,
+                running:!access('/tmp/kk-car-vpn-paused') && (openvpn ? ovpnRun : !!wgAddr),
+                auto:system('/etc/init.d/kk-car-vpn-select enabled >/dev/null 2>&1') == 0,
+                ip:openvpn ? ovpnAddr : wgAddr,
+                server:openvpn ? (ovpnServer?.[1] || '') : '公司 WireGuard',
+                age:openvpn ? +(ovpnState.uptime || 0) : +(wgState.uptime || 0),
+                rx:numberfile('/sys/class/net/'+selected+'/statistics/rx_bytes'),
+                tx:numberfile('/sys/class/net/'+selected+'/statistics/tx_bytes'),
+                route:index(ikeRoute,'default dev '+selected) >= 0 && !!match(ikeRule, /10000:.*fwmark 0x20000\/0xff0000.*lookup 300/)},
             wifi:{ssid:c.get('wireless','default_radio0','ssid'), channel:c.get('wireless','radio0','channel'),
                 width:width ? +width[1] : null,
                 band:c.get('wireless','radio0','band') || '2g', frequency:ap.freq || 0,
                 enabled:c.get('wireless','default_radio0','disabled') != '1', clients:length(ap.clients || {})},
             ipv6_disabled:ipv6off, modem:jsonfile('/tmp/kk-car-modem.json'),
             vpn_ping:jsonfile('/tmp/kk-car-vpn-ping.json'),
+            vpn_selector:jsonfile('/tmp/kk-car-vpn-select.json'),
             peers, wg_enabled:c.get('network','wgcar','auto') == '1',
             job:jsonfile('/tmp/kk-car-ui-job.json'), busy:access('/tmp/kk-car-ui-lock'),
             wifi_pending: pending.deadline ? {deadline:pending.deadline, ssid:pending.ssid} : null,
@@ -144,9 +149,14 @@ return { 'kkcar': {
     }},
     auto_connect: {args:{enabled:true}, call:function(req) {
         if (access('/tmp/kk-car-ui-lock')) return {ok:false,error:'请等待当前操作完成'};
-        let service = cursor().get('openvpn','kkcar','enabled') == '1' ? 'openvpn' : 'swanctl';
-        let rc = system('/etc/init.d/'+service+(req.args.enabled ? ' enable' : ' disable'));
-        return {ok:rc == 0, enabled:system('/etc/init.d/'+service+' enabled >/dev/null 2>&1') == 0};
+        let action = req.args.enabled ? 'enable' : 'disable';
+        let c=cursor();
+        c.set('network','wgcar','auto',req.args.enabled ? '1' : '0');
+        let saved=c.commit('network');
+        let ovpn=system('/etc/init.d/openvpn '+action);
+        let selector=system('/etc/init.d/kk-car-vpn-select '+action);
+        return {ok:saved && ovpn == 0 && selector == 0,
+                enabled:system('/etc/init.d/kk-car-vpn-select enabled >/dev/null 2>&1') == 0};
     }},
     port_save: {args:{mode:''}, call:function(req) {
         let mode=req.args.mode;
