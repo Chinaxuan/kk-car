@@ -166,7 +166,7 @@ return view.extend({
                             E('p',{'class':'kk-footnote'},'只影响下次开机，不会立即断开当前连接。'),
                             E('button',{type:'submit','class':'kk-button quiet'},'保存自动连接设置')
                         ]),
-                        E('p',{'class':'kk-footnote',id:'kk-wg-note'},'原 WireGuard 已停用，配置保留。')
+                        E('p',{'class':'kk-footnote',id:'kk-wg-note'},'两条 VPN 会定期对比延迟，按健康状态自动选择。')
                     ]),
                     section('网口用途','LAN 接设备；WAN 接上级路由器，获取 IPv4 地址。',[
                         field('当前用途','—','kk-port-current'),field('有线连接','—','kk-port-link'),field('当前上网出口','—','kk-uplink-active'),
@@ -194,7 +194,7 @@ return view.extend({
                             E('p',{},'重连上网棒会同时中断国内网络与 VPN，请先等待自动恢复，必要时再操作。'),
                             E('label',{'class':'kk-check',for:'kk-wan-ack'},[wanAck,E('span',{},'我已了解网络会短暂中断')]),wanButton,
                             E('dl',{'class':'kk-technical'},[
-                                E('dt',{},'VPN 协议'),E('dd',{},'IKEv2 / IPsec'),
+                                E('dt',{},'当前 VPN 协议'),E('dd',{id:'kk-vpn-protocol'},'—'),
                                 E('dt',{},'公司服务器'),E('dd',{id:'kk-server'},'—'),
                                 E('dt',{},'VPN 路由'),E('dd',{id:'kk-route'},'—'),
                                 E('dt',{},'热点频段 / 信道'),E('dd',{id:'kk-channel'},'—'),
@@ -527,15 +527,18 @@ return view.extend({
         this.text('kk-packets',statsPair(wireStats,'rx_packets','tx_packets'));
         this.text('kk-errors',errors(wireStats));this.text('kk-vpn-errors',errors(vpnStats));
         this.text('kk-wan-mtu',wireStats.mtu==null?'未知':wireStats.mtu+' B');this.text('kk-vpn-mtu',vpnStats.mtu==null?'未知':vpnStats.mtu+' B');
-        this.text('kk-cipher',telemetry.cipher?(d.vpn.backend==='OpenVPN/TCP'?telemetry.cipher:telemetry.cipher.split('/')[0].replace('AES_CBC-','AES-')+' CBC'):'未建立');
+        this.text('kk-cipher',telemetry.cipher || '未建立');
         this.el('kk-cipher').parentElement.title=telemetry.cipher || '当前 VPN 未建立';
-        this.text('kk-rekey',d.vpn.backend==='OpenVPN/TCP'?'服务端管理':telemetry.rekey==null?'未建立':duration(telemetry.rekey));
+        this.text('kk-rekey',d.vpn.backend==='WireGuard'?'自动续期':'服务端管理');
         this.text('kk-memory',bytes(d.memory && d.memory.available)+' / '+bytes(d.memory && d.memory.total));
         this.text('kk-vpn-total',bytes(d.vpn.rx)+' / '+bytes(d.vpn.tx));
         this.text('kk-total',bytes(d.wan.rx)+' / '+bytes(d.wan.tx));
         this.text('kk-server',d.vpn.server);this.text('kk-route',d.vpn.route?'已就绪':'需要检查');
+        this.text('kk-vpn-protocol',d.vpn.backend);
         this.text('kk-channel',activeBand+' / '+d.wifi.channel+(d.wifi.width?' / '+d.wifi.width+' MHz':''));
-        this.text('kk-wg-note',d.wg_enabled?'WireGuard 已被高级设置启用，请检查是否与当前 VPN 冲突。':'原 WireGuard 已停用，配置保留。');
+        var selector=d.vpn_selector||{}, sample=selector.results||{};
+        var latency=function(key){var x=sample[key]||{};return x.healthy&&x.median_ms!=null?x.median_ms+' ms':'不可用';};
+        this.text('kk-wg-note','自动选线 · OpenVPN '+latency('ovpncar')+' / WireGuard '+latency('wgcar')+' · 每 5 分钟复测，网络恢复后立即复测');
         this.el('kk-power').hidden=!(d.power.undervoltage || d.power.throttled);
         this.text('kk-power-text',d.power.undervoltage?'当前检测到欠压，可能引起降速或掉线。请检查电源和供电线。':'当前检测到处理器降频，请检查温度及供电。');
         var pending=d.wifi_pending;
