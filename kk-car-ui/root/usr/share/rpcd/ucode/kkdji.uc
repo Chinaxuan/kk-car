@@ -84,6 +84,13 @@ function state(auto_refresh) {
     let available=modem_available(modem);
     if (!fresh(info,600)) info={};
     if (!fresh(storage,600)) storage={};
+    // The independent SMS poller is the freshest source of SIM occupancy.
+    // sms_list returns a directory count, but no CPMS capacity of its own.
+    if (sms_forward.storage_at && time()-sms_forward.storage_at<120 && sms_forward.storage_capacity>0)
+        storage={storage:sms_forward.storage || storage.storage || 'SM',
+            used:+sms_forward.storage_used,total:+sms_forward.storage_capacity,
+            full:+sms_forward.storage_used>=+sms_forward.storage_capacity,
+            timestamp:+sms_forward.storage_at};
     if (auto_refresh) refresh_if_needed(modem, info);
     let cell=read_cellular(bus);
     let qmi=c.get('network','wan','proto') == 'qmi';

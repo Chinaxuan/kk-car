@@ -65,11 +65,19 @@ return { 'kkcar': {
         let wgState = bus.call('network.interface.wgcar','status') || {};
         let wgAddress = match(run('/sbin/ip -o -4 addr show dev wgcar'), /inet[ \t]+([0-9.]+)\//);
         let wgAddr = wgAddress?.[1] || '';
-        let ovpnState = openvpn ? (bus.call('network.interface.ovpncar','status') || {}) : {};
+        let ovpnState = bus.call('network.interface.ovpncar','status') || {};
         let ovpnAddress = match(run('/sbin/ip -o -4 addr show dev ovpncar'), /inet[ \t]+([0-9.]+)\//);
         let ovpnAddr = ovpnAddress?.[1] || '';
-        let ovpnRun = openvpn && run('pidof openvpn') != '';
-        let ovpnServer = match(readfile('/etc/openvpn/kkcar.conf') || '', /remote[ \t]+([A-Za-z0-9.-]+)[ \t]+[0-9]+/);
+        let ovpnRun = run('pidof openvpn') != '';
+        let ovpnConfig = readfile('/etc/openvpn/kkcar.conf') || '';
+        let ovpnServer = match(ovpnConfig, /remote[ \t]+([A-Za-z0-9.-]+)[ \t]+([0-9]+)/);
+        let ovpnProto = match(ovpnConfig, /proto[ \t]+([A-Za-z0-9-]+)/);
+        let ovpnCipher = match(ovpnConfig, /data-ciphers[ \t]+([A-Za-z0-9-]+)/);
+        let wgPeer = c.get('network','wgcar_company','endpoint_host') || '';
+        let wgPort = +(c.get('network','wgcar_company','endpoint_port') || 0);
+        let dnsServers = run('uci -q get "dhcp.@dnsmasq[0].server"');
+        let dnsInterface = index(dnsServers,'@'+selected) >= 0 ? selected : '';
+        let selector = jsonfile('/tmp/kk-car-vpn-select.json');
         let sa = run('/usr/sbin/swanctl --list-sas');
         let virtual = match(sa, /local\s+([0-9.]+)\/32/);
         let remote = match(sa, /remote\s+[^\n]+@\s+([0-9.]+)\[/);
@@ -129,7 +137,16 @@ return { 'kkcar': {
                 enabled:c.get('wireless','default_radio0','disabled') != '1', clients:length(ap.clients || {})},
             ipv6_disabled:ipv6off, modem:jsonfile('/tmp/kk-car-modem.json'),
             vpn_ping:jsonfile('/tmp/kk-car-vpn-ping.json'),
-            vpn_selector:jsonfile('/tmp/kk-car-vpn-select.json'),
+            vpn_selector:selector,
+            vpn_paths:{selected, dns_interface:dnsInterface, routes_ready:index(ikeRoute,'default dev '+selected)>=0,
+                probe_fresh:selector.timestamp && time()-selector.timestamp<=600,
+                ovpncar:{label:'OpenVPN/TCP',interface:'ovpncar',connected:!!ovpnAddr && ovpnRun,
+                    address:ovpnAddr,uptime:+(ovpnState.uptime || 0),endpoint:ovpnServer?.[1] || '',
+                    port:+(ovpnServer?.[2] || 0),transport:ovpnProto?.[1] || 'tcp-client',
+                    cipher:ovpnCipher?.[1] || '',mtu:metricfile('/sys/class/net/ovpncar/mtu')},
+                wgcar:{label:'WireGuard',interface:'wgcar',connected:!!wgAddr && !!wgState.up,
+                    address:wgAddr,uptime:+(wgState.uptime || 0),endpoint:wgPeer,port:wgPort,
+                    transport:'UDP',cipher:'ChaCha20-Poly1305',mtu:metricfile('/sys/class/net/wgcar/mtu')}} ,
             peers, wg_enabled:c.get('network','wgcar','auto') == '1',
             job:jsonfile('/tmp/kk-car-ui-job.json'), busy:access('/tmp/kk-car-ui-lock'),
             wifi_pending: pending.deadline ? {deadline:pending.deadline, ssid:pending.ssid} : null,
