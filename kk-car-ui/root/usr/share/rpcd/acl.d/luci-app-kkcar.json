@@ -12,6 +12,8 @@
           "status",
           "sms_list",
           "sms_read",
+          "sms_history",
+          "sms_history_read",
           "voice_probe",
           "call_status",
           "phone_data",
