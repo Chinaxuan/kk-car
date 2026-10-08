@@ -46,7 +46,7 @@ return view.extend({
         this.settingsPage=window.location.pathname.endsWith('/kkcar_connections');
         this.previous=null; this.requesting=false; this.historyRange='1h'; this.historyRequest=0; this.historyFetched=0;
         document.title='KK-Car · '+(this.settingsPage?'连接设置':'行车总览');
-        if(!document.getElementById('kk-style')) document.head.appendChild(E('link',{id:'kk-style',rel:'stylesheet',href:L.resource('view/kkcar/overview.css')+'?v=20260927-health1'}));
+        if(!document.getElementById('kk-style')) document.head.appendChild(E('link',{id:'kk-style',rel:'stylesheet',href:L.resource('view/kkcar/overview.css')+'?v=20261008-vpn2'}));
         this.root=E('div',{'class':'kk-app'});
         var refresh=button('刷新状态',function(){self.refresh();});
         var diag=button('检查网络',function(){self.perform('diagnose');},'primary');
@@ -375,10 +375,29 @@ return view.extend({
         history.querySelector('.kk-fold').remove();
         history.querySelector('.kk-section-head').remove();
         var top=this.root.querySelector('.kk-overview'),status=top.querySelector('.kk-overview-top');
+        function pathCard(key,title){
+            return E('article',{'class':'kk-vpn-path',id:'kk-path-'+key},[
+                E('div',{'class':'kk-vpn-path-head'},[E('h3',{},title),E('span',{'class':'kk-vpn-path-badge',id:'kk-path-'+key+'-role'},'待检测')]),
+                E('strong',{'class':'kk-vpn-path-latency',id:'kk-path-'+key+'-latency'},'—'),
+                E('p',{'class':'kk-vpn-path-health',id:'kk-path-'+key+'-health'},'等待检测'),
+                E('dl',{'class':'kk-vpn-path-data'},[
+                    E('dt',{},'隧道 / 地址'),E('dd',{id:'kk-path-'+key+'-address'},'—'),
+                    E('dt',{},'服务器 / 端口'),E('dd',{id:'kk-path-'+key+'-endpoint'},'—'),
+                    E('dt',{},'传输 / 加密'),E('dd',{id:'kk-path-'+key+'-crypto'},'—'),
+                    E('dt',{},'MTU / 在线'),E('dd',{id:'kk-path-'+key+'-uptime'},'—')
+                ])
+            ]);
+        }
+        var vpnCompare=section('两条 VPN · 自动选路','延迟来自最近一次设备探测；只有公司探测、加密 DNS 和国外 HTTPS 均通过，才参与切换。',[
+            E('div',{'class':'kk-vpn-route-line'},[E('strong',{id:'kk-vpn-route-summary'},'正在读取实际分流…'),E('span',{id:'kk-vpn-route-dns'},'')]),
+            E('div',{'class':'kk-vpn-path-grid'},[pathCard('ovpncar','OpenVPN / TCP'),pathCard('wgcar','WireGuard / UDP')]),
+            E('p',{'class':'kk-footnote',id:'kk-vpn-probe-time'},'等待选线器首次检测')
+        ]);
         this.root.querySelector('.kk-header').append(this.el('kk-summary'),status.querySelector('.kk-actions'));
         status.remove();
         top.append(E('span',{id:'kk-summary-desc',hidden:true},''));
         columns.replaceWith(workspace);
+        top.after(vpnCompare);
         this.root.classList.add('kk-console','kk-fullscreen','kk-studio');
         this.root.classList.add(this.settingsPage?'kk-connection-page':'kk-home-page');
         top.append(E('a',{id:'kk-health-link','class':'kk-health-link',href:L.url('admin/kkcar_health')},[E('span',{},'网络守护'),E('strong',{id:'kk-health-brief'},'等待检测'),E('span',{},'详情与策略 →')]));
@@ -536,9 +555,27 @@ return view.extend({
         this.text('kk-server',d.vpn.server);this.text('kk-route',d.vpn.route?'已就绪':'需要检查');
         this.text('kk-vpn-protocol',d.vpn.backend);
         this.text('kk-channel',activeBand+' / '+d.wifi.channel+(d.wifi.width?' / '+d.wifi.width+' MHz':''));
-        var selector=d.vpn_selector||{}, sample=selector.results||{};
+        var selector=d.vpn_selector||{}, sample=selector.results||{}, paths=d.vpn_paths||{};
         var latency=function(key){var x=sample[key]||{};return x.healthy&&x.median_ms!=null?x.median_ms+' ms':'不可用';};
         this.text('kk-wg-note','自动选线 · OpenVPN '+latency('ovpncar')+' / WireGuard '+latency('wgcar')+' · 每 5 分钟复测，网络恢复后立即复测');
+        var probeCurrent=!!paths.probe_fresh;
+        var reason={ok:'公司探测、加密 DNS 和国外 HTTPS 均通过',encrypted_dns_failed:'加密 DNS 未通过',foreign_https_failed:'国外 HTTPS 未通过',company_failed:'公司探测未通过'};
+        var selected=paths.selected || (d.vpn.backend==='WireGuard'?'wgcar':'ovpncar');
+        this.text('kk-vpn-route-summary','业务分流：'+(selected==='wgcar'?'WireGuard':'OpenVPN/TCP')+' · 上联 '+uplinkName);
+        this.text('kk-vpn-route-dns','策略路由 '+(paths.routes_ready?'已指向当前隧道':'未就绪')+' · DNS '+(paths.dns_interface===selected?'同路由':'未同步 / 待检查'));
+        this.text('kk-vpn-probe-time',selector.timestamp?'最近检测 '+stamp(selector.timestamp)+(probeCurrent?'':' · 结果已过期')+' · 每 5 分钟自动复测':'选线器尚无检测结果');
+        ['ovpncar','wgcar'].forEach(function(key){
+            var path=paths[key]||{}, result=sample[key]||{}, active=selected===key;
+            var label=active?'当前业务线路':'备用线路';
+            self.text('kk-path-'+key+'-role',label);
+            self.text('kk-path-'+key+'-latency',probeCurrent&&result.median_ms!=null?Number(result.median_ms).toFixed(1)+' ms':'—');
+            self.text('kk-path-'+key+'-health',!probeCurrent?'检测结果过期':!path.connected?'隧道未连接':(result.healthy?'可用 · 丢包 '+(result.loss_percent==null?'—':result.loss_percent+'%'):'不可用于自动选线 · '+(reason[result.internet_reason]||result.internet_reason||'探测未通过')));
+            self.text('kk-path-'+key+'-address',(path.interface||key)+' · '+(path.address||'未分配'));
+            self.text('kk-path-'+key+'-endpoint',path.endpoint?(path.endpoint+':'+(path.port||'—')):'未配置 / 未读取');
+            self.text('kk-path-'+key+'-crypto',(path.transport||'—')+' · '+(path.cipher||'—'));
+            self.text('kk-path-'+key+'-uptime',(path.mtu||'—')+' B · '+(path.connected?duration(path.uptime):'未连接'));
+            var card=self.el('kk-path-'+key);card.dataset.active=active?'true':'false';card.dataset.healthy=probeCurrent&&result.healthy?'true':'false';
+        });
         this.el('kk-power').hidden=!(d.power.undervoltage || d.power.throttled);
         this.text('kk-power-text',d.power.undervoltage?'当前检测到欠压，可能引起降速或掉线。请检查电源和供电线。':'当前检测到处理器降频，请检查温度及供电。');
         var pending=d.wifi_pending;

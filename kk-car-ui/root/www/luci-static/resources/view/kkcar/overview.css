@@ -148,6 +148,24 @@ body:has(.kk-fullscreen) .container{max-width:none;width:100%;padding-left:10px;
 @media(max-width:1399px){.kk-studio .kk-workspace{grid-template-columns:1fr}.kk-studio .kk-control-column{display:block}.kk-studio .kk-control-column>.kk-section{margin-bottom:10px}.kk-studio .kk-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.kk-app.kk-studio{padding:8px}.kk-studio .kk-history-section{padding:10px!important}.kk-studio .kk-history-toolbar{flex-wrap:wrap}.kk-studio .kk-history-ranges .kk-button{min-height:36px;font-size:11px}.kk-studio .kk-traffic-numbers strong{font-size:25px}.kk-studio .kk-ping-strip .kk-data-row{flex-direction:column}.kk-studio .kk-instrument-board{grid-template-columns:1fr;gap:12px}.kk-studio .kk-instrument-group{padding:0!important;border:0}.kk-studio .kk-instrument>span,.kk-studio .kk-instrument>strong,.kk-studio .kk-instrument>b,.kk-studio .kk-instrument>dd{font-size:12px!important;line-height:24px}.kk-studio .kk-controls,.kk-studio .kk-bottom-grid{grid-template-columns:1fr}.kk-studio .kk-check{font-size:12px}.kk-studio .kk-controls input[type=text],.kk-studio .kk-controls input[type=password],.kk-studio .kk-controls select{font-size:16px;height:40px}.kk-studio .kk-button{min-height:38px;font-size:12px}.kk-studio .kk-inline-notes .kk-footnote{font-size:11px!important}}
 .kk-studio #kk-history-cursor{border:0;box-shadow:none;border-radius:0;outline-offset:2px}
+/* Both VPNs remain visible on the overview and connection pages. */
+.kk-studio>.kk-section:has(.kk-vpn-path-grid){margin:0 0 10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+.kk-studio .kk-vpn-route-line{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:8px 0;color:var(--muted);font-size:12px}
+.kk-studio .kk-vpn-route-line strong{color:var(--vpn);font-size:13px}
+.kk-studio .kk-vpn-path-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kk-studio .kk-vpn-path{min-width:0;padding:12px;border:1px solid var(--line);border-radius:10px;background:oklch(21% .025 255)}
+.kk-studio .kk-vpn-path[data-active=true]{border-color:var(--vpn);background:oklch(25% .035 284)}
+.kk-studio .kk-vpn-path-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.kk-studio .kk-vpn-path h3{font-size:13px;margin:0;color:var(--ink)}
+.kk-studio .kk-vpn-path-badge{font-size:11px;color:var(--muted)}
+.kk-studio .kk-vpn-path[data-active=true] .kk-vpn-path-badge{color:var(--vpn)}
+.kk-studio .kk-vpn-path-latency{display:block;margin:5px 0;font-size:22px;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--blue)}
+.kk-studio .kk-vpn-path[data-healthy=false] .kk-vpn-path-latency{color:var(--warn)}
+.kk-studio .kk-vpn-path-health{margin:0 0 9px;font-size:11px;color:var(--muted)}
+.kk-studio .kk-vpn-path-data{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;margin:0;font-size:11px}
+.kk-studio .kk-vpn-path-data dt{color:var(--muted)}
+.kk-studio .kk-vpn-path-data dd{margin:0;text-align:right;overflow-wrap:anywhere;color:var(--ink)}
+@media(max-width:680px){.kk-studio .kk-vpn-path-grid{grid-template-columns:1fr}.kk-studio .kk-vpn-route-line{display:block}.kk-studio .kk-vpn-route-line span{display:block;margin-top:4px}}
 @media(min-width:1400px){.kk-studio .kk-header{min-height:36px;padding-bottom:2px}.kk-studio .kk-overview{margin-bottom:7px}.kk-studio .kk-instrument-board{padding-top:8px;padding-bottom:8px}.kk-studio .kk-instrument{min-height:16px}.kk-studio .kk-instrument>span,.kk-studio .kk-instrument>strong,.kk-studio .kk-instrument>b,.kk-studio .kk-instrument>dd{line-height:16px}.kk-studio .kk-bottom-grid{margin-top:7px}}
 /* Unified dark theme. Geometry, content and controls remain unchanged. */
 html:has(.kk-studio),body:has(.kk-studio){background:oklch(18% .022 255);color:oklch(93% .009 253);color-scheme:dark}

@@ -409,14 +409,19 @@ return view.extend({
         this.smsForm.hidden=!smsSendAvailable;
         var sms=extra.sms || {}, used=first(sms.used,sms.count), capacity=first(sms.capacity,sms.total),
             smsPlace=sms.storage==='SM'?'SIM':sms.storage==='ME'?'模块内存':'短信仓';
+        this.smsCapacity=capacity;
         if(used!=null && capacity!=null){
-            this.el('kk-dji-sms-count').textContent=smsPlace+' '+used+' / '+capacity+(Number(used)>=Number(capacity)?' · 已满':'');
-            this.el('kk-dji-sms-count').className=Number(used)>=Number(capacity)?'kk-dji-full':'kk-muted';
-            this.set('kk-dji-shortcut-sms',Number(used)>=Number(capacity)?'存储已满':used+' / '+capacity);
+            var smsNearFull=Number(capacity)>0 && Number(used)/Number(capacity)>=0.75;
+            var shownUnread=this.smsItems.filter(function(x){return x.ui_unread===true;}).length;
+            var knownUnread=this.smsItems.every(function(x){return typeof x.ui_unread==='boolean';});
+            var smsPrefix=this.smsItems.length?this.smsItems.length+' 条短信 · '+(knownUnread?shownUnread+' 条未查看':'未查看状态待同步')+' · ':'';
+            this.el('kk-dji-sms-count').textContent=smsPrefix+smsPlace+' '+used+' / '+capacity+(Number(used)>=Number(capacity)?' · 已满':smsNearFull?' · 快满':'');
+            this.el('kk-dji-sms-count').className=smsNearFull?'kk-dji-full':'kk-muted';
+            this.set('kk-dji-shortcut-sms',Number(used)>=Number(capacity)?'存储已满':smsNearFull?'存储快满':knownUnread&&shownUnread?shownUnread+' 条未查看':used+' / '+capacity);
         }
         var forward=extra.sms_forward || {};
         this.el('kk-dji-sms-note').textContent=!smsReadAvailable&&!smsSendAvailable?'当前固件或控制服务未开放短信功能。':
-            (used!=null&&capacity!=null&&Number(used)>=Number(capacity)?smsPlace+'已满，新短信可能无法接收。请先备份并清理旧短信。 ':smsPlace+'保存原件；树莓派在运行时把完整短信加密归档到 SD 卡。 ')+
+            (used!=null&&capacity!=null&&Number(capacity)>0&&Number(used)/Number(capacity)>=0.75?smsPlace+(Number(used)>=Number(capacity)?'已满':'快满')+'，新短信可能接收失败；请先确认加密备份再清理旧短信。 ':smsPlace+'保存原件；树莓派在运行时把完整短信加密归档到 SD 卡。 ')+
             (forward.error?'归档/推送提醒：'+forward.error+'。':forward.enabled?'新短信正文转发飞书已开启'+(forward.pending?'，待重试 '+forward.pending+' 条':'')+'。':'新短信飞书转发已关闭，可在“飞书推送”中开启。');
         var liveGps=this.liveGps || {},sky=liveGps.sky || {},gpsSupported=gps.supported===true, gpsControl=caps.gps===true,
             gpsEnabled=liveGps.ok===true?liveGps.enabled===true:gps.enabled===true,
@@ -700,8 +705,8 @@ return view.extend({
             });
             var unread=self.smsItems.filter(function(x){return x.ui_unread===true;}).length;
             var badgeKnown=self.smsItems.every(function(x){return typeof x.ui_unread==='boolean';});
-            self.el('kk-dji-sms-count').textContent=messages.length+' 条短信 · '+(badgeKnown?unread+' 条未查看':'未查看状态待同步')+' / '+reply.count+' 个存储槽';
-            self.set('kk-dji-shortcut-sms',badgeKnown&&unread?unread+' 条未查看':messages.length+' 条短信');
+            self.el('kk-dji-sms-count').textContent=messages.length+' 条短信 · '+(badgeKnown?unread+' 条未查看':'未查看状态待同步')+' · SIM '+reply.count+(self.smsCapacity?' / '+self.smsCapacity:'')+' 个存储槽';
+            self.set('kk-dji-shortcut-sms',self.smsCapacity&&reply.count>=self.smsCapacity?'存储已满':self.smsCapacity&&reply.count/self.smsCapacity>=0.75?'存储快满':badgeKnown&&unread?unread+' 条未查看':reply.count+(self.smsCapacity?' / '+self.smsCapacity:'')+' 个存储槽');
             self.renderSmsItems();
         }).catch(function(err){if(!background || !self.smsItems.length)self.smsListArea.textContent='短信目录读取失败：'+(err.message || '未知错误');}).finally(function(){self.smsLoading=false;self.smsListButton.disabled=false;});
     },
