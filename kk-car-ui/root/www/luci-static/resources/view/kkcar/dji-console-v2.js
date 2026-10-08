@@ -9,6 +9,8 @@ var getDji = rpc.declare({object:'kkdji',method:'status',expect:{}});
 var djiAction = rpc.declare({object:'kkdji',method:'action',params:['action'],expect:{}});
 var smsList = rpc.declare({object:'kkdji',method:'sms_list',expect:{}});
 var smsRead = rpc.declare({object:'kkdji',method:'sms_read',params:['index'],expect:{}});
+var smsHistory = rpc.declare({object:'kkdji',method:'sms_history',expect:{}});
+var smsHistoryRead = rpc.declare({object:'kkdji',method:'sms_history_read',params:['id'],expect:{}});
 var smsAck = rpc.declare({object:'kkdji',method:'sms_ack',params:['id'],expect:{}});
 var smsSend = rpc.declare({object:'kkdji',method:'sms_send',params:['to','text'],expect:{}});
 var smsDelete = rpc.declare({object:'kkdji',method:'sms_delete',params:['index'],expect:{}});
@@ -97,7 +99,7 @@ return view.extend({
             E('div',{'class':'kk-dji-actions'},[E('span',{'class':'kk-muted'},'单条 UCS2 最多 70 字，不支持 emoji；发送可能产生费用。'),E('button',{type:'submit','class':'kk-button primary'},'发送短信')])
         ]);
         this.smsListArea=E('div',{'class':'kk-dji-sms-list','aria-live':'polite'},'正在自动读取短信…');
-        this.smsItems=[];this.selectedSmsIndex=null;
+        this.smsItems=[];this.historyItems=[];this.selectedSmsIndex=null;this.selectedHistoryId=null;
         this.root=E('div',{'class':'kk-app kk-studio kk-dji'},[
             E('header',{'class':'kk-header'},[
                 E('div',{'class':'kk-brand'},[E('span',{'class':'kk-monogram','aria-hidden':'true'},'DJ'),E('div',{},[E('h1',{},'DJI 4G 模块'),E('p',{},'蜂窝线路 · 信号、连接与模块控制')])]),
@@ -160,9 +162,9 @@ return view.extend({
                     E('div',{'class':'kk-dji-actions'},[this.trafficSaveButton,this.trafficQueryButton]),
                     E('p',{'class':'kk-dji-note'},'默认电信 10001 / 108；移动与联通指令可能因省份和套餐不同，请先核对本卡。短信可能产生费用。运营商已用/剩余是最近回复；估算值再叠加本设备后续流量，不包含其他设备耗用。')
                 ],'kk-dji-traffic-card','kk-dji-traffic-section'),
-                card('短信中心','原件优先存在 SIM；树莓派连接时加密归档到 SD 卡。',[
+                card('短信中心','SIM 接收，树莓派保存加密历史；满足备份与投递条件后自动腾出 SIM 空间。',[
                     E('div',{'class':'kk-dji-actions'},[this.smsListButton,E('span',{id:'kk-dji-sms-count','class':'kk-muted'},'尚未读取')]),
-                    E('p',{'class':'kk-dji-note'},'打开页面即读取目录，之后定时更新；长短信合并显示。读取详情可能标为已读，不会自动删除。'),
+                    E('p',{'class':'kk-dji-note'},'页面自动更新；长短信收齐后合并。旧短信、缺段或归档与投递失败的消息不会自动清理。'),
                     E('div',{'class':'kk-dji-sms-workspace'},[
                         E('div',{'class':'kk-dji-sms-inbox'},[this.smsSearch,this.smsListArea]),
                         E('div',{'class':'kk-dji-sms-detail'},[
@@ -415,13 +417,14 @@ return view.extend({
             var shownUnread=this.smsItems.filter(function(x){return x.ui_unread===true;}).length;
             var knownUnread=this.smsItems.every(function(x){return typeof x.ui_unread==='boolean';});
             var smsPrefix=this.smsItems.length?this.smsItems.length+' 条短信 · '+(knownUnread?shownUnread+' 条未查看':'未查看状态待同步')+' · ':'';
-            this.el('kk-dji-sms-count').textContent=smsPrefix+smsPlace+' '+used+' / '+capacity+(Number(used)>=Number(capacity)?' · 已满':smsNearFull?' · 快满':'');
+            this.el('kk-dji-sms-count').textContent=smsPrefix+smsPlace+' '+used+' / '+capacity+(Number(used)>=Number(capacity)?' · 已满':smsNearFull?' · 快满':'')+
+                (this.historyItems.length?' · 树莓派历史 '+this.historyItems.length+' 条':'');
             this.el('kk-dji-sms-count').className=smsNearFull?'kk-dji-full':'kk-muted';
             this.set('kk-dji-shortcut-sms',Number(used)>=Number(capacity)?'存储已满':smsNearFull?'存储快满':knownUnread&&shownUnread?shownUnread+' 条未查看':used+' / '+capacity);
         }
         var forward=extra.sms_forward || {};
         this.el('kk-dji-sms-note').textContent=!smsReadAvailable&&!smsSendAvailable?'当前固件或控制服务未开放短信功能。':
-            (used!=null&&capacity!=null&&Number(capacity)>0&&Number(used)/Number(capacity)>=0.75?smsPlace+(Number(used)>=Number(capacity)?'已满':'快满')+'，新短信可能接收失败；请先确认加密备份再清理旧短信。 ':smsPlace+'保存原件；树莓派在运行时把完整短信加密归档到 SD 卡。 ')+
+            (used!=null&&capacity!=null&&Number(capacity)>0&&Number(used)/Number(capacity)>=0.75?smsPlace+(Number(used)>=Number(capacity)?'已满':'快满')+'，请检查归档和转发状态。 ':smsPlace+'接收短信；完整短信在树莓派加密留存，确认归档和转发后清理 SIM。 ')+
             (forward.error?'归档/推送提醒：'+forward.error+'。':forward.enabled?'新短信正文转发飞书已开启'+(forward.pending?'，待重试 '+forward.pending+' 条':'')+'。':'新短信飞书转发已关闭，可在“飞书推送”中开启。');
         var liveGps=this.liveGps || {},sky=liveGps.sky || {},gpsSupported=gps.supported===true, gpsControl=caps.gps===true,
             gpsEnabled=liveGps.ok===true?liveGps.enabled===true:gps.enabled===true,
@@ -705,18 +708,30 @@ return view.extend({
             });
             var unread=self.smsItems.filter(function(x){return x.ui_unread===true;}).length;
             var badgeKnown=self.smsItems.every(function(x){return typeof x.ui_unread==='boolean';});
-            self.el('kk-dji-sms-count').textContent=messages.length+' 条短信 · '+(badgeKnown?unread+' 条未查看':'未查看状态待同步')+' · SIM '+reply.count+(self.smsCapacity?' / '+self.smsCapacity:'')+' 个存储槽';
+            self.el('kk-dji-sms-count').textContent=messages.length+' 条短信 · '+(badgeKnown?unread+' 条未查看':'未查看状态待同步')+' · SIM '+reply.count+(self.smsCapacity?' / '+self.smsCapacity:'')+' 个存储槽'+
+                (self.historyItems.length?' · 树莓派历史 '+self.historyItems.length+' 条':'');
             self.set('kk-dji-shortcut-sms',self.smsCapacity&&reply.count>=self.smsCapacity?'存储已满':self.smsCapacity&&reply.count/self.smsCapacity>=0.75?'存储快满':badgeKnown&&unread?unread+' 条未查看':reply.count+(self.smsCapacity?' / '+self.smsCapacity:'')+' 个存储槽');
             self.renderSmsItems();
-        }).catch(function(err){if(!background || !self.smsItems.length)self.smsListArea.textContent='短信目录读取失败：'+(err.message || '未知错误');}).finally(function(){self.smsLoading=false;self.smsListButton.disabled=false;});
+        }).catch(function(err){if(!background || !self.smsItems.length)self.smsListArea.textContent='短信目录读取失败：'+(err.message || '未知错误');})
+            .then(function(){return smsHistory().then(function(reply){
+                if(reply && reply.ok===true && Array.isArray(reply.entries)){
+                    self.historyItems=reply.entries.slice().reverse();
+                    self.el('kk-dji-sms-count').textContent=self.el('kk-dji-sms-count').textContent.replace(/ · 树莓派历史 \d+ 条$/,'')+
+                        (self.historyItems.length?' · 树莓派历史 '+self.historyItems.length+' 条':'');
+                    self.renderSmsItems();
+                }
+            }).catch(function(){});})
+            .finally(function(){self.smsLoading=false;self.smsListButton.disabled=false;});
     },
     renderSmsItems:function(){
         var self=this,query=(this.smsSearch.value || '').trim().toLowerCase();
         var messages=this.smsItems.filter(function(item){
             return !query || [item.from,item.number,item.time,item.status].some(function(v){return String(v || '').toLowerCase().indexOf(query)>=0;});
         });
-        if(!messages.length){this.smsListArea.textContent=this.smsItems.length?'没有匹配的短信。':'模块存储中没有短信。';return;}
-        this.smsListArea.replaceChildren.apply(this.smsListArea,messages.map(function(item){
+        var onSim={};this.smsItems.forEach(function(item){if(item.badge_id)onSim[item.badge_id]=true;});
+        var history=this.historyItems.filter(function(item){return !onSim[item.id] && (!query || [item.from,item.time].some(function(v){return String(v || '').toLowerCase().indexOf(query)>=0;}));});
+        if(!messages.length&&!history.length){this.smsListArea.textContent=this.smsItems.length||this.historyItems.length?'没有匹配的短信。':'SIM 和树莓派中都没有短信。';return;}
+        var rows=messages.map(function(item){
             var index=Number(item.index),safe=Number.isInteger(index)&&index>=0&&index<=255;
             var select=E('button',{type:'button','class':'kk-dji-sms-item'+(index===self.selectedSmsIndex?' selected':''),
                 click:function(){self.readSms(index);}},[
@@ -725,16 +740,38 @@ return view.extend({
             ]);
             select.disabled=!safe;
             return select;
-        }));
+        });
+        if(history.length){rows.push(E('div',{'class':'kk-dji-sms-detail-meta'},'树莓派历史 · 已从 SIM 清理或仍在 SIM 中'));
+            history.forEach(function(item){rows.push(E('button',{type:'button','class':'kk-dji-sms-item'+(item.id===self.selectedHistoryId?' selected':''),
+                click:function(){self.readHistory(item.id);}},[
+                E('span',{'class':'kk-dji-sms-item-top'},[E('strong',{},shown(item.from,'未知号码')),E('small',{},item.unread?'未查看':'已归档')]),
+                E('span',{'class':'kk-dji-sms-item-bottom'},[E('span',{},shown(item.time,'时间未知')),E('span',{},'树莓派加密历史 →')])
+            ]));});}
+        this.smsListArea.replaceChildren.apply(this.smsListArea,rows);
     },
     clearSmsDetail:function(){
         this.smsRequestId=(this.smsRequestId || 0)+1;
-        this.selectedSmsIndex=null;this.smsReading=false;
+        this.selectedSmsIndex=null;this.selectedHistoryId=null;this.smsReading=false;
         this.smsDetailMeta.textContent='选择左侧短信查看正文';
         this.smsDetailBody.textContent='正文只在你点击短信后读取，不保存在浏览器。';
         this.smsDeleteButton.disabled=true;
         this.smsReplyButton.disabled=true;
         this.smsListArea.querySelectorAll('.kk-dji-sms-item.selected').forEach(function(el){el.classList.remove('selected');});
+    },
+    readHistory:function(id){
+        var self=this,item=this.historyItems.find(function(entry){return entry.id===id;});
+        if(!item)return;
+        this.clearSmsDetail();this.selectedHistoryId=id;this.smsReading=true;
+        var requestId=this.smsRequestId;
+        this.smsDetailMeta.textContent=shown(item.from,'未知号码')+' · '+shown(item.time,'时间未知')+' · 树莓派历史';
+        this.smsDetailBody.textContent='正在解密本地历史…';this.renderSmsItems();
+        return smsHistoryRead(id).then(function(reply){
+            if(self.smsRequestId!==requestId || self.selectedHistoryId!==id)return;
+            if(!reply || reply.ok!==true || !reply.message)throw Error(reply && reply.error || '历史读取失败');
+            self.smsDetailBody.textContent=reply.message.text || '这是一条空短信。';
+            if(item.unread)smsAck(id).then(function(){item.unread=false;self.renderSmsItems();}).catch(function(){});
+        }).catch(function(error){if(self.smsRequestId===requestId)self.smsDetailBody.textContent='读取失败：'+error.message;})
+            .finally(function(){if(self.smsRequestId===requestId)self.smsReading=false;});
     },
     readSms:function(index){
         var self=this,item=this.smsItems.find(function(message){return Number(message.index)===index;});
@@ -772,7 +809,8 @@ return view.extend({
                     item.ui_unread=false;
                     self.renderSmsItems();
                     var unread=self.smsItems.filter(function(x){return x.ui_unread===true;}).length;
-                    self.el('kk-dji-sms-count').textContent=self.smsItems.length+' 条短信 · '+unread+' 条未查看';
+                    self.el('kk-dji-sms-count').textContent=self.smsItems.length+' 条短信 · '+unread+' 条未查看'+
+                        (self.historyItems.length?' · 树莓派历史 '+self.historyItems.length+' 条':'');
                     self.set('kk-dji-shortcut-sms',unread?unread+' 条未查看':self.smsItems.length+' 条短信');
                 }).catch(function(){});
             }
