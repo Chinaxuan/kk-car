@@ -50,6 +50,9 @@ while IFS= read -r -d "$cr" command; do
         'AT+CMGD=1,0')
             printf '1' > "$KK_CAR_SMS_MOCK_DELETE"
             printf '\r\nOK\r\n' ;;
+        'AT+CMGD=2,0'|'AT+CMGD=3,0')
+            printf '%s' "${command#AT+CMGD=}" | cut -d, -f1 >> "$KK_CAR_SMS_MOCK_DELETE"
+            printf '\r\nOK\r\n' ;;
         'AT+CMGS='*)
             printf '\r\n> '
             IFS= read -r -d "$ctrlz" pdu || true
@@ -117,6 +120,25 @@ printf '%s\n' "$read" | grep -q '"part": 1'
 read=$(ucode "$script" read 5)
 printf '%s\n' "$read" | grep -q '"bits": 16'
 printf '%s\n' "$read" | grep -q '"part": 2'
+
+sms_time=$(printf '%s\n' "$list" | jsonfilter -e '@.groups[0].time')
+sms_digest=$(printf '中文' | sha256sum | cut -d' ' -f1)
+printf '{"id":"%064d","index":1,"parts":[1],"from":"10086","time":"%s","concat":null,"digest":"%064d"}' 0 "$sms_time" 0 > "$dir/request.json"
+chmod 600 "$dir/request.json"
+invalid=$(ucode "$script" cleanup "$dir/request.json")
+printf '%s\n' "$invalid" | grep -q '"code": "CHANGED"'
+[ ! -e "$KK_CAR_SMS_MOCK_DELETE" ]
+printf '{"id":"%064d","index":1,"parts":[1],"from":"10086","time":"%s","concat":null,"digest":"%s"}' 0 "$sms_time" "$sms_digest" > "$dir/request.json"
+cleared=$(ucode "$script" cleanup "$dir/request.json")
+printf '%s\n' "$cleared" | grep -q '"removed": 1'
+[ "$(cat "$KK_CAR_SMS_MOCK_DELETE")" = 1 ]
+rm -f "$KK_CAR_SMS_MOCK_DELETE"
+long_digest=$(printf '中文' | sha256sum | cut -d' ' -f1)
+printf '{"id":"%064d","index":2,"parts":[2,3],"from":"10086","time":"%s","concat":{"ref":122,"bits":8,"total":2},"digest":"%s"}' 0 "$sms_time" "$long_digest" > "$dir/request.json"
+long_result=$(ucode "$script" cleanup "$dir/request.json")
+printf '%s\n' "$long_result" | grep -q '"removed": 2'
+[ "$(tr -d '\n' < "$KK_CAR_SMS_MOCK_DELETE")" = 32 ]
+rm -f "$KK_CAR_SMS_MOCK_DELETE"
 
 call=$(ucode "$script" call_status)
 printf '%s\n' "$call" | grep -q '"state": "来电振铃"'
