@@ -316,12 +316,22 @@ function encode_submit(to, text) {
     return {pdu:'00' + tpdu,length:length(tpdu) / 2};
 }
 function load_request(path) {
-    if (!TEST && path != '/tmp/kk-car-dji-sms-request-lock/request.json') return null;
+    if (!TEST && path != '/tmp/kk-car-dji-sms-request-lock/request.json' &&
+        path != '/tmp/kk-car-sms-forward/cleanup.json') return null;
     let s = stat(path);
     if (!s || s.type != 'file' || s.uid != 0 || s.size > 1024 ||
         s.perm.group_read || s.perm.group_write || s.perm.other_read || s.perm.other_write) return null;
     try { let value = json(readfile(path) || ''); return type(value) == 'object' ? value : null; }
     catch (e) { return null; }
+}
+function text_hash(text) {
+    let path=WORK+'/cleanup-body';
+    if (!writefile(path,text)) return null;
+    chmod(path,0600);
+    let result=read_command('sha256sum '+path);
+    unlink(path);
+    let match_hash=match(result,/^([0-9a-f]{64}) /);
+    return match_hash ? match_hash[1] : null;
 }
 function call_status(raw) {
     let state='idle',direction=null,count=0,number=null;
@@ -627,6 +637,50 @@ function perform(session, action, param) {
         let result = at(session, 'AT+CMGL=4', 10);
         return result.ok ? parse_list(result.data, state.storage) : result;
     }
+    if (action == 'cleanup') {
+        let request=load_request(param);
+        if (!request || !match(request.id || '',/^[0-9a-f]{64}$/) ||
+            !match(request.digest || '',/^[0-9a-f]{64}$/) ||
+            type(request.from)!='string' || type(request.time)!='string' ||
+            type(request.index)!='int' || request.index<0 || request.index>255 ||
+            type(request.parts)!='array' || !length(request.parts) ||
+            length(request.parts)>12) return error('INPUT','清理凭据无效');
+        let listed=at(session,'AT+CMGL=4',10);
+        if (!listed.ok) return listed;
+        let directory=parse_list(listed.data,state.storage);
+        if (!directory.ok) return directory;
+        let group=filter(directory.groups,g=>g.index==request.index &&
+            g.from==request.from && g.time==request.time &&
+            ((!g.concat && !request.concat) || (g.concat && request.concat &&
+                g.concat.ref==request.concat.ref && g.concat.bits==request.concat.bits &&
+                g.concat.total==request.concat.total)) &&
+            sprintf('%J',g.parts)==sprintf('%J',request.parts))[0];
+        if (!group || !group.complete || group.status=='已发' || group.status=='待发')
+            return error('CHANGED','短信目录已变化，停止自动清理');
+        let content='';
+        for (let i=0;i<length(group.parts);i++) {
+            let index=group.parts[i],read=at(session,'AT+CMGR='+index,6);
+            if (!read.ok) return read;
+            let parsed=parse_read(read.data,index,state.storage);
+            if (!parsed.ok || parsed.message.unsupported || parsed.message.from!=group.from ||
+                ((!parsed.message.concat && !!group.concat) || (!!parsed.message.concat && !group.concat)) ||
+                (group.concat && (parsed.message.concat.ref!=group.concat.ref ||
+                    parsed.message.concat.bits!=group.concat.bits ||
+                    parsed.message.concat.total!=group.concat.total)) ||
+                (group.concat && parsed.message.concat.part!=i+1))
+                return error('CHANGED','短信内容已变化，停止自动清理');
+            content+=parsed.message.text;
+        }
+        if (text_hash(content)!=request.digest)
+            return error('CHANGED','短信正文校验失败，停止自动清理');
+        let parts=sort(group.parts,(a,b)=>b-a),removed=0;
+        for (let index in parts) {
+            let deleted=at(session,'AT+CMGD='+index+',0',6);
+            if (!deleted.ok) return {ok:false,code:'PARTIAL',error:'部分片段未删除',removed};
+            removed++;
+        }
+        return {ok:true,id:request.id,removed};
+    }
     if (!match(param || '', /^(0|[1-9][0-9]{0,2})$/) || +param > 255)
         return error('INPUT', '短信编号无效');
     if (action == 'read') {
@@ -641,15 +695,15 @@ function perform(session, action, param) {
 }
 
 let action = ARGV[0] || '', param = ARGV[1] || '', result = null;
-if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|voice_probe|call_status|call_diag|call_dial|call_answer|call_hangup|gps_probe|gps_start|gps_stop)$/)) result = error('INPUT', '不支持的模块操作');
+if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|cleanup|voice_probe|call_status|call_diag|call_dial|call_answer|call_hangup|gps_probe|gps_start|gps_stop)$/)) result = error('INPUT', '不支持的模块操作');
 else if (getenv('KK_CAR_DJI_SMS_LOCKED') != '1') {
     // The read-only AT probes use flock on this same file. Re-exec under that
     // lock so the lock is held for the full serial session and cleaned by the
     // kernel even if this process is killed.
     let script = TEST ? (getenv('KK_CAR_SMS_TEST_SCRIPT') || '') : '/etc/kk-car/dji-sms.uc';
     let safe_script = TEST ? match(script, /^\/tmp\/[A-Za-z0-9_./-]+\.uc$/) : true;
-    let safe_param = action == 'send' ?
-        (TEST ? match(param, /^\/tmp\/[A-Za-z0-9_./-]+$/) : param == '/tmp/kk-car-dji-sms-request-lock/request.json') :
+    let safe_param = action == 'send' || action == 'cleanup' ?
+        (TEST ? match(param, /^\/tmp\/[A-Za-z0-9_./-]+$/) : param == (action=='cleanup' ? '/tmp/kk-car-sms-forward/cleanup.json' : '/tmp/kk-car-dji-sms-request-lock/request.json')) :
         (action == 'read' || action == 'delete' ? match(param, /^(0|[1-9][0-9]{0,2})$/) :
          action == 'call_dial' ? match(param,/^\+?[0-9]{3,15}$/) : param == '');
     if (!safe_script || !safe_param) result = error('INPUT', '操作参数无效');

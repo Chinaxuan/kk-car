@@ -14,6 +14,10 @@ const badge_path='/tmp/kk-car-sms-badge.json';
 const seen_path='/etc/kk-car/private/dji-sms-seen.json';
 const archive_dir='/etc/kk-car/private/sms-archive';
 const recipient='/etc/kk-car/private/sms-archive-recipient.pem';
+const history_dir='/etc/kk-car/private/sms-history';
+const history_index='/etc/kk-car/private/sms-history-index.json';
+const local_cert='/etc/kk-car/private/sms-local-cert.pem';
+const local_key='/etc/kk-car/private/sms-local-key.pem';
 function parse(path) { try { return json(readfile(path) || ''); } catch(e) { return null; } }
 function save(path, value) {
     let temp=path+'.new';
@@ -71,6 +75,52 @@ function archive(id,group,text) {
     chmod(target+'.new',0600);
     return rename(target+'.new',target);
 }
+function digest(text) {
+    if (!writefile(dir+'/digest-input',text)) return null;
+    chmod(dir+'/digest-input',0600);
+    let value=match(run('sha256sum '+dir+'/digest-input'),/^([0-9a-f]{64}) /);
+    unlink(dir+'/digest-input');
+    return value ? value[1] : null;
+}
+function local_history(id,group,text) {
+    if (!stat(history_dir) && !mkdir(history_dir,0700)) return false;
+    chmod(history_dir,0700);
+    if (!!stat(local_cert)!=!!stat(local_key)) return false;
+    if (!stat(local_cert) && !stat(local_key)) {
+        if (system('openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=KK-Car-SMS -keyout '+
+            local_key+'.new -out '+local_cert+'.new >/dev/null 2>&1')!=0) return false;
+        chmod(local_key+'.new',0600);chmod(local_cert+'.new',0600);
+        if (!rename(local_key+'.new',local_key) || !rename(local_cert+'.new',local_cert)) return false;
+    }
+    let target=history_dir+'/'+id+'.der';
+    if (!writefile(dir+'/history.json',sprintf('%J',{from:group.from,time:group.time,
+        concat:group.concat,text}))) return false;
+    chmod(dir+'/history.json',0600);
+    let expected=digest(readfile(dir+'/history.json'));
+    if (!expected) { unlink(dir+'/history.json'); return false; }
+    if (!stat(target)) {
+        let rc=system('openssl cms -encrypt -binary -aes-256-cbc -outform DER -in '+dir+
+            '/history.json -out '+target+'.new -recip '+local_cert+' >/dev/null 2>&1');
+        if (rc!=0 || (stat(target+'.new')?.size || 0)<128) {
+            unlink(target+'.new');unlink(dir+'/history.json');return false;
+        }
+        chmod(target+'.new',0600);
+        if (!rename(target+'.new',target)) { unlink(dir+'/history.json'); return false; }
+    }
+    let verified=system('openssl cms -decrypt -inform DER -in '+target+' -recip '+local_cert+
+        ' -inkey '+local_key+' -out '+dir+'/verified.json >/dev/null 2>&1')==0 &&
+        digest(readfile(dir+'/verified.json') || '')==expected;
+    unlink(dir+'/history.json');unlink(dir+'/verified.json');
+    if (!verified) return false;
+    let index=parse(history_index) || {entries:[]};
+    if (type(index.entries)!='array') return false;
+    if (!length(filter(index.entries,e=>e.id==id))) {
+        push(index.entries,{id,from:group.from,time:group.time,concat:group.concat,
+            archived_at:time()});
+        if (!save(history_index,index)) return false;
+    }
+    return true;
+}
 function send(dest,text) {
     if (!valid_url(dest.url)) return false;
     if (!save(dir+'/payload.json',{msg_type:'text',content:{text}})) return false;
@@ -114,7 +164,7 @@ function process_messages() {
     let seen=parse(seen_path)?.ids || {};
     let badges=[];
     let unread=0;
-    let incomplete=false;
+    let incomplete=false,cleanup_queue=[];
     // A SIM/module store switch can expose historical messages that were not
     // visible in the previous poll. Archive them, but never label them new.
     let storage_changed=state.storage!=null && state.storage!=list.storage;
@@ -125,7 +175,9 @@ function process_messages() {
         if (!id) { summary.error='无法识别短信'; return; }
         let existing=filter(state.entries,e=>e.id==id)[0];
         if (!existing) {
-            existing={id,baseline:!state.initialized || !summary.enabled || storage_changed,archived:false,delivered:{}};
+            existing={id,baseline:!state.initialized || !summary.enabled || storage_changed,
+                archived:false,delivered:{},cleanup_eligible:state.initialized && !storage_changed,
+                required:summary.enabled ? map(filter(c.destinations || [],d=>d.enabled && valid_url(d.url)),d=>d.id) : []};
             // Automatic archival reads the SIM slot, but is not a user read.
             existing.unread=state.initialized && !storage_changed;
             existing.legacy=!state.initialized || storage_changed;
@@ -137,14 +189,28 @@ function process_messages() {
             unread:is_new,baseline:existing.legacy==true || (existing.unread==null && existing.baseline==true)});
         let targets=existing.baseline || !summary.enabled ? [] : filter(c.destinations || [],d=>d.enabled && valid_url(d.url));
         let waiting=filter(targets,d=>existing.delivered[d.id]!=true);
-        if (existing.archived && !length(waiting)) continue;
+        if (existing.archived && existing.local_history && !length(waiting)) {
+            if (existing.cleanup_eligible && !existing.cleaned &&
+                !length(filter(existing.required || [],target=>existing.delivered[target]!=true)))
+                push(cleanup_queue,{id,group,existing});
+            continue;
+        }
         let message=body(group);
         if (message==null) { summary.pending++; continue; }
         if (!existing.archived) {
             if (archive(id,group,message)) { existing.archived=true; save(state_path,state); }
             else summary.error='短信加密备份失败';
         }
-        if (!length(waiting)) continue;
+        if (existing.archived && !existing.local_history) {
+            if (local_history(id,group,message)) { existing.local_history=true;save(state_path,state); }
+            else summary.error='本地短信历史保存失败';
+        }
+        if (!length(waiting)) {
+            if (existing.cleanup_eligible && existing.archived && existing.local_history && !existing.cleaned &&
+                !length(filter(existing.required || [],target=>existing.delivered[target]!=true)))
+                push(cleanup_queue,{id,group,existing,message});
+            continue;
+        }
         let formatted='【KK-Car 新短信】\n发件人：'+group.from+'\n时间：'+group.time+'\n内容：\n'+message;
         for (let target in waiting) {
             if (send(target,formatted)) {
@@ -154,9 +220,33 @@ function process_messages() {
             }
             else summary.pending++;
         }
+        if (existing.cleanup_eligible && existing.archived && existing.local_history && !existing.cleaned &&
+            !length(filter(existing.required || [],target=>existing.delivered[target]!=true)))
+            push(cleanup_queue,{id,group,existing,message});
+    }
+    // New complete messages may leave the SIM only after both archives and
+    // every destination enabled at receipt have been confirmed. Old entries
+    // are intentionally ineligible; their historical delivery is ambiguous.
+    for (let item in cleanup_queue) {
+        let message=item.message ?? body(item.group);
+        let hash=message==null ? null : digest(message);
+        if (!hash || !stat(archive_dir+'/'+item.id+'.der') ||
+            !stat(history_dir+'/'+item.id+'.der')) continue;
+        if (!save(dir+'/cleanup.json',{id:item.id,index:item.group.index,parts:item.group.parts,
+            from:item.group.from,time:item.group.time,concat:item.group.concat,digest:hash})) continue;
+        let result=sms('cleanup',dir+'/cleanup.json');
+        unlink(dir+'/cleanup.json');
+        if (result?.ok && result.removed==length(item.group.parts)) {
+            item.existing.cleaned=true;
+            save(state_path,state);
+            summary.cleaned=(summary.cleaned || 0)+result.removed;
+        }
+        else summary.error='自动清理未确认，已保留短信';
     }
     state.initialized=true;
     state.storage=list.storage;
+    // Cleared SIM messages remain unread in the Pi history until opened.
+    unread=length(filter(state.entries,e=>e.local_history==true && e.unread==true && seen[e.id]!=true));
     if (length(state.entries)>512) state.entries=slice(state.entries,length(state.entries)-512);
     if (!save(state_path,state)) { summary.error='无法保存去重状态'; return; }
     if (!save(badge_path,{timestamp:summary.timestamp,storage:list.storage,groups:badges})) {
@@ -168,5 +258,6 @@ function process_messages() {
 }
 process_messages();
 save(status_path,summary);
-for (let file in ['hash-input','payload.json','curl.conf','response.json','archive.json']) unlink(dir+'/'+file);
+for (let file in ['hash-input','payload.json','curl.conf','response.json','archive.json',
+    'digest-input','history.json','verified.json','cleanup.json']) unlink(dir+'/'+file);
 rmdir(dir);
