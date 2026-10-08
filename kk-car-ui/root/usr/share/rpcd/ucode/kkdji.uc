@@ -204,11 +204,44 @@ return {'kkdji': {
         }
         return result;
     }},
+    sms_history:{call:function() {
+        let index=filejson('/etc/kk-car/private/sms-history-index.json');
+        let entries=type(index.entries)=='array' ? index.entries : [];
+        let seen=filejson('/etc/kk-car/private/dji-sms-seen.json').ids || {};
+        let state=filejson('/etc/kk-car/private/dji-sms-forward-state.json').entries || [];
+        let result=[];
+        for (let item in entries) {
+            if (!match(item.id || '',/^[0-9a-f]{64}$/) ||
+                !access('/etc/kk-car/private/sms-history/'+item.id+'.der')) continue;
+            let tracked=filter(state,e=>e.id==item.id)[0] || {};
+            push(result,{id:item.id,from:item.from,time:item.time,
+                archived_at:item.archived_at,unread:tracked.unread==true && seen[item.id]!=true});
+        }
+        return {ok:true,entries:slice(result,length(result)>500?length(result)-500:0)};
+    }},
+    sms_history_read:{args:{id:''},call:function(req) {
+        let id=req.args.id;
+        if (type(id)!='string' || !match(id,/^[0-9a-f]{64}$/)) return {ok:false,error:'短信标识无效'};
+        let base='/etc/kk-car/private/';
+        let index=filejson(base+'sms-history-index.json').entries || [];
+        if (!length(filter(index,e=>e.id==id))) return {ok:false,error:'短信历史不存在'};
+        let command='openssl cms -decrypt -inform DER -in '+base+'sms-history/'+id+'.der'+
+            ' -recip '+base+'sms-local-cert.pem -inkey '+base+'sms-local-key.pem 2>/dev/null';
+        let process=popen(command);
+        if (!process) return {ok:false,error:'短信历史解密失败'};
+        let raw=process.read('all') || '';process.close();
+        if (length(raw)>16384) return {ok:false,error:'短信历史格式异常'};
+        let data={};try { data=json(raw); } catch(e) { return {ok:false,error:'短信历史解密失败'}; }
+        return type(data.text)=='string' ? {ok:true,message:{id,from:data.from,time:data.time,
+            text:data.text,concat:data.concat}} : {ok:false,error:'短信历史格式异常'};
+    }},
     sms_ack:{args:{id:''},call:function(req) {
         let id=req.args.id;
         if (type(id)!='string' || !match(id,/^[0-9a-f]{64}$/)) return {ok:false,error:'短信标识无效'};
         let badges=sms_badges();
-        if (!badges || !length(filter(badges.groups,b=>b.id==id)))
+        let history=filejson('/etc/kk-car/private/sms-history-index.json').entries || [];
+        if ((!badges || !length(filter(badges.groups,b=>b.id==id))) &&
+            !length(filter(history,e=>e.id==id)))
             return {ok:false,error:'短信目录已变化，请刷新'};
         return save_sms_seen(id) ? {ok:true} : {ok:false,error:'未能保存已读状态'};
     }},
