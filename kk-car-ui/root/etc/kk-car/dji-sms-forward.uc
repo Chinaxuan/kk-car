@@ -85,20 +85,31 @@ function send(dest,text) {
 }
 
 if (!mkdir(dir,0700)) exit(0); // a previous poll still owns the tmpfs workdir
-let summary={timestamp:time(),enabled:false,initialized:false,pending:0,last_success:null,
-    unread_count:null,unread_known:false,error:null};
+let previous=parse(status_path) || {};
+let summary={timestamp:time(),enabled:false,initialized:previous.initialized==true,pending:0,
+    last_success:previous.last_success || null,unread_count:previous.unread_count ?? null,
+    unread_known:previous.unread_known==true,error:null,
+    storage:previous.storage || null,storage_used:previous.storage_used ?? null,
+    storage_capacity:previous.storage_capacity ?? null,storage_at:previous.storage_at || null};
 function process_messages() {
     let c=read_config(), list=sms('list',null);
+    summary.enabled=c.enabled==true && c.events?.sms_received==true;
     if (!list?.ok || type(list.groups)!='array') {
-        unlink(badge_path); summary.error='短信目录暂不可读'; return;
+        // A busy AT port is transient. Preserve the last badge until a fresh
+        // directory can be read, instead of briefly clearing the unread hint.
+        summary.error='短信目录暂不可读'; return;
     }
+    let storage=sms('storage',null);
+    summary.storage=list.storage;
+    summary.storage_used=+(list.count || 0);
+    summary.storage_capacity=storage?.ok ? +(storage.capacity || 0) : 0;
+    summary.storage_at=time();
     let state=parse(state_path);
     if (!state || type(state.entries)!='array' || !match(state.salt || '',/^[0-9a-f]{64}$/)) {
         let salt=run('head -c 32 /dev/urandom | hexdump -v -e \'1/1 "%02x"\'');
         if (!match(salt,/^[0-9a-f]{64}$/)) { summary.error='无法初始化去重状态'; return; }
         state={salt,initialized:false,entries:[]};
     }
-    summary.enabled=c.enabled==true && c.events?.sms_received==true;
     summary.initialized=state.initialized;
     let seen=parse(seen_path)?.ids || {};
     let badges=[];

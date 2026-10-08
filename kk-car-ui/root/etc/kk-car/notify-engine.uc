@@ -37,6 +37,11 @@ function step(s,x,c,now) {
     let hot=x.temperature==null ? null : x.temperature>=c.temperature_c ? true : x.temperature<=c.temperature_c-5 ? false : s.rules.temperature?.value || false;
     transition('temperature',hot,c.hold_seconds,'temperature',hot?'树莓派持续高温：'+x.temperature+' °C':'树莓派温度已恢复',!hot,true);
     transition('power',x.undervoltage,10,'power',x.undervoltage?'树莓派当前供电不足':'树莓派供电已恢复',!x.undervoltage,true);
+    let store=x.sms_storage, storeHigh=store?.capacity>0 ?
+        (store.used*4>=store.capacity*3 ? true : store.used*2<store.capacity ? false : s.rules.sms_storage?.value || false) : null;
+    transition('sms_storage',storeHigh,30,'sms_storage',storeHigh?
+        'DJI 短信仓快满：'+store.used+'/'+store.capacity+'，新短信可能接收失败；请先确认加密备份再清理旧短信。':
+        'DJI 短信仓空间已恢复',!storeHigh,true);
     if(x.clients!=null) {
         for(let mac,name in x.clients) {
             let p=s.clients[mac];

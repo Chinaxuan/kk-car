@@ -60,9 +60,12 @@ try {
                 }
             }
             let modem=d.modem || {}, mf=modem.timestamp && time()-modem.timestamp>=0 && time()-modem.timestamp<90;
+            let smsStatus=read('/tmp/kk-car-sms-forward-status.json');
+            let smsStore=smsStatus?.storage_at && time()-smsStatus.storage_at<120 && smsStatus.storage_capacity>0 ?
+                {used:smsStatus.storage_used,capacity:smsStatus.storage_capacity} : null;
             let sample={timestamp:time(),vpn:d.vpn?.connected==true,uplink:d.uplink?.active || null,ping:d.vpn_ping,
                 rsrp:mf && modem.online ? modem.rsrp : null,temperature:d.temperature>0 ? d.temperature : null,
-                undervoltage:d.power?.known ? d.power.undervoltage : null,clients};
+                undervoltage:d.power?.known ? d.power.undervoltage : null,clients,sms_storage:smsStore};
             let result=step(s.engine,sample,c,now);s.engine=result.state;
             for(let e in result.events)push(s.queue,{...e,queued_at:now,done:{}});
             s.sample_at=time();s.sample_error=false;
