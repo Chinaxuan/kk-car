@@ -110,9 +110,16 @@ function query(state,c,today,automatic) {
     }
     unlink(request);rmdir(dir);
     state.last_query_epoch=time();
-    if (automatic) state.last_query_day=today;
-    if (!reply?.ok) return {ok:false,error:reply?.error || '模块未确认发送'};
+    if (!reply?.ok) {
+        state.last_query_error=reply?.error || '模块未确认发送';
+        // Only BUSY is known to have stopped before submission. Other
+        // failures may have reached the carrier; do not send twice today.
+        if (reply?.code!='BUSY') state.last_query_blocked_day=today;
+        return {ok:false,error:state.last_query_error};
+    }
     state.last_query_day=today;
+    state.last_query_blocked_day=null;
+    state.last_query_error=null;
     state.pending_time=run('date +%Y-%m-%d\\ %H:%M:%S');
     state.parse_error=null;
     return {ok:true,accepted:true};
@@ -120,12 +127,15 @@ function query(state,c,today,automatic) {
 function publish(state,c) {
     let anchor=state.anchor?.operator==c.operator ? state.anchor : null;
     let delta=anchor ? max(0,(state.total?.rx || 0)+(state.total?.tx || 0)-anchor.local_total) : 0;
-    return {timestamp:time(),config:c,day:state.day || {rx:0,tx:0},
+    return {timestamp:time(),today:day(),config:c,day:state.day || {rx:0,tx:0},
         month:state.month || {rx:0,tx:0},total:state.total || {rx:0,tx:0},
         resets:state.resets || 0,anchor,
         estimated_used:anchor ? anchor.used_bytes+delta : null,
         estimated_remaining:anchor ? max(0,anchor.remaining_bytes-delta) : null,
-        last_query_day:state.last_query_day || null,pending:!!state.pending_time,
+        last_query_day:state.last_query_day || null,
+        last_query_blocked_day:state.last_query_blocked_day || null,
+        last_query_epoch:state.last_query_epoch || null,
+        last_query_error:state.last_query_error || null,pending:!!state.pending_time,
         parse_error:state.parse_error || null};
 }
 let mode=ARGV[0] || 'tick', c=config(), state=read(state_path), today=day();
@@ -135,7 +145,9 @@ if (mode=='tick' || mode=='query' || mode=='import_today') {
     let modem=mode=='query' ? null : connect().call('kkdji','status',{});
     if (mode!='query') sample(state,today,modem);
     if (mode=='query') { print(sprintf('%J',query(state,c,today,false))+'\n');changed=true; }
-    else if (mode=='tick' && c.daily==true && hour()>=+c.hour && state.last_query_day!=today && modem?.capabilities?.sms_send==true) {
+    else if (mode=='tick' && c.daily==true && hour()>=+c.hour && state.last_query_day!=today &&
+        state.last_query_blocked_day!=today &&
+        (!state.last_query_epoch || time()-state.last_query_epoch>=300) && modem?.capabilities?.sms_send==true) {
         query(state,c,today,true);changed=true;
     }
     if (mode=='import_today' || (state.pending_time && (!state.last_scan || time()-state.last_scan>=60))) {

@@ -31,8 +31,17 @@ function run(command) {
     let output=trim(p.read('all') || ''); p.close(); return output;
 }
 function sms(action,index) {
-    let raw=run('/usr/bin/ucode /etc/kk-car/dji-sms.uc '+action+(index==null?'':' '+index));
-    try { return json(raw); } catch(e) { return null; }
+    // Status sampling, the webpage and this poller share one AT port. Retry
+    // only read operations after a BUSY result; never repeat sends/deletes.
+    let response=null;
+    for (let attempt=0;attempt<3;attempt++) {
+        let raw=run('/usr/bin/ucode /etc/kk-car/dji-sms.uc '+action+(index==null?'':' '+index));
+        try { response=json(raw); } catch(e) { response=null; }
+        if (response?.code!='BUSY' || index!=null && action!='read' ||
+            index==null && action!='list' && action!='storage') break;
+        if (attempt<2) sleep(0.5);
+    }
+    return response;
 }
 function fingerprint(state,group) {
     // CMGD compacts slot indexes; including them here would re-send surviving

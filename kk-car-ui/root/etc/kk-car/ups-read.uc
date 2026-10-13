@@ -89,8 +89,11 @@ function validRaw(v) {
         u16(0x13)<=100 && u16(0x15)>=1 && u16(0x15)<=1440 &&
         (v[0x17-1]==0 || v[0x17-1]==1) &&
         u16(0x28)>=1 && u16(0x28)<=255 &&
-        total<=2147483647 && charging<=2147483647 && current<=2147483647 &&
-        current<=total+120 && charging<=total+86400;
+        // Firmware counters can survive/reset independently. In particular,
+        // charging_s may exceed total_run_s on a healthy, readable V10 board.
+        // Validate each counter, but do not reject all battery measurements
+        // because two independent lifetime counters disagree.
+        total<=2147483647 && charging<=2147483647 && current<=2147483647;
 }
 
 function sample(lite,attempt) {

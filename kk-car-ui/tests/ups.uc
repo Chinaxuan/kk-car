@@ -75,6 +75,8 @@ put16(0x0b,49);put16(0x0d,4282);put16(0x0f,1792);
 put16(0x13,86);put16(0x15,2);frame[0x17-1]=1;
 put32(0x1c,3600);put32(0x20,3600);put32(0x24,3600);put16(0x28,10);
 check(validRaw(frame),'valid controller frame');
+put32(0x1c,818664);put32(0x20,1184156);put32(0x24,32894);
+check(validRaw(frame),'independent V10 runtime counters do not hide battery data');
 put16(0x28,65535);check(!validRaw(frame),'reject corrupt firmware version');put16(0x28,10);
 put32(0x24,4294967295);check(!validRaw(frame),'reject corrupt uptime');put32(0x24,3600);
 put16(0x11,65535);check(!validRaw(frame),'reject corrupt protection voltage');

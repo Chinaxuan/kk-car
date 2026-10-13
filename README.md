@@ -2,7 +2,7 @@
 
 把闲置的树莓派 3B+ 变成车载路由器：USB 4G 上网、Wi-Fi 热点、回公司 VPN。管理台按使用场景组织为行车总览、连接设置、网络守护、蜂窝与通信、电源与设备、通知中心和设置中心；所有页面共用左侧导航、页头、深色界面和操作规范，手机从「功能」按钮切换。
 
-本仓库保存 **截至 2026-10-07 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
+本仓库保存 **截至 2026-10-13 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
 
 [使用说明](docs/USAGE.md) · [VPN 自动选线](docs/VPN-AUTO-SELECT.md) · [OpenVPN/TCP 有线接入](docs/OPENVPN-TCP.md) · [统一界面](docs/CONSOLE-UI.md) · [网络守护](docs/NETWORK-HEALTH.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [充放电曲线](docs/BATTERY-HISTORY.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
 
