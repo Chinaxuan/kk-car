@@ -1,6 +1,14 @@
 'use strict';
 import { access, popen, readfile } from 'fs';
 
+function percent_field_checked() {
+    // Explicit field evidence for the installed cells; not a firmware flag or
+    // a laboratory capacity measurement. Missing marker defaults to unknown.
+    let data={};
+    try { data=json(readfile('/etc/kk-car/private/ups-percent-check.json') || '{}'); } catch(e) {}
+    return data.checked===true && data.battery_profile=='2x4000mah';
+}
+
 // EP-0136 UPS Plus. This module only reads documented registers.
 function command(cmd) {
     let p = popen(cmd + ' 2>/dev/null');
@@ -130,7 +138,7 @@ function sample(lite,attempt) {
     result.battery={percent:charge, millivolts:battery, temperature_c:temp,
         configured_full_mv:full, configured_empty_mv:empty,
         configured_protect_mv:u16(0x11),user_programmed:values[0x2a-1]==1,
-        percent_calibration_unverified:true};
+        percent_calibration_unverified:!percent_field_checked()};
     result.input={external, usb_c_mv:usbC, micro_usb_mv:micro};
     result.output={pogo_mv:pogo, mcu_mv:u16(0x01),
         pi_undervoltage:throttled==null ? null : !!(throttled&1),
@@ -165,7 +173,7 @@ function sample(lite,attempt) {
     if (temp>=50) push(result.warnings,'电池温度偏高，请检查散热和充电环境');
     if (pogo<4700) push(result.warnings,'树莓派供电电压偏低');
     if (throttled!=null && (throttled&1)) push(result.warnings,'树莓派当前报告欠压');
-    if (charge<=20) push(result.warnings,'电量估计值偏低；尚需完整充放电校准');
+    if (charge<=20) push(result.warnings,'UPS 电量估计值偏低，请检查关机保护');
     return result;
 }
 

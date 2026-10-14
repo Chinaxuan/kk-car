@@ -281,7 +281,7 @@ return view.extend({
             self.text('kk-ups-path',source);
             self.text('kk-ups-detail',(Number.isFinite(battery.percent)?battery.percent+'% · ':'')+(Number.isFinite(output.pogo_mv)?(output.pogo_mv/1000).toFixed(2)+' V':'电压未知'));
             self.text('kk-ups-source',source);
-            self.text('kk-ups-percent',Number.isFinite(battery.percent)?battery.percent+'% · 未校准':'未知');
+            self.text('kk-ups-percent',Number.isFinite(battery.percent)?battery.percent+'% · '+(battery.percent_calibration_unverified===false?'曲线已核对':'待核对'):'未知');
             self.text('kk-ups-voltage',Number.isFinite(output.pogo_mv)?(output.pogo_mv/1000).toFixed(2)+' V':'未知');
             self.text('kk-ups-watts',Number.isFinite(pi.power_mw)?(pi.power_mw/1000).toFixed(1)+' W · 估算':'未知');
             self.text('kk-ups-temp',Number.isFinite(battery.temperature_c)?battery.temperature_c+' °C':'未知');

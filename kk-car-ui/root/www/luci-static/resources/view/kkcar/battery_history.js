@@ -9,7 +9,7 @@ var metrics={battery_a:{label:'电池电流',unit:'A',col:5,color:'#8edcc5',sign
     battery_w:{label:'电池功率',unit:'W',col:6,color:'#8edcc5',signed:true},
     pi_w:{label:'Pi 耗电',unit:'W',col:8,color:'#f3c17a'},
     temperature_c:{label:'电池温度',unit:'°C',col:9,color:'#f3c17a'},
-    percent_estimate:{label:'电量估计（未校准）',unit:'%',col:10,color:'#c4b3f8'},
+    percent_estimate:{label:'UPS 电量估计',unit:'%',col:10,color:'#c4b3f8'},
     pi_v:{label:'Pi 供电电压',unit:'V',col:7,color:'#f3c17a'}};
 function fmt(v,d){return Number.isFinite(v)?v.toFixed(d==null?2:d):'—';}
 function date(t){return t?new Date(t*1000).toLocaleString('zh-CN',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';}
@@ -153,7 +153,7 @@ var HistoryPanel=baseclass.extend({
             .finally(function(){self.exporting=false;self.exportButton.disabled=!self.data.points.length;self.exportButton.textContent='导出原始数据 CSV';});
     },
     download:function(points,range){
-        var header=['时间 ISO','连续片段','状态','UPS 主控 V','INA219 电池侧 V','电池电流估算 A','电池功率估算 W','Pi 供电 V','Pi 功率估算 W','电池温度估算 C','电量估计 %（未校准）','外电接入','当前欠压'];
+        var header=['时间 ISO','连续片段','状态','UPS 主控 V','INA219 电池侧 V','电池电流估算 A','电池功率估算 W','Pi 供电 V','Pi 功率估算 W','电池温度估算 C','UPS 电量估计 %','外电接入','当前欠压'];
         var rows=points.map(function(r){return [new Date(r[0]*1000).toISOString(),r[1],modes[r[2]]].concat(r.slice(3)).map(function(v){return v==null?'':String(v);}).join(',');});
         var blob=new Blob(['\ufeff'+header.join(',')+'\r\n'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=E('a',{href:url,download:'KK-Car-battery-'+range+'.csv'});link.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);
     }

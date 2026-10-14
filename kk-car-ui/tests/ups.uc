@@ -36,6 +36,23 @@ let lowFirst=step(idle,low,idleAlmost,0,3700);
 let lowSecond=step(idle,low,lowFirst,0,3710);
 let lowPriority=step(idle,low,lowSecond,0,3720);
 check(lowPriority.should_shutdown && lowPriority.shutdown_reason=='low_voltage','low voltage overrides idle reason');
+let percentPolicy={enabled:true,mode:'percent',shutdown_mv:3500,shutdown_percent:10,
+    emergency_mv:3250,idle_enabled:false,idle_minutes:60};
+let ten={ok:true,input:{external:false},battery:{millivolts:3320,percent:10}};
+let pctFirst=step(percentPolicy,ten,{},1,100),pctSecond=step(percentPolicy,ten,pctFirst,1,110);
+let pctThird=step(percentPolicy,ten,pctSecond,1,120);
+check(pctFirst.percent_consecutive==1 && pctSecond.percent_consecutive==2 &&
+    pctThird.should_shutdown && pctThird.shutdown_reason=='low_percent','three low percent samples');
+check(!step(percentPolicy,ten,pctThird,1,130).should_shutdown,'percent shutdown triggered once');
+let badPercent={ok:true,input:{external:false},battery:{millivolts:3400,percent:101}};
+check(step(percentPolicy,badPercent,{},1,100).status=='invalid_percent' &&
+    !step(percentPolicy,badPercent,{},1,100).should_shutdown,'invalid percent cannot shut down');
+let floorOnly={ok:true,input:{external:false},battery:{millivolts:3240,percent:50}};
+let floorFirst=step(percentPolicy,floorOnly,{},1,100);
+check(step(percentPolicy,floorOnly,step(percentPolicy,floorOnly,floorFirst,1,110),1,120).shutdown_reason=='low_voltage',
+    'voltage floor protects percent mode');
+check(step(percentPolicy,plugged,pctSecond,1,130).percent_consecutive==0,
+    'external power resets low percent counter');
 let armed={ok:true,input:{external:true},controller:{shutdown_countdown_s:88}};
 check(orphaned_timer({},armed,false),'cancel orphaned timer on powered startup');
 check(!orphaned_timer({timestamp:1},armed,false),'do not cancel timer during normal running');
@@ -98,4 +115,4 @@ check(validRaw(frame),'independent V10 runtime counters do not hide battery data
 put16(0x28,65535);check(!validRaw(frame),'reject corrupt firmware version');put16(0x28,10);
 put32(0x24,4294967295);check(!validRaw(frame),'reject corrupt uptime');put32(0x24,3600);
 put16(0x11,65535);check(!validRaw(frame),'reject corrupt protection voltage');
-print('PASS UPS policy, voltage consistency, disabled monitoring, write-validation, and corrupt-frame cases\n');
+print('PASS UPS voltage/percent/idle policy, sensor consistency, write-validation, and corrupt-frame cases\n');

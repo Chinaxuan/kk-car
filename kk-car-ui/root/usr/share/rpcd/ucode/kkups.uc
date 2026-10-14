@@ -1,7 +1,7 @@
 'use strict';
 import { sample } from '/etc/kk-car/ups-read.uc';
 import { readfile, popen } from 'fs';
-import { policy,save_policy,save_idle_policy,set_option,save_battery,rtc_sync,power_action } from '/etc/kk-car/ups-control.uc';
+import { policy,save_policy,save_shutdown_policy,save_idle_policy,set_option,save_battery,rtc_sync,power_action } from '/etc/kk-car/ups-control.uc';
 
 function status() {
     let data=sample();
@@ -47,6 +47,11 @@ return { 'kkups': {
     }},
     save_policy: {args:{enabled:false,shutdown_mv:3550},call:function(req) {
         let a=req.args;return save_policy(a.enabled,a.shutdown_mv);
+    }},
+    save_shutdown_policy: {args:{enabled:false,mode:'voltage',shutdown_mv:3550,
+        shutdown_percent:10,emergency_mv:3250},call:function(req) {
+        let a=req.args;return save_shutdown_policy(a.enabled,a.mode,a.shutdown_mv,
+            a.shutdown_percent,a.emergency_mv);
     }},
     save_idle_policy: {args:{idle_enabled:false,idle_minutes:60},call:function(req) {
         let a=req.args;return save_idle_policy(a.idle_enabled,a.idle_minutes);

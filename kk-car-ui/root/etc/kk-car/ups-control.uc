@@ -20,37 +20,55 @@ function policy() {
     try { data=json(raw || '{}'); } catch(e) {}
     return {enabled:data.enabled===true,shutdown_mv:type(data.shutdown_mv)=='int' &&
         data.shutdown_mv>=3300 && data.shutdown_mv<=3900 ? data.shutdown_mv : 3550,
+        mode:data.mode=='percent'?'percent':'voltage',
+        shutdown_percent:type(data.shutdown_percent)=='int' && data.shutdown_percent>=5 &&
+            data.shutdown_percent<=30 ? data.shutdown_percent : 10,
+        emergency_mv:type(data.emergency_mv)=='int' && data.emergency_mv>=3100 &&
+            data.emergency_mv<=3500 ? data.emergency_mv : 3250,
         idle_enabled:data.idle_enabled===true,
         idle_minutes:type(data.idle_minutes)=='int' && data.idle_minutes>=5 &&
             data.idle_minutes<=240 ? data.idle_minutes : 60};
 }
 
+function write_policy(next) {
+    let path=POLICY+'.new';
+    if (!writefile(path,sprintf('%J',next))) return {ok:false,error:'无法保存关机策略'};
+    chmod(path,0600);
+    if (!rename(path,POLICY)) return {ok:false,error:'无法完成关机策略保存'};
+    return {ok:true,policy:policy()};
+}
+
 function save_policy(enabled,shutdown_mv) {
     if (type(enabled)!='bool' || type(shutdown_mv)!='int' || shutdown_mv<3300 || shutdown_mv>3900)
         return {ok:false,error:'低电阈值须为 3300–3900 mV'};
-    let before=policy(), next={enabled,shutdown_mv,
-        idle_enabled:before.idle_enabled,idle_minutes:before.idle_minutes};
-    if (before.enabled==enabled && before.shutdown_mv==shutdown_mv) return {ok:true,unchanged:true,policy:before};
-    let path=POLICY+'.new';
-    if (!writefile(path,sprintf('%J',next))) return {ok:false,error:'无法保存低电策略'};
-    chmod(path,0600);
-    if (!rename(path,POLICY)) return {ok:false,error:'无法完成低电策略保存'};
-    return {ok:true,policy:policy()};
+    let before=policy(), next={...before,enabled,shutdown_mv,mode:'voltage'};
+    if (before.enabled==enabled && before.shutdown_mv==shutdown_mv && before.mode=='voltage')
+        return {ok:true,unchanged:true,policy:before};
+    return write_policy(next);
+}
+
+function save_shutdown_policy(enabled,mode,shutdown_mv,shutdown_percent,emergency_mv) {
+    if (type(enabled)!='bool' || (mode!='voltage' && mode!='percent') ||
+        type(shutdown_mv)!='int' || shutdown_mv<3300 || shutdown_mv>3900 ||
+        type(shutdown_percent)!='int' || shutdown_percent<5 || shutdown_percent>30 ||
+        type(emergency_mv)!='int' || emergency_mv<3100 || emergency_mv>3500)
+        return {ok:false,error:'关机参数超出允许范围'};
+    let before=policy(),next={...before,enabled,mode,shutdown_mv,
+        shutdown_percent,emergency_mv};
+    if (before.enabled==enabled && before.mode==mode && before.shutdown_mv==shutdown_mv &&
+        before.shutdown_percent==shutdown_percent && before.emergency_mv==emergency_mv)
+        return {ok:true,unchanged:true,policy:before};
+    return write_policy(next);
 }
 
 function save_idle_policy(idle_enabled,idle_minutes) {
     if (type(idle_enabled)!='bool' || type(idle_minutes)!='int' ||
         idle_minutes<5 || idle_minutes>240)
         return {ok:false,error:'无人连接关机时间须为 5–240 分钟'};
-    let before=policy(), next={enabled:before.enabled,shutdown_mv:before.shutdown_mv,
-        idle_enabled,idle_minutes};
+    let before=policy(), next={...before,idle_enabled,idle_minutes};
     if (before.idle_enabled==idle_enabled && before.idle_minutes==idle_minutes)
         return {ok:true,unchanged:true,policy:before};
-    let path=POLICY+'.new';
-    if (!writefile(path,sprintf('%J',next))) return {ok:false,error:'无法保存无人连接策略'};
-    chmod(path,0600);
-    if (!rename(path,POLICY)) return {ok:false,error:'无法完成无人连接策略保存'};
-    return {ok:true,policy:policy()};
+    return write_policy(next);
 }
 
 function write_reg(reg,value) {
@@ -313,5 +331,5 @@ function power_action(action,confirm) {
     });
 }
 
-export { policy,save_policy,save_idle_policy,set_option,battery_voltage_error,battery_settings,
+export { policy,save_policy,save_shutdown_policy,save_idle_policy,set_option,battery_voltage_error,battery_settings,
     battery_revision,battery_expected_matches,battery_settings_error,battery_transaction,save_battery,rtc_sync,power_action };

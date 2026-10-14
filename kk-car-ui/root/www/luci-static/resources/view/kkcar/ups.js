@@ -11,7 +11,7 @@ var getSettings=rpc.declare({object:'kksettings',method:'status',expect:{}});
 var saveSettings=rpc.declare({object:'kksettings',method:'save',params:['settings','revision'],expect:{}});
 var setOption=rpc.declare({object:'kkups',method:'set_option',params:['key','value','expected','confirm'],expect:{}});
 var saveBattery=rpc.declare({object:'kkups',method:'save_battery',params:['full_mv','empty_mv','protect_mv','manual','expected','confirm'],expect:{}});
-var savePolicy=rpc.declare({object:'kkups',method:'save_policy',params:['enabled','shutdown_mv'],expect:{}});
+var saveShutdownPolicy=rpc.declare({object:'kkups',method:'save_shutdown_policy',params:['enabled','mode','shutdown_mv','shutdown_percent','emergency_mv'],expect:{}});
 var saveIdlePolicy=rpc.declare({object:'kkups',method:'save_idle_policy',params:['idle_enabled','idle_minutes'],expect:{}});
 var syncRtc=rpc.declare({object:'kkups',method:'rtc_sync',expect:{}});
 var powerAction=rpc.declare({object:'kkups',method:'power_action',params:['action','confirm'],expect:{}});
@@ -21,7 +21,7 @@ function millivolts(mv){return Number.isFinite(mv)?number(mv,0)+' mV':'—';}
 function chargingPower(input,sensor){return input.external===true&&sensor.detected===true&&sensor.overflow!==true&&sensor.conversion_ready===true&&Number.isFinite(sensor.current_ma)&&sensor.current_ma>100&&Number.isFinite(sensor.power_mw)&&sensor.power_mw>=200&&sensor.power_mw<=30000?sensor.power_mw/1000:null;}
 function duration(s){if(!Number.isFinite(s))return '—';var h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h>0?h+' 小时 '+m+' 分钟':m+' 分钟';}
 function yesno(v){return v==null?'未知':v?'是':'否';}
-function watchLabel(v){return ({disabled:'未启用',monitoring:'监测中',external_power:'外部供电中',on_battery:'电池供电中',idle_wait:'无人连接计时中',idle_shutdown:'已触发无人连接关机',clients_unknown:'终端状态未知，暂不计时',low_battery_wait:'低电压复核中',low_battery:'已触发低电关机',read_error:'采样失败',invalid_voltage:'电压读数无效',decision_cancelled:'关机前状态变化，已取消'})[v]||'等待首次采样';}
+function watchLabel(v){return ({disabled:'未启用',monitoring:'监测中',external_power:'外部供电中',on_battery:'电池供电中',idle_wait:'无人连接计时中',idle_shutdown:'已触发无人连接关机',clients_unknown:'终端状态未知，暂不计时',low_battery_wait:'低电压复核中',low_battery:'已触发低电关机',low_percent_wait:'低电量复核中',low_percent:'已触发低电量关机',invalid_percent:'百分比无效，保留电压兜底',read_error:'采样失败',invalid_voltage:'电压读数无效',decision_cancelled:'关机前状态变化，已取消'})[v]||'等待首次采样';}
 function cell(label,value,hint){var children=[E('span',{},label),E('strong',{},value)];if(hint)children.push(E('small',{},hint));return E('div',{'class':'ku-cell'},children);}
 function section(title,nodes,subtitle){var heading=[E('h2',{},title)];if(subtitle)heading.push(E('span',{},subtitle));return E('section',{'class':'ku-panel'},[E('div',{'class':'ku-panel-title'},heading),E('div',{'class':'ku-grid'},nodes)]);}
 function nav(href,title,active){return E('a',{href:href,'class':'ku-nav-item'+(active?' active':''),'aria-current':active?'page':null},title);}
@@ -121,7 +121,7 @@ return view.extend({
                 E('span',{},'mAh'),
                 this.capacitySave=E('button',{'class':'ku-button',type:'button',click:function(){self.saveCapacity();}},'保存容量')
             ]),
-            this.capacityHint=E('p',{'class':'ku-helper','aria-live':'polite'},'容量只用于续航粗估，电量百分比仍未校准。')
+            this.capacityHint=E('p',{'class':'ku-helper','aria-live':'polite'},'容量只用于续航粗估，不会修改 UPS 上报的百分比。')
         ]);
         return this.batteryForm;
     },
@@ -190,9 +190,14 @@ return view.extend({
             .finally(function(){self.batterySaving=false;self.updateBattery(self.batteryLast);});
     },
     buildControls:function(d){
-        var self=this,b=d.battery,c=d.controller,p=d.policy||{enabled:false,shutdown_mv:3550,idle_enabled:false,idle_minutes:60};
+        var self=this,b=d.battery,c=d.controller,p=d.policy||{enabled:false,shutdown_mv:3550,mode:'voltage',shutdown_percent:10,emergency_mv:3250,idle_enabled:false,idle_minutes:60};
         var policyOn=E('input',{type:'checkbox','aria-label':'启用低电安全关机'});policyOn.checked=!!p.enabled;
         var policyMv=E('input',{type:'number',min:3300,max:3900,step:10,value:p.shutdown_mv,'aria-label':'低电关机阈值 mV'});
+        var policyMode=E('select',{'aria-label':'低电关机依据'},[
+            E('option',{value:'voltage'},'参考电压'),E('option',{value:'percent'},'UPS 百分比 + 电压兜底')]);
+        policyMode.value=p.mode||'voltage';
+        var policyPct=E('input',{type:'number',min:5,max:30,step:1,value:p.shutdown_percent||10,'aria-label':'低电关机百分比'});
+        var emergencyMv=E('input',{type:'number',min:3100,max:3500,step:10,value:p.emergency_mv||3250,'aria-label':'百分比模式电压兜底 mV'});
         var idleOn=E('input',{type:'checkbox','aria-label':'启用无人连接自动关机'});idleOn.checked=!!p.idle_enabled;
         var idleMinutes=E('input',{type:'number',min:5,max:240,step:1,value:p.idle_minutes||60,'aria-label':'无人连接关机分钟数'});
         function action(label,key,phrase,description){return E('div',{'class':'ku-action'},[E('div',{},[E('strong',{},label),E('small',{},description)]),E('button',{'class':'ku-button'+(phrase?' danger':''),type:'button',click:function(){var answer=phrase?(window.prompt('此操作会改变设备供电状态。请输入“'+phrase+'”确认：')||''):'';if(phrase&&answer!==phrase)return;self.perform(powerAction(key,answer),key.startsWith('cancel')?'倒计时取消指令已发送':'操作指令已发送',true);}},label)]);}
@@ -203,9 +208,13 @@ return view.extend({
                     this.controlRow('来电自启','auto_start_on_ac',c.auto_start_on_ac?1:0,0,1,'外部电源恢复后自动启动',false,true),
                     this.controlRow('采样周期','sample_minutes',c.sample_minutes,1,1440,'1–1440 分钟；当前设备为 '+c.sample_minutes+' 分钟',false,false),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'RTC 校时'),E('small',{},'将已校准的系统 UTC 时间写入 UPS 时钟')]),E('button',{'class':'ku-button',type:'button',click:function(){if(window.confirm('确认用树莓派当前系统时间同步 UPS 实时时钟？'))self.perform(syncRtc(),'RTC 已与系统时间同步',true);}},'同步时间')])]),
-                E('section',{'class':'ku-panel'},[E('h3',{},'低电安全关机'),E('p',{'class':'ku-helper'},'外部输入断开时监测参考电压。两路读数差异超过 150 mV 时回退主控读数并告警；连续 3 次低于阈值才安排 UPS 180 秒后断电，并让 OpenWrt 正常关机。电量百分比不参与判断，低压段仍需实测核对。'),
+                E('section',{'class':'ku-panel'},[E('h3',{},'低电安全关机'),E('p',{'class':'ku-helper'},'仅在外电断开时运行。电压模式按参考电压；百分比模式按 UPS 上报电量，同时保留独立电压兜底。任一条件连续 3 次成立才安排正常关机，UPS 180 秒后切断输出。'),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'启用监控'),E('small',{},'断电后持续监测电池电压')]),policyOn]),
-                    E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'关机阈值'),E('small',{},'3300–3900 mV；需按实际电池与负载校准')]),policyMv,E('button',{'class':'ku-button',type:'button',click:function(){var mv=Number(policyMv.value);if(!Number.isInteger(mv)){self.message('请输入整数电压',true);return;}if(policyOn.checked&&!p.enabled&&!window.confirm('启用后，当车载外部供电断开且电池持续低电压时，树莓派会自动关机。确定启用？'))return;self.perform(savePolicy(policyOn.checked,mv),'低电保护设置已保存',true);}},'保存策略')]),
+                    E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'关机依据'),E('small',{},'新电池曲线已观察到 96%→1%；容量和剩余时间仍只是估算')]),policyMode]),
+                    E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'电压模式阈值'),E('small',{},'3300–3900 mV；只在电压模式使用')]),policyMv]),
+                    E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'百分比阈值'),E('small',{},'5–30%；当前目标 10%')]),policyPct]),
+                    E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'百分比模式电压兜底'),E('small',{},'3100–3500 mV；百分比失效或低压时仍能关机')]),emergencyMv,
+                        E('button',{'class':'ku-button',type:'button',click:function(){var mv=Number(policyMv.value),pct=Number(policyPct.value),floor=Number(emergencyMv.value);if(!Number.isInteger(mv)||mv<3300||mv>3900||!Number.isInteger(pct)||pct<5||pct>30||!Number.isInteger(floor)||floor<3100||floor>3500){self.message('请核对电压和百分比范围',true);return;}if(policyOn.checked&&(!p.enabled||p.mode!==policyMode.value)&&!window.confirm('断电后达到所选低电条件，树莓派会自动关机。确定保存？'))return;self.perform(saveShutdownPolicy(policyOn.checked,policyMode.value,mv,pct,floor),'低电保护设置已保存',true);}},'保存策略')]),
                     this.lowWatch=E('small',{'class':'ku-watch'},'')]),
                 E('section',{'class':'ku-panel'},[E('h3',{},'断电后无人连接关机'),E('p',{'class':'ku-helper'},'仅在 UPS 外部输入断开且 Wi-Fi/LAN 终端连续为零时计时；有设备接入或外电恢复立即清零。终端检测失败时暂停计时。低电压保护始终优先。'),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'启用无人连接计时'),E('small',{},'关闭前仍保持网络与短信服务运行')]),idleOn]),
@@ -241,7 +250,7 @@ return view.extend({
             '按主控电压、保护值、'+runtime.capacity_mah+' mAh 与当前约 '+number(runtime.power_w,1)+' W 估算；未校准，不用于关机。';
         this.updated.textContent='更新于 '+new Date(d.timestamp*1000).toLocaleTimeString('zh-CN',{hour12:false});
         this.hero.replaceChildren(
-            E('div',{'class':'ku-battery'},[E('div',{'class':'ku-battery-top'},[E('span',{},'BATTERY / 电池电量估计'),E('span',{'class':'ku-pill '+(i.external?'good':'warn')},i.external?'外部供电中':'电池供电中')]),E('div',{'class':'ku-battery-value'},[E('strong',{},number(b.percent,0)),E('span',{},'%')]),E('div',{'class':'ku-gauge',role:'meter','aria-label':'电池电量估计','aria-valuemin':'0','aria-valuemax':'100','aria-valuenow':String(pct)},E('div',{style:'width:'+pct+'%'})),E('p',{},'UPS 百分比未校准；续航粗估改用主控电压和当前负载。'),E('div',{'class':'ku-runtime'},[E('span',{},runtimeTitle),E('strong',{},runtimeValue),E('small',{},runtimeNote)])]),
+            E('div',{'class':'ku-battery'},[E('div',{'class':'ku-battery-top'},[E('span',{},'BATTERY / 电池电量估计'),E('span',{'class':'ku-pill '+(i.external?'good':'warn')},i.external?'外部供电中':'电池供电中')]),E('div',{'class':'ku-battery-value'},[E('strong',{},number(b.percent,0)),E('span',{},'%')]),E('div',{'class':'ku-gauge',role:'meter','aria-label':'电池电量估计','aria-valuemin':'0','aria-valuemax':'100','aria-valuenow':String(pct)},E('div',{style:'width:'+pct+'%'})),E('p',{},b.percent_calibration_unverified===false?'新电池满电到低电的显示范围已核对；仍是 UPS 估算，不等于实测容量。':'UPS 百分比尚无本机新电池完整曲线核对。'),E('div',{'class':'ku-runtime'},[E('span',{},runtimeTitle),E('strong',{},runtimeValue),E('small',{},runtimeNote)])]),
             E('div',{'class':'ku-hero-stats'},[cell('树莓派供电',volts(o.pogo_mv),o.pi_undervoltage===true?'当前欠压':o.pi_undervoltage===false?'当前无欠压':'欠压状态未知'),cell('树莓派耗电估算',number(pi.power_mw/1000,1)+' W','来自 INA219 电压差及厂商标注电阻'),cell('电池充电功率',chargeWatts===null?'—':'约 '+number(chargeWatts,1)+' W',chargeWatts===null?'当前未检测到有效充电':'电池侧估算，非充电器输入功率')])
         );
         this.warnings.replaceChildren.apply(this.warnings,(d.warnings||[]).map(function(w){return E('div',{'class':'ku-warning'},w);}));
@@ -252,7 +261,7 @@ return view.extend({
             section('时钟与硬件诊断',[cell('故障记录',diag.ok&&d.timestamp>=diag.timestamp&&d.timestamp-diag.timestamp<90?'每分钟保存中':'尚未更新','SD 卡保留 · 总量上限 16 MB'),cell('最近一分钟 QMI 错误',number(diag.qmi_errors,0),'超时及响应解析失败次数'),cell('本次启动未正常卸载告警',number(diag.sd_unclean,0),'启动分区 FAT 告警次数'),cell('RTC',rtc.detected?(rtc.halted?'停振 / 待校时':rtc.valid?'运行中':'时间无效'):'未检测','I²C 0x68'),cell('RTC 寄存器时间',rtc.time_register||'—','手动同步后为 UTC'),cell('UPS 主控','已连接','I²C 0x17'),cell('Pi 侧 INA219',pi.detected?'已检测':'未检测','I²C 0x40 · 校准 '+(pi.calibration??'—')),cell('电池侧 INA219',bat.detected?'已检测':'未检测','I²C 0x45 · 校准 '+(bat.calibration??'—')),cell('Pi 传感器状态',pi.overflow?'量程溢出':pi.conversion_ready?'转换完成':'等待转换','配置 0x'+(pi.config==null?'—':pi.config.toString(16))),cell('电池传感器状态',bat.overflow?'量程溢出':bat.conversion_ready?'转换完成':'等待转换','配置 0x'+(bat.config==null?'—':bat.config.toString(16))),cell('CPU 温度',number(o.cpu_temperature_c,1)+' °C'),cell('树莓派供电标志',o.power_flags==null?'未知':'0x'+o.power_flags.toString(16)),cell('当前欠压 / 降频',yesno(o.pi_undervoltage)+' / '+yesno(o.pi_throttled)),cell('当前限频 / 软温控',yesno(o.pi_frequency_capped)+' / '+yesno(o.pi_soft_temp_limit)),cell('曾欠压 / 降频',yesno(o.pi_undervoltage_history)+' / '+yesno(o.pi_throttled_history)),cell('曾限频 / 软温控',yesno(o.pi_frequency_capped_history)+' / '+yesno(o.pi_soft_temp_limit_history))],'RTC 时间可手动从系统写入；电流与功率为未外部校准的估算值')
         );
         if(!this.controlsReady)this.buildControls(d);
-        if(this.lowWatch)this.lowWatch.textContent='监控状态：'+watchLabel(d.watch&&d.watch.status)+' · 连续低电样本 '+((d.watch&&d.watch.consecutive)||0)+'/3';
+        if(this.lowWatch)this.lowWatch.textContent='监控状态：'+watchLabel(d.watch&&d.watch.status)+' · 电压 '+((d.watch&&d.watch.consecutive)||0)+'/3 · 百分比 '+((d.watch&&d.watch.percent_consecutive)||0)+'/3';
         if(this.idleWatch)this.idleWatch.textContent='终端：'+(d.watch&&d.watch.clients!=null?d.watch.clients+' 台':'未知')+' · 已连续无人 '+duration(d.watch&&d.watch.idle_elapsed_s||0);
         if(this.capacityInput&&!this.capacityDirty){
             this.capacityInput.value=b.nominal_capacity_mah;

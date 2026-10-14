@@ -34,15 +34,19 @@ ERRORS = {
     'vpn_unreachable': r'ipsec:.*Host is unreachable',
     'collector_error': r'kk-car-(?:diagnostics|ups):.*(?:failed|error)',
 }
-EVENTS = {'low_voltage_shutdown', 'power_action', 'power_action_failed',
+EVENTS = {'low_voltage_shutdown', 'low_percent_shutdown', 'idle_shutdown',
+          'ups_shutdown_cancelled', 'power_action', 'power_action_failed',
           'ups_countdown_orphaned', 'ups_countdown_cancelled', 'ups_transition'}
 NUMERIC = {'controller_mv', 'sensor_mv', 'battery_mv', 'threshold_mv',
-           'consecutive', 'shutdown_s', 'restart_s'}
+           'consecutive', 'shutdown_s', 'restart_s', 'clients',
+           'idle_elapsed_s', 'percent', 'threshold_percent'}
 ENUMS = {'action': {'shutdown', 'restart_ups', 'reboot_pi', 'cancel_shutdown',
                     'cancel_restart', 'factory_reset'},
          'voltage_source': {'battery_sensor', 'controller'}}
 ENUMS['state'] = {'disabled', 'monitoring', 'external_power', 'on_battery',
-                  'low_battery_wait', 'low_battery', 'read_error', 'invalid_voltage'}
+                  'low_battery_wait', 'low_battery', 'low_percent_wait',
+                  'low_percent', 'idle_wait', 'idle_shutdown', 'clients_unknown',
+                  'invalid_percent', 'decision_cancelled', 'read_error', 'invalid_voltage'}
 
 
 def read_json(path):

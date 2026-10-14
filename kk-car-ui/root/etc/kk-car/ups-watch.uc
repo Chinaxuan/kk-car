@@ -33,9 +33,11 @@ function orphaned_timer(previous,data,pending) {
 }
 function step(config,data,previous,clients,uptime) {
     let prior=previous || {},state={timestamp:time(),enabled:!!config.enabled,
+        mode:config.mode=='percent'?'percent':'voltage',
+        shutdown_percent:config.shutdown_percent || 10,
         idle_enabled:!!config.idle_enabled,idle_minutes:config.idle_minutes || 60,
-        clients:clients ?? null,consecutive:0,triggered:!!prior.triggered,
-        status:'monitoring',threshold_mv:config.shutdown_mv};
+        clients:clients ?? null,consecutive:0,percent_consecutive:0,triggered:!!prior.triggered,
+        status:'monitoring',threshold_mv:config.mode=='percent'?config.emergency_mv:config.shutdown_mv};
     if (!data?.ok || type(data.input?.external)!='bool') {
         state.status=config.enabled||config.idle_enabled?'read_error':'disabled';
         state.triggered=false;return state;
@@ -47,6 +49,7 @@ function step(config,data,previous,clients,uptime) {
     state.voltage_source=reference.source;
     state.voltage_difference_mv=reference.difference_mv;
     state.sensor_voltage_rejected=reference.sensor_rejected;
+    state.percent=data.battery?.percent;
     state.external=data.input.external;
     if (!config.enabled && !config.idle_enabled) {
         state.triggered=false;state.status='disabled';return state;
@@ -66,10 +69,11 @@ function step(config,data,previous,clients,uptime) {
     else if (config.idle_enabled && clients==null) state.status='clients_unknown';
     else state.status='on_battery';
     if (config.enabled) {
+        let threshold=state.threshold_mv;
         if (state.battery_mv==null || state.battery_mv<2500 || state.battery_mv>4500) {
             if (!state.should_shutdown) state.status='invalid_voltage';
         }
-        else if (state.battery_mv<=config.shutdown_mv) {
+        else if (state.battery_mv<=threshold) {
             state.consecutive=(prior.consecutive || 0)+1;
             if (state.consecutive>=3) {
                 state.status='low_battery';state.shutdown_reason='low_voltage';
@@ -77,9 +81,23 @@ function step(config,data,previous,clients,uptime) {
             }
             else if (!state.should_shutdown) state.status='low_battery_wait';
         }
+        if (state.mode=='percent') {
+            if (type(state.percent)=='int' && state.percent>=0 && state.percent<=100) {
+                if (state.percent<=state.shutdown_percent) {
+                    state.percent_consecutive=(prior.percent_consecutive || 0)+1;
+                    if (state.percent_consecutive>=3 && state.shutdown_reason!='low_voltage') {
+                        state.status='low_percent';state.shutdown_reason='low_percent';
+                        state.should_shutdown=!state.triggered;
+                    }
+                    else if (state.shutdown_reason!='low_voltage' && !state.should_shutdown)
+                        state.status='low_percent_wait';
+                }
+            }
+            else if (state.status=='on_battery') state.status='invalid_percent';
+        }
     }
     if (state.should_shutdown) state.triggered=true;
-    else if (state.status!='low_battery' && state.status!='idle_shutdown')
+    else if (state.status!='low_battery' && state.status!='low_percent' && state.status!='idle_shutdown')
         state.triggered=false;
     return state;
 }
@@ -108,11 +126,15 @@ function run() {
         let verify=sample(true);
         let clients=next.shutdown_reason=='idle' ? connected_terminals() : next.clients;
         let voltage=voltage_reference(verify).millivolts;
+        let pct=verify?.battery?.percent;
         if (!verify?.ok || verify.input?.external!==false ||
             (next.shutdown_reason=='idle' && clients!==0) ||
-            (next.shutdown_reason=='low_voltage' && (voltage==null || voltage>config.shutdown_mv))) {
+            (next.shutdown_reason=='low_voltage' && (voltage==null || voltage>next.threshold_mv)) ||
+            (next.shutdown_reason=='low_percent' &&
+                (type(pct)!='int' || pct>next.shutdown_percent))) {
             next.should_shutdown=false;next.triggered=false;next.status='decision_cancelled';
             if (next.shutdown_reason=='low_voltage') next.consecutive=0;
+            if (next.shutdown_reason=='low_percent') next.percent_consecutive=0;
             if (next.shutdown_reason=='idle' && clients!==0) {
                 next.clients=clients;next.idle_since_uptime=null;next.idle_elapsed_s=0;
             }
@@ -121,11 +143,13 @@ function run() {
         }
     }
     if (next.should_shutdown) {
-        record_event(next.shutdown_reason=='idle'?'idle_shutdown':'low_voltage_shutdown',
+        record_event(next.shutdown_reason=='idle'?'idle_shutdown':
+            next.shutdown_reason=='low_percent'?'low_percent_shutdown':'low_voltage_shutdown',
             {controller_mv:next.controller_mv,sensor_mv:next.sensor_mv,
             battery_mv:next.battery_mv,threshold_mv:next.threshold_mv,consecutive:next.consecutive,
             voltage_source:next.voltage_source,external:next.external,
-            clients:next.clients,idle_elapsed_s:next.idle_elapsed_s});
+            clients:next.clients,idle_elapsed_s:next.idle_elapsed_s,
+            percent:next.percent,threshold_percent:next.shutdown_percent});
         // Make the last decision observable before the OS shutdown is scheduled.
         writefile(STATE,sprintf('%J',next));chmod(STATE,0600);
         let action=power_action('shutdown','关闭树莓派');

@@ -84,6 +84,17 @@ class RecorderTests(unittest.TestCase):
         self.assertIsNone(d.number(float('nan')))
         self.assertIsNone(d.number(True))
 
+    def test_automatic_shutdown_events_are_retained_without_private_data(self):
+        d.event('low_percent_shutdown', {'percent':10,'threshold_percent':10,
+                 'battery_mv':3240,'phone':'private-number'})
+        d.event('idle_shutdown', {'clients':0,'idle_elapsed_s':3600,
+                 'battery_mv':3900,'phone':'private-number'})
+        rows=[json.loads(line) for line in (d.DIRECTORY/'faults.jsonl').read_text().splitlines()]
+        self.assertEqual([r['event'] for r in rows],['low_percent_shutdown','idle_shutdown'])
+        self.assertEqual(rows[0]['details']['threshold_percent'],10)
+        self.assertEqual(rows[1]['details']['idle_elapsed_s'],3600)
+        self.assertNotIn('private-number',json.dumps(rows))
+
     def test_incomplete_power_loss_tail(self):
         d.event('power_action', {'action':'shutdown'})
         p=d.DIRECTORY/'faults.jsonl'
