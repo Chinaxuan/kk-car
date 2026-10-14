@@ -19,18 +19,37 @@ function policy() {
     let raw=readfile(POLICY), data={};
     try { data=json(raw || '{}'); } catch(e) {}
     return {enabled:data.enabled===true,shutdown_mv:type(data.shutdown_mv)=='int' &&
-        data.shutdown_mv>=3300 && data.shutdown_mv<=3900 ? data.shutdown_mv : 3550};
+        data.shutdown_mv>=3300 && data.shutdown_mv<=3900 ? data.shutdown_mv : 3550,
+        idle_enabled:data.idle_enabled===true,
+        idle_minutes:type(data.idle_minutes)=='int' && data.idle_minutes>=5 &&
+            data.idle_minutes<=240 ? data.idle_minutes : 60};
 }
 
 function save_policy(enabled,shutdown_mv) {
     if (type(enabled)!='bool' || type(shutdown_mv)!='int' || shutdown_mv<3300 || shutdown_mv>3900)
         return {ok:false,error:'低电阈值须为 3300–3900 mV'};
-    let before=policy(), next={enabled,shutdown_mv};
+    let before=policy(), next={enabled,shutdown_mv,
+        idle_enabled:before.idle_enabled,idle_minutes:before.idle_minutes};
     if (before.enabled==enabled && before.shutdown_mv==shutdown_mv) return {ok:true,unchanged:true,policy:before};
     let path=POLICY+'.new';
     if (!writefile(path,sprintf('%J',next))) return {ok:false,error:'无法保存低电策略'};
     chmod(path,0600);
     if (!rename(path,POLICY)) return {ok:false,error:'无法完成低电策略保存'};
+    return {ok:true,policy:policy()};
+}
+
+function save_idle_policy(idle_enabled,idle_minutes) {
+    if (type(idle_enabled)!='bool' || type(idle_minutes)!='int' ||
+        idle_minutes<5 || idle_minutes>240)
+        return {ok:false,error:'无人连接关机时间须为 5–240 分钟'};
+    let before=policy(), next={enabled:before.enabled,shutdown_mv:before.shutdown_mv,
+        idle_enabled,idle_minutes};
+    if (before.idle_enabled==idle_enabled && before.idle_minutes==idle_minutes)
+        return {ok:true,unchanged:true,policy:before};
+    let path=POLICY+'.new';
+    if (!writefile(path,sprintf('%J',next))) return {ok:false,error:'无法保存无人连接策略'};
+    chmod(path,0600);
+    if (!rename(path,POLICY)) return {ok:false,error:'无法完成无人连接策略保存'};
     return {ok:true,policy:policy()};
 }
 
@@ -294,5 +313,5 @@ function power_action(action,confirm) {
     });
 }
 
-export { policy,save_policy,set_option,battery_voltage_error,battery_settings,
+export { policy,save_policy,save_idle_policy,set_option,battery_voltage_error,battery_settings,
     battery_revision,battery_expected_matches,battery_settings_error,battery_transaction,save_battery,rtc_sync,power_action };

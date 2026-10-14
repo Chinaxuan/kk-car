@@ -63,6 +63,7 @@
           "set_option",
           "save_battery",
           "save_policy",
+          "save_idle_policy",
           "rtc_sync",
           "power_action"
         ],
