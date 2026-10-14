@@ -21,6 +21,8 @@ STATE = PRIVATE / 'esim-switch-state.json'
 LOCK = '/tmp/kk-car-esim-at.lock'
 OPERATION_LOCK = '/tmp/kk-car-esim-operation.lock'
 REQUEST = Path('/tmp/kk-car-esim-request/config.json')
+HISTORY = PRIVATE / 'esim-sms-history'
+ARCHIVE = PRIVATE / 'esim-sms-archive'
 
 
 def load(path):
@@ -85,10 +87,33 @@ def secondary_network_devices():
     return devices
 
 
+def storage_status():
+    """Report SD overlay headroom without opening or exposing SMS plaintext."""
+    result = {'ready': False, 'history_count': 0, 'archive_count': 0,
+              'history_bytes': 0, 'archive_bytes': 0,
+              'free_bytes': None, 'total_bytes': None}
+    try:
+        disk = os.statvfs(PRIVATE)
+        result['free_bytes'] = disk.f_bavail * disk.f_frsize
+        result['total_bytes'] = disk.f_blocks * disk.f_frsize
+        for directory, label in ((HISTORY, 'history'), (ARCHIVE, 'archive')):
+            for path in directory.glob('*.der'):
+                result[label + '_count'] += 1
+                result[label + '_bytes'] += path.stat().st_size
+        required = (HISTORY, ARCHIVE, PRIVATE / 'esim-sms-history-index.json',
+                    PRIVATE / 'sms-local-cert.pem', PRIVATE / 'sms-local-key.pem',
+                    PRIVATE / 'sms-archive-recipient.pem')
+        result['ready'] = all(path.exists() for path in required) and result['free_bytes'] >= 64 * 1024 * 1024
+    except OSError:
+        result['error'] = 'SD 卡存储状态暂不可读'
+    return result
+
+
 def status():
     config = load(CONFIG)
     result = {'ok': True, 'present': False, 'sms_only': True,
               'data_devices': secondary_network_devices(),
+              'storage': storage_status(),
               'auto': config.get('auto') is True,
               'interval_minutes': config.get('interval_minutes', 60),
               'rotation': config.get('rotation', []),

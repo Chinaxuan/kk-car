@@ -69,7 +69,7 @@
     "order": 3.5,
     "action": {
       "type": "view",
-      "path": "kkcar/esim_20261015"
+      "path": "kkcar/esim_20261015_sms"
     },
     "depends": {
       "acl": [

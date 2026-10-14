@@ -416,6 +416,17 @@ function parse_gnss_sky(gsv_raw, gsa_raw) {
         systems:system_names,partial:incomplete,satellites};
 }
 function perform(session, action, param) {
+    if (action == 'registration') {
+        // Read-only. An enabled eSIM profile is not proof that the modem has
+        // registered on a network and can receive a new SMS.
+        let eps=at(session,'AT+CEREG?',5),cs=at(session,'AT+CREG?',5);
+        let em=eps.ok ? match(eps.data,/\+CEREG:\s*[0-5],([0-5])/) : null;
+        let cm=cs.ok ? match(cs.data,/\+CREG:\s*[0-5],([0-5])/) : null;
+        if (!em && !cm) return error('REGISTRATION','无法读取蜂窝注册状态');
+        let lte=em ? +em[1] : null,circuit=cm ? +cm[1] : null;
+        return {ok:true,registered:lte==1 || lte==5 || circuit==1 || circuit==5,
+            lte,circuit,timestamp:time()};
+    }
     if (action == 'storage_probe') {
         let response=at(session,'AT+CPMS=?',5);
         if (!response.ok) return response;
@@ -696,8 +707,8 @@ function perform(session, action, param) {
 }
 
 let action = ARGV[0] || '', param = ARGV[1] || '', result = null;
-if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|cleanup|voice_probe|call_status|call_diag|call_dial|call_answer|call_hangup|gps_probe|gps_start|gps_stop)$/)) result = error('INPUT', '不支持的模块操作');
-else if (SECONDARY && !match(action, /^(storage|list|read|send|cleanup)$/)) result = error('INPUT', '副卡仅允许短信收发与备份后清理');
+if (!match(action, /^(storage|registration|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|cleanup|voice_probe|call_status|call_diag|call_dial|call_answer|call_hangup|gps_probe|gps_start|gps_stop)$/)) result = error('INPUT', '不支持的模块操作');
+else if (SECONDARY && !match(action, /^(storage|registration|list|read|send|cleanup)$/)) result = error('INPUT', '副卡仅允许短信收发与只读注册查询');
 else if (getenv('KK_CAR_DJI_SMS_LOCKED') != '1') {
     // The read-only AT probes use flock on this same file. Re-exec under that
     // lock so the lock is held for the full serial session and cleaned by the

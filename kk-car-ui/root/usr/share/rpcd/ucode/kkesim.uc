@@ -30,11 +30,13 @@ function save_seen(id) {
 }
 function status() {
     let s=manager('status');
+    if (s.ok && s.present) s.network=sms('registration');
     let forward=filejson('/tmp/kk-car-esim-sms-forward-status.json');
     s.sms={initialized:forward.initialized==true,unread:forward.unread_known==true?forward.unread_count:null,
         storage:forward.storage || null,used:forward.storage_used ?? null,
         capacity:forward.storage_capacity ?? null,last_success:forward.last_success || null,
-        error:forward.error || null,updated_at:forward.timestamp || null};
+        error:forward.error || null,updated_at:forward.timestamp || null,
+        profile_token:match(forward.profile_token || '',/^[0-9a-f]{64}$/) ? forward.profile_token : null};
     let tick=filejson('/tmp/kk-car-esim-tick.json');
     s.rotation_status=tick.error || null;
     return s;
@@ -67,7 +69,9 @@ return {'kkesim': {
                 !access('/etc/kk-car/private/esim-sms-history/'+item.id+'.der')) continue;
             let tracked=filter(state,e=>e.id==item.id)[0] || {};
             push(result,{id:item.id,from:item.from,time:item.time,
-                archived_at:item.archived_at,unread:tracked.unread==true && seen[item.id]!=true});
+                archived_at:item.archived_at,
+                profile_token:match(item.profile_token || '',/^[0-9a-f]{64}$/) ? item.profile_token : null,
+                unread:tracked.unread==true && seen[item.id]!=true});
         }
         return {ok:true,entries:slice(result,length(result)>500?length(result)-500:0)};
     }},
@@ -110,8 +114,17 @@ return {'kkesim': {
     }},
     switch:{args:{token:''},call:function(req){
         let token=req.args.token;
-        return type(token)=='string' && match(token,/^[0-9a-f]{64}$/)?manager('switch',token):
-            {ok:false,error:'配置选择无效'};
+        if (type(token)!='string' || !match(token,/^[0-9a-f]{64}$/))
+            return {ok:false,error:'配置选择无效'};
+        let result=manager('switch',token);
+        if (result.ok && result.changed) {
+            // The first poll after a profile change establishes a safe SMS
+            // baseline. Run it now so the UI can distinguish card activation
+            // from a ready inbox; never bypass the archive/Feishu worker.
+            result.monitor_ready=system('flock -n /tmp/kk-car-esim-operation.lock env KK_CAR_SMS_ROLE=secondary '+
+                'ucode /etc/kk-car/dji-sms-forward.uc >/dev/null 2>&1')==0;
+        }
+        return result;
     }},
     save:{args:{auto:false,interval_minutes:60,rotation:[]},call:function(req){
         let a=req.args, path='/tmp/kk-car-esim-request';

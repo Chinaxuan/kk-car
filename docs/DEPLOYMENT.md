@@ -40,6 +40,8 @@
 
 第二只 DJI 模块的 eSIM/短信功能另外依赖同版 OpenWrt 软件源中的 `lpac` 与 Python 3，部署文件包括 `esim_bridge.py`、`esim-manager.py`、副卡绑定/数据保护/轮询脚本、`kk-car-esim` 启动服务、`kkesim` rpcd、LuCI 菜单/ACL 与页面。设备只应有主卡 QMI WAN；副卡 USB 标识需先核对，不能用通配串口选择。新页面和主导航必须一起更新，清理 LuCI 菜单缓存后重新加载；部署后读回副卡配置数量、短信仓、主 WAN 和 VPN。详见 [副卡与 eSIM](ESIM-SECONDARY.md)。
 
+2026-10-15 副卡收件箱改版需同步 `esim-manager.py`、`dji-sms.uc`、`dji-sms-forward.uc`、`kkesim.uc`、`esim.css`、`esim.js`、版本化视图 `esim_20261015_sms.js` 和指向它的 LuCI 菜单。只更新这些文件即可，不应重载网络、Wi-Fi 或 VPN。更新后检查 `kkesim status` 中的 `storage.ready`、`storage.free_bytes`、`network.registered`，执行一次副卡短信轮询并读回 `sms.profile_token`；浏览器重新登录后核对当前号码、筛选器和存储空间。旧历史未标记配置归属，不能在迁移时猜填。
+
 
 1. 确保 Wi-Fi 管理稳定、没有正在进行的热点或网口试用。
 2. 先从 LuCI「系统 → 备份与更新」导出当前配置，离线保管；另保存安装包清单。

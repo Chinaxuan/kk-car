@@ -92,7 +92,7 @@ function digest(text) {
     unlink(dir+'/digest-input');
     return value ? value[1] : null;
 }
-function local_history(id,group,text) {
+function local_history(id,group,text,profile_token) {
     if (!stat(history_dir) && !mkdir(history_dir,0700)) return false;
     chmod(history_dir,0700);
     if (!!stat(local_cert)!=!!stat(local_key)) return false;
@@ -126,7 +126,7 @@ function local_history(id,group,text) {
     if (type(index.entries)!='array') return false;
     if (!length(filter(index.entries,e=>e.id==id))) {
         push(index.entries,{id,from:group.from,time:group.time,concat:group.concat,
-            archived_at:time()});
+            archived_at:time(),profile_token:secondary ? profile_token : null});
         if (!save(history_index,index)) return false;
     }
     return true;
@@ -149,6 +149,7 @@ let previous=parse(status_path) || {};
 let summary={timestamp:time(),enabled:false,initialized:previous.initialized==true,pending:0,
     last_success:previous.last_success || null,unread_count:previous.unread_count ?? null,
     unread_known:previous.unread_known==true,error:null,
+    profile_token:previous.profile_token || null,
     storage:previous.storage || null,storage_used:previous.storage_used ?? null,
     storage_capacity:previous.storage_capacity ?? null,storage_at:previous.storage_at || null};
 function process_messages() {
@@ -232,7 +233,7 @@ function process_messages() {
             else summary.error='短信加密备份失败';
         }
         if (existing.archived && !existing.local_history) {
-            if (local_history(id,group,message)) { existing.local_history=true;save(state_path,state); }
+            if (local_history(id,group,message,profile_token)) { existing.local_history=true;save(state_path,state); }
             else summary.error='本地短信历史保存失败';
         }
         if (!length(waiting)) {
@@ -282,6 +283,7 @@ function process_messages() {
     if (!save(badge_path,{timestamp:summary.timestamp,storage:list.storage,groups:badges})) {
         summary.error='无法保存短信提示'; return;
     }
+    if (secondary) summary.profile_token=profile_token;
     summary.initialized=true;
     summary.unread_count=incomplete ? null : unread;
     summary.unread_known=!incomplete;
