@@ -29,7 +29,9 @@ for tty in "$sysfs"/class/tty/ttyUSB*; do
     usb=$(usb_parent "$interface") || continue
     vid=$(cat "$usb/idVendor" 2>/dev/null)
     pid=$(cat "$usb/idProduct" 2>/dev/null)
-    case "$vid:$pid" in 2ca3:4006|2c7c:0125) ;; *) continue ;; esac
+    # The stock-ID second modem is reserved for eSIM/SMS and must not replace
+    # primary cellular telemetry when ttyUSB numbers change.
+    [ "$vid:$pid" = 2c7c:0125 ] || continue
     candidate="$devroot/${tty##*/}"
     [ -c "$candidate" ] || continue
     port=$candidate

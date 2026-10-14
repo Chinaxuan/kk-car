@@ -38,6 +38,9 @@
 
 ## 更新现有 KK-Car
 
+第二只 DJI 模块的 eSIM/短信功能另外依赖同版 OpenWrt 软件源中的 `lpac` 与 Python 3，部署文件包括 `esim_bridge.py`、`esim-manager.py`、副卡绑定/数据保护/轮询脚本、`kk-car-esim` 启动服务、`kkesim` rpcd、LuCI 菜单/ACL 与页面。设备只应有主卡 QMI WAN；副卡 USB 标识需先核对，不能用通配串口选择。新页面和主导航必须一起更新，清理 LuCI 菜单缓存后重新加载；部署后读回副卡配置数量、短信仓、主 WAN 和 VPN。详见 [副卡与 eSIM](ESIM-SECONDARY.md)。
+
+
 1. 确保 Wi-Fi 管理稳定、没有正在进行的热点或网口试用。
 2. 先从 LuCI「系统 → 备份与更新」导出当前配置，离线保管；另保存安装包清单。
 3. 对照改动，只上传需要更新的文件。`root/` 内目录对应路由器绝对路径，例如 `root/etc/kk-car/history.uc` 对应 `/etc/kk-car/history.uc`。

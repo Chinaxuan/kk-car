@@ -2,7 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
-'require view.kkcar.console as consoleUI';
+'require view.kkcar.console_20261015 as consoleUI';
 
 var getHistory = rpc.declare({object:'kkcar', method:'history', params:['range'], expect:{}});
 var getStatus = rpc.declare({object:'kkcar', method:'status', expect:{}});

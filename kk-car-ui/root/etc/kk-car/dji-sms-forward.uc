@@ -7,15 +7,16 @@
 import { readfile, writefile, rename, chmod, mkdir, unlink, rmdir, popen, stat } from 'fs';
 import { read_config, valid_url } from '/etc/kk-car/notify-config.uc';
 
-const dir='/tmp/kk-car-sms-forward';
-const state_path='/etc/kk-car/private/dji-sms-forward-state.json';
-const status_path='/tmp/kk-car-sms-forward-status.json';
-const badge_path='/tmp/kk-car-sms-badge.json';
-const seen_path='/etc/kk-car/private/dji-sms-seen.json';
-const archive_dir='/etc/kk-car/private/sms-archive';
+const secondary=getenv('KK_CAR_SMS_ROLE')=='secondary';
+const dir=secondary?'/tmp/kk-car-esim-sms-forward':'/tmp/kk-car-sms-forward';
+const state_path=secondary?'/etc/kk-car/private/esim-sms-forward-state.json':'/etc/kk-car/private/dji-sms-forward-state.json';
+const status_path=secondary?'/tmp/kk-car-esim-sms-forward-status.json':'/tmp/kk-car-sms-forward-status.json';
+const badge_path=secondary?'/tmp/kk-car-esim-sms-badge.json':'/tmp/kk-car-sms-badge.json';
+const seen_path=secondary?'/etc/kk-car/private/esim-sms-seen.json':'/etc/kk-car/private/dji-sms-seen.json';
+const archive_dir=secondary?'/etc/kk-car/private/esim-sms-archive':'/etc/kk-car/private/sms-archive';
 const recipient='/etc/kk-car/private/sms-archive-recipient.pem';
-const history_dir='/etc/kk-car/private/sms-history';
-const history_index='/etc/kk-car/private/sms-history-index.json';
+const history_dir=secondary?'/etc/kk-car/private/esim-sms-history':'/etc/kk-car/private/sms-history';
+const history_index=secondary?'/etc/kk-car/private/esim-sms-history-index.json':'/etc/kk-car/private/sms-history-index.json';
 const local_cert='/etc/kk-car/private/sms-local-cert.pem';
 const local_key='/etc/kk-car/private/sms-local-key.pem';
 function parse(path) { try { return json(readfile(path) || ''); } catch(e) { return null; } }
@@ -46,7 +47,7 @@ function sms(action,index) {
 function fingerprint(state,group) {
     // CMGD compacts slot indexes; including them here would re-send surviving
     // messages after any deletion. Sender/time/concat stay stable across moves.
-    let value=[state.salt,group.storage,group.from,group.time,group.concat];
+    let value=[state.salt,secondary ? state.profile_token : null,group.storage,group.from,group.time,group.concat];
     if (!writefile(dir+'/hash-input',sprintf('%J',value))) return null;
     chmod(dir+'/hash-input',0600);
     let out=run('sha256sum '+dir+'/hash-input');
@@ -153,6 +154,23 @@ let summary={timestamp:time(),enabled:false,initialized:previous.initialized==tr
 function process_messages() {
     let c=read_config(), list=sms('list',null);
     summary.enabled=c.enabled==true && c.events?.sms_received==true;
+    let profile_token=null;
+    if (secondary) {
+        let info=null;
+        // Dashboard reads can briefly own the AT port. Retry without deleting
+        // any SIM message or advancing the archive cursor on a busy read.
+        for (let attempt=0; attempt<10; attempt++) {
+            let identity=run('/usr/bin/python3 /etc/kk-car/esim-manager.py status');
+            try { info=json(identity); } catch(e) { info=null; }
+            if (info?.ok && !info?.error) break;
+            if (attempt<9) run('sleep 1');
+        }
+        let active=filter(info?.profiles || [],p=>p.enabled==true);
+        if (!info?.ok || length(active)!=1 || !match(active[0].token || '',/^[0-9a-f]{64}$/)) {
+            summary.error='无法确认当前 eSIM 配置，暂停短信归档'; return;
+        }
+        profile_token=active[0].token;
+    }
     if (!list?.ok || type(list.groups)!='array') {
         // A busy AT port is transient. Preserve the last badge until a fresh
         // directory can be read, instead of briefly clearing the unread hint.
@@ -177,6 +195,9 @@ function process_messages() {
     // A SIM/module store switch can expose historical messages that were not
     // visible in the previous poll. Archive them, but never label them new.
     let storage_changed=state.storage!=null && state.storage!=list.storage;
+    if (secondary && state.profile_token!=null && state.profile_token!=profile_token)
+        storage_changed=true;
+    if (secondary) state.profile_token=profile_token;
     for (let group in list.groups) {
         if (group.status=='已发' || group.status=='待发') continue;
         if (!group.complete || !group.from || !group.time) { incomplete=true; continue; }
@@ -220,7 +241,7 @@ function process_messages() {
                 push(cleanup_queue,{id,group,existing,message});
             continue;
         }
-        let formatted='【KK-Car 新短信】\n发件人：'+group.from+'\n时间：'+group.time+'\n内容：\n'+message;
+        let formatted=(secondary?'【KK-Car 副卡新短信】':'【KK-Car 新短信】')+'\n发件人：'+group.from+'\n时间：'+group.time+'\n内容：\n'+message;
         for (let target in waiting) {
             if (send(target,formatted)) {
                 existing.delivered[target.id]=true;

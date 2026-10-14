@@ -1,0 +1,13 @@
+#!/bin/sh /etc/rc.common
+START=96
+STOP=12
+USE_PROCD=1
+start_service() {
+    # One-time binding. The hotplug hook handles later insertions. Neither
+    # path starts a mobile-data session on the secondary modem.
+    /etc/kk-car/esim-bind.sh once >/dev/null 2>&1 || true
+    procd_open_instance
+    procd_set_param command /etc/kk-car/esim-watch.sh
+    procd_set_param respawn 3600 5 5
+    procd_close_instance
+}

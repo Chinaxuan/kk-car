@@ -2,7 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
-'require view.kkcar.console as consoleUI';
+'require view.kkcar.console_20261015 as consoleUI';
 'require view.kkcar.battery_history as batteryHistory';
 'require view.kkcar.battery_runtime as batteryRuntime';
 

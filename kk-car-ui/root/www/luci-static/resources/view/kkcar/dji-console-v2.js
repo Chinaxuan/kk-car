@@ -2,7 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
-'require view.kkcar.console as consoleUI';
+'require view.kkcar.console_20261015 as consoleUI';
 
 var getNetwork = rpc.declare({object:'kkcar',method:'status',expect:{}});
 var getDji = rpc.declare({object:'kkdji',method:'status',expect:{}});

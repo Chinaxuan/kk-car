@@ -1,0 +1,4 @@
+#!/bin/sh
+[ "$ACTION" = add ] || exit 0
+# The sysfs scan checks vendor/product/manufacturer before binding.
+/etc/kk-car/esim-bind.sh once >/dev/null 2>&1 || true

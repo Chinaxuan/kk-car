@@ -5,10 +5,11 @@
 import { access, chmod, glob, mkdir, open, popen, readfile, rmdir, stat, unlink, writefile } from 'fs';
 
 const TEST = getenv('KK_CAR_SMS_TEST') == '1';
-const LOCK = TEST ? '/tmp/kk-car-dji-at-test.lock' : '/tmp/kk-car-dji-at.lock';
+const SECONDARY = !TEST && getenv('KK_CAR_SMS_ROLE') == 'secondary';
+const LOCK = TEST ? '/tmp/kk-car-dji-at-test.lock' : SECONDARY ? '/tmp/kk-car-esim-at.lock' : '/tmp/kk-car-dji-at.lock';
 const TEST_WORK = getenv('KK_CAR_SMS_TEST_WORK') || '';
 if (TEST && !match(TEST_WORK, /^\/tmp\/kk-car-sms-fixture\.[A-Za-z0-9]+\/work$/)) exit(2);
-const WORK = TEST ? TEST_WORK : '/tmp/kk-car-dji-sms';
+const WORK = TEST ? TEST_WORK : SECONDARY ? '/tmp/kk-car-esim-sms' : '/tmp/kk-car-dji-sms';
 const OUT = WORK + '/response';
 const FIFO = WORK + '/input';
 const PID = WORK + '/pid';
@@ -32,8 +33,8 @@ function device() {
         let iface = replace(tty, /\/ttyUSB[0-9]+$/, '');
         let usb = replace(iface, /\/[^/]+$/, '');
         if (trim(readfile(iface + '/bInterfaceNumber') || '') != '02') continue;
-        if (trim(readfile(usb + '/idVendor') || '') != '2c7c' ||
-            trim(readfile(usb + '/idProduct') || '') != '0125') continue;
+        if (trim(readfile(usb + '/idVendor') || '') != (SECONDARY ? '2ca3' : '2c7c') ||
+            trim(readfile(usb + '/idProduct') || '') != (SECONDARY ? '4006' : '0125')) continue;
         if (uc(trim(readfile(usb + '/manufacturer') || '')) != 'BAIWANG') continue;
         if (!match(read_command('readlink -f ' + iface + '/driver'), /\/(option|qcserial)$/)) continue;
         let path = '/dev/' + name;
@@ -316,8 +317,8 @@ function encode_submit(to, text) {
     return {pdu:'00' + tpdu,length:length(tpdu) / 2};
 }
 function load_request(path) {
-    if (!TEST && path != '/tmp/kk-car-dji-sms-request-lock/request.json' &&
-        path != '/tmp/kk-car-sms-forward/cleanup.json') return null;
+    if (!TEST && path != (SECONDARY ? '/tmp/kk-car-esim-sms-request/request.json' : '/tmp/kk-car-dji-sms-request-lock/request.json') &&
+        path != (SECONDARY ? '/tmp/kk-car-esim-sms-forward/cleanup.json' : '/tmp/kk-car-sms-forward/cleanup.json')) return null;
     let s = stat(path);
     if (!s || s.type != 'file' || s.uid != 0 || s.size > 1024 ||
         s.perm.group_read || s.perm.group_write || s.perm.other_read || s.perm.other_write) return null;
@@ -696,6 +697,7 @@ function perform(session, action, param) {
 
 let action = ARGV[0] || '', param = ARGV[1] || '', result = null;
 if (!match(action, /^(storage|storage_probe|storage_select_sim|storage_select_me|list|read|send|delete|cleanup|voice_probe|call_status|call_diag|call_dial|call_answer|call_hangup|gps_probe|gps_start|gps_stop)$/)) result = error('INPUT', '不支持的模块操作');
+else if (SECONDARY && !match(action, /^(storage|list|read|send|cleanup)$/)) result = error('INPUT', '副卡仅允许短信收发与备份后清理');
 else if (getenv('KK_CAR_DJI_SMS_LOCKED') != '1') {
     // The read-only AT probes use flock on this same file. Re-exec under that
     // lock so the lock is held for the full serial session and cleaned by the
@@ -703,7 +705,7 @@ else if (getenv('KK_CAR_DJI_SMS_LOCKED') != '1') {
     let script = TEST ? (getenv('KK_CAR_SMS_TEST_SCRIPT') || '') : '/etc/kk-car/dji-sms.uc';
     let safe_script = TEST ? match(script, /^\/tmp\/[A-Za-z0-9_./-]+\.uc$/) : true;
     let safe_param = action == 'send' || action == 'cleanup' ?
-        (TEST ? match(param, /^\/tmp\/[A-Za-z0-9_./-]+$/) : param == (action=='cleanup' ? '/tmp/kk-car-sms-forward/cleanup.json' : '/tmp/kk-car-dji-sms-request-lock/request.json')) :
+        (TEST ? match(param, /^\/tmp\/[A-Za-z0-9_./-]+$/) : param == (action=='cleanup' ? (SECONDARY ? '/tmp/kk-car-esim-sms-forward/cleanup.json' : '/tmp/kk-car-sms-forward/cleanup.json') : SECONDARY ? '/tmp/kk-car-esim-sms-request/request.json' : '/tmp/kk-car-dji-sms-request-lock/request.json')) :
         (action == 'read' || action == 'delete' ? match(param, /^(0|[1-9][0-9]{0,2})$/) :
          action == 'call_dial' ? match(param,/^\+?[0-9]{3,15}$/) : param == '');
     if (!safe_script || !safe_param) result = error('INPUT', '操作参数无效');

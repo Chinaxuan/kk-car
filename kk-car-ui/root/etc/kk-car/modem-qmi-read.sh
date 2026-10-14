@@ -20,7 +20,8 @@ for control in "$sysfs"/class/usbmisc/cdc-wdm*; do
     candidate=$(usb_parent "$control/device") || continue
     vid=$(cat "$candidate/idVendor" 2>/dev/null)
     pid=$(cat "$candidate/idProduct" 2>/dev/null)
-    case "$vid:$pid" in 2ca3:4006|2c7c:0125) ;; *) continue ;; esac
+    # Never discover the 2ca3:4006 SMS-only modem as a data uplink.
+    [ "$vid:$pid" = 2c7c:0125 ] || continue
     interface=$(readlink -f "$control/device" 2>/dev/null)
     [ "$(cat "$interface/bInterfaceNumber" 2>/dev/null)" = 04 ] || continue
     # Only QMI drivers are safe to query with uqmi; MBIM/ECM are separate paths.

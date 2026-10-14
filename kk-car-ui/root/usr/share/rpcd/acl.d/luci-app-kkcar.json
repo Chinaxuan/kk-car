@@ -20,6 +20,13 @@
           "gps_probe",
           "traffic_status"
         ],
+        "kkesim": [
+          "status",
+          "sms_list",
+          "sms_read",
+          "sms_history",
+          "sms_history_read"
+        ],
         "kkups": [
           "status",
           "history"
@@ -58,6 +65,12 @@
           "phone_contact_save",
           "phone_contact_delete",
           "voice_ticket"
+        ],
+        "kkesim": [
+          "save",
+          "switch",
+          "sms_send",
+          "sms_ack"
         ],
         "kkups": [
           "set_option",

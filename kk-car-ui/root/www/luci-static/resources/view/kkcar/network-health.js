@@ -2,7 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
-'require view.kkcar.console as consoleUI';
+'require view.kkcar.console_20261015 as consoleUI';
 
 var read = rpc.declare({object:'kkhealth',method:'status',expect:{}});
 var save = rpc.declare({object:'kkhealth',method:'save',params:['settings','revision'],expect:{}});

@@ -2,7 +2,7 @@
 'require view';
 'require rpc';
 'require poll';
-'require view.kkcar.console as consoleUI';
+'require view.kkcar.console_20261015 as consoleUI';
 
 var get=rpc.declare({object:'kksettings',method:'status',expect:{}});
 var getFrame=rpc.declare({object:'kksettings',method:'epaper_frame',expect:{}});

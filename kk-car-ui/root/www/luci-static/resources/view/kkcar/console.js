@@ -7,6 +7,7 @@ var pages = [
     ['kkcar_connections', '连接设置', 'connections', '网络'],
     ['kkcar_health', '网络守护', 'health', '网络'],
     ['kkcar_dji', '蜂窝与通信', 'cellular', '通信与设备'],
+    ['kkcar_esim', '副卡与 eSIM', 'esim', '通信与设备'],
     ['kkcar_ups', '电源与设备', 'power', '通信与设备'],
     ['kkcar_notifications', '通知中心', 'notifications', '管理'],
     ['kkcar_settings', '设置中心', 'settings', '管理']
@@ -16,6 +17,7 @@ var paths = {
     connections: ['M5 12h14', 'M8 8l-4 4 4 4', 'M16 8l4 4-4 4'],
     health: ['M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z', 'M7 12h3l2-4 2 8 2-4h2'],
     cellular: ['M4 20v-4', 'M9 20v-8', 'M14 20V8', 'M19 20V4'],
+    esim: ['M5 4h14v16H5z', 'M8 8h8', 'M8 12h8', 'M8 16h5'],
     power: ['M4 7h15v10H4z', 'M21 10v4', 'M12 9l-3 4h4l-1 3'],
     notifications: ['M6 9a6 6 0 0112 0v7l2 2H4l2-2z', 'M10 21h4'],
     settings: ['M4 6h16', 'M4 12h16', 'M4 18h16', 'M8 4v4', 'M16 10v4', 'M10 16v4']

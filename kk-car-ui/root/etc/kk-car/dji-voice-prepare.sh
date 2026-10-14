@@ -7,7 +7,18 @@ dir=/etc/kk-car/private/voice-runtime
 remote=/tmp/kkcar-voice
 
 /etc/kk-car/dji-voice-health.sh prepared && exit 0
-test -c /dev/ttyUSB2 && test -e /proc/asound/Baiwang || exit 1
+test -e /proc/asound/Baiwang || exit 1
+primary_at=
+for tty in /sys/class/tty/ttyUSB*; do
+    [ -e "$tty/device" ] || continue
+    iface=$(readlink -f "$tty/device" 2>/dev/null) || continue
+    iface=${iface%/*}
+    [ "$(cat "$iface/bInterfaceNumber" 2>/dev/null)" = 02 ] || continue
+    usb=${iface%/*}
+    [ "$(cat "$usb/idVendor" 2>/dev/null):$(cat "$usb/idProduct" 2>/dev/null)" = 2c7c:0125 ] || continue
+    [ -c "/dev/${tty##*/}" ] && primary_at=1 && break
+done
+[ -n "$primary_at" ] || exit 1
 test "$(adb -d shell uname -r 2>/dev/null | tr -d '\r')" = 3.18.44 || exit 1
 
 check() {
