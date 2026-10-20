@@ -111,12 +111,14 @@ class RecorderTests(unittest.TestCase):
 
     def test_cutoff_preparation_keeps_verified_steps(self):
         d.event('ups_cutoff_armed', {'action':'shutdown','stage':'armed','shutdown_s':178,
-            'auto_start_disabled':True,'restart_cancelled':True,
+            'auto_start_preserved':True,'auto_start_on_ac':True,'restart_cancelled':True,
             'watchdog_stopped':False,'preserved':True,'raw':'private'})
         row=json.loads((d.DIRECTORY/'faults.jsonl').read_text().splitlines()[-1])
         self.assertEqual(row['details']['stage'],'armed')
         self.assertEqual(row['details']['shutdown_s'],178)
         self.assertTrue(row['details']['preserved'])
+        self.assertTrue(row['details']['auto_start_preserved'])
+        self.assertTrue(row['details']['auto_start_on_ac'])
         self.assertFalse(row['details']['watchdog_stopped'])
         self.assertNotIn('private',json.dumps(row))
 

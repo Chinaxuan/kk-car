@@ -148,7 +148,8 @@ def event(kind, details):
             clean[key] = enum(details[key], choices)
     if type(details.get('external')) is bool:
         clean['external'] = details['external']
-    for key in ('auto_start_disabled', 'restart_cancelled', 'watchdog_stopped', 'preserved'):
+    for key in ('auto_start_disabled', 'auto_start_preserved', 'auto_start_on_ac',
+                'restart_cancelled', 'watchdog_stopped', 'preserved'):
         if type(details.get(key)) is bool:
             clean[key] = details[key]
     append(dict(identity(), event=kind, details=clean))

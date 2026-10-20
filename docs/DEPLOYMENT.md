@@ -38,7 +38,7 @@
 
 ## 更新现有 KK-Car
 
-2026-10-20 UPS 关机修正需同步 `ups-control.uc`、`ups-watch.uc`、`diagnostics.py` 和 `ups.js`。先保存原文件并核对设备没有正在进行的关机/重启任务；在隔离临时路径运行 `tests/ups-shutdown.uc`、`tests/ups.uc`、`tests/ups-battery.uc`，测试导入路径必须指向临时模块，不能借测试触发真实供电操作。新控制模块与 watcher 成对部署，重新加载 rpcd、只重启诊断记录器；watcher 下次轮询读取新模块，不重载网络或 VPN。确认来电自启读回关闭、倒计时仍为零、普通运行中的看门狗仍运行、启动标识及网络配置哈希不变。只有执行安全关机才会停止看门狗和安排输出断电；不应为了验证部署调用 `power_action`。实际输出断电、静态耗电与再次启动需在电池/供电硬件安全确认后另行验收。
+2026-10-20 UPS 关机修正需同步 `ups-control.uc`、`ups-watch.uc`、`diagnostics.py` 和 `ups.js`。先保存原文件并核对设备没有正在进行的关机/重启任务；在隔离临时路径运行 `tests/ups-shutdown.uc`、`tests/ups.uc`、`tests/ups-battery.uc`，测试导入路径必须指向临时模块，不能借测试触发真实供电操作。新控制模块与 watcher 成对部署，重新加载 rpcd、只重启诊断记录器；watcher 下次轮询读取新模块，不重载网络或 VPN。确认来电自启与管理员选择一致、倒计时仍为零、普通运行中的看门狗仍运行、启动标识及网络配置哈希不变。只有执行安全关机才会停止看门狗和安排输出断电；不应为了验证部署调用 `power_action`。实际输出断电、静态耗电与再次启动需在电池/供电硬件安全确认后另行验收。后续按用户选择保留来电自启，关机准备测试必须覆盖开启/关闭两种选择；设备策略改为 3600mV 电压模式仅通过私有 RPC 保存，不把真实配置上传。
 
 第二只 DJI 模块的 eSIM/短信功能另外依赖同版 OpenWrt 软件源中的 `lpac` 与 Python 3，部署文件包括 `esim_bridge.py`、`esim-manager.py`、副卡绑定/数据保护/轮询脚本、`kk-car-esim` 启动服务、`kkesim` rpcd、LuCI 菜单/ACL 与页面。设备只应有主卡 QMI WAN；副卡 USB 标识需先核对，不能用通配串口选择。新页面和主导航必须一起更新，清理 LuCI 菜单缓存后重新加载；部署后读回副卡配置数量、短信仓、主 WAN 和 VPN。详见 [副卡与 eSIM](ESIM-SECONDARY.md)。
 

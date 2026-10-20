@@ -292,12 +292,15 @@ function prepare_shutdown(io) {
     let before=io.read();
     if (!before?.ok) return {ok:false,stage:'read',error:'UPS 当前无法读取'};
     let existing=before.controller?.shutdown_countdown_s || 0;
-    if (!io.write(0x19,0)) return {ok:false,stage:'auto_start',error:'无法关闭来电自启，未提交关机'};
+    let auto_start=before.controller?.auto_start_on_ac;
+    if (type(auto_start)!='bool') return {ok:false,stage:'read',error:'来电自启状态无效'};
+    // Preserve the administrator's choice. AC wake is independent of the
+    // explicit restart timer; never silently change it during shutdown.
     if (!io.write(0x1a,0)) return {ok:false,stage:'restart_timer',error:'无法清除 UPS 重启倒计时'};
     if (!existing && !io.write(0x18,180))
         return {ok:false,stage:'cutoff_timer',error:'无法设置 UPS 断电倒计时'};
     let after=io.read(),c=after?.controller;
-    if (!after?.ok || c?.auto_start_on_ac!==false || c.restart_countdown_s!=0 ||
+    if (!after?.ok || c?.auto_start_on_ac!==auto_start || c.restart_countdown_s!=0 ||
         !(c.shutdown_countdown_s>0 && c.shutdown_countdown_s<=(existing || 180)) ||
         (!existing && c.shutdown_countdown_s<170))
         return {ok:false,stage:'readback',error:'断电准备未通过读回核对；不会取消已有断电任务'};
@@ -306,7 +309,7 @@ function prepare_shutdown(io) {
     // Keep a confirmed hardware cutoff even if the OS watchdog cannot be
     // stopped; returning to a running low battery would be less safe.
     return {ok:true,stage:'armed',shutdown_s:c.shutdown_countdown_s,
-        preserved:existing>0,auto_start_disabled:true,restart_cancelled:true,
+        preserved:existing>0,auto_start_preserved:true,auto_start_on_ac:auto_start,restart_cancelled:true,
         watchdog_stopped:watchdog?.ok===true};
 }
 
@@ -359,7 +362,8 @@ function power_action(action,confirm) {
                 stop_watchdog:stop_shutdown_watchdog});
             record_event(prepared.ok?'ups_cutoff_armed':'power_action_failed',
                 {action,stage:prepared.stage,shutdown_s:prepared.shutdown_s,
-                auto_start_disabled:prepared.auto_start_disabled,
+                auto_start_preserved:prepared.auto_start_preserved,
+                auto_start_on_ac:prepared.auto_start_on_ac,
                 restart_cancelled:prepared.restart_cancelled,
                 watchdog_stopped:prepared.watchdog_stopped,preserved:prepared.preserved});
             if (!prepared.ok) return prepared;

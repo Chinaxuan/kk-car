@@ -16,6 +16,20 @@ check(b.consecutive==1 && c.consecutive==2 && d.should_shutdown,'three low sampl
 let e=step(config,low,d);
 check(!e.should_shutdown && e.triggered,'once only');
 check(step(config,plugged,e).consecutive==0,'external power resets');
+let conservative={enabled:true,mode:'voltage',shutdown_mv:3600,shutdown_percent:10,emergency_mv:3250};
+let boundary={ok:true,input:{external:false},battery:{millivolts:3600,percent:80}};
+let boundary1=step(conservative,boundary,{},1,100);
+let boundary2=step(conservative,boundary,boundary1,1,110);
+check(!boundary1.should_shutdown && !boundary2.should_shutdown &&
+    step(conservative,boundary,boundary2,1,120).shutdown_reason=='low_voltage',
+    '3600mV boundary triggers after three samples despite high percent');
+boundary.battery.millivolts=3601;boundary.battery.percent=1;
+check(!step(conservative,boundary,{},1,130).should_shutdown &&
+    step(conservative,boundary,{},1,130).consecutive==0,
+    'voltage mode ignores uncalibrated percent above voltage threshold');
+check(step(conservative,plugged,boundary2,1,140).status=='external_power' &&
+    !step(conservative,plugged,boundary2,1,140).should_shutdown,
+    'external input bypasses conservative voltage shutdown');
 check(step(config,{ok:false},e).consecutive==0,'read error resets');
 check(step({enabled:false,shutdown_mv:3550},low,d).status=='disabled','default off');
 let idle={enabled:true,shutdown_mv:3500,idle_enabled:true,idle_minutes:60};
