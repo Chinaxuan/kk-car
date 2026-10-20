@@ -36,7 +36,8 @@ ERRORS = {
 }
 EVENTS = {'low_voltage_shutdown', 'low_percent_shutdown', 'idle_shutdown',
           'ups_shutdown_cancelled', 'power_action', 'power_action_failed',
-          'ups_countdown_orphaned', 'ups_countdown_cancelled', 'ups_transition'}
+          'ups_countdown_orphaned', 'ups_countdown_cancelled', 'ups_countdown_preserved',
+          'ups_cutoff_armed', 'ups_transition'}
 NUMERIC = {'controller_mv', 'sensor_mv', 'battery_mv', 'threshold_mv',
            'consecutive', 'shutdown_s', 'restart_s', 'clients',
            'idle_elapsed_s', 'percent', 'threshold_percent'}
@@ -46,7 +47,9 @@ ENUMS = {'action': {'shutdown', 'restart_ups', 'reboot_pi', 'cancel_shutdown',
 ENUMS['state'] = {'disabled', 'monitoring', 'external_power', 'on_battery',
                   'low_battery_wait', 'low_battery', 'low_percent_wait',
                   'low_percent', 'idle_wait', 'idle_shutdown', 'clients_unknown',
-                  'invalid_percent', 'decision_cancelled', 'read_error', 'invalid_voltage'}
+                  'invalid_percent', 'decision_cancelled', 'read_error', 'invalid_voltage',
+                  'shutdown_pending'}
+ENUMS['stage'] = {'read', 'auto_start', 'restart_timer', 'cutoff_timer', 'readback', 'armed'}
 
 
 def read_json(path):
@@ -145,6 +148,9 @@ def event(kind, details):
             clean[key] = enum(details[key], choices)
     if type(details.get('external')) is bool:
         clean['external'] = details['external']
+    for key in ('auto_start_disabled', 'restart_cancelled', 'watchdog_stopped', 'preserved'):
+        if type(details.get(key)) is bool:
+            clean[key] = details[key]
     append(dict(identity(), event=kind, details=clean))
 
 
@@ -192,10 +198,9 @@ def select_snapshot(ups, modem, at, uplink, ping, watch, wan, now):
                 'auto_start_on_ac': ctrl.get('auto_start_on_ac') is True,
                 'run_s': number(ctrl.get('current_run_s'), 0),
                 'battery_sensor': sensor('battery'), 'pi_sensor': sensor('pi_supply'),
-                'watch': {'state': enum(watch.get('status'), {'disabled', 'monitoring', 'external_power',
-                         'on_battery', 'low_battery_wait', 'low_battery', 'read_error', 'invalid_voltage'}),
+                'watch': {'state': enum(watch.get('status'), ENUMS['state']),
                          'consecutive': number(watch.get('consecutive'), 0, 10000),
-                         'threshold_mv': number(watch.get('threshold_mv'), 3300, 3900)}},
+                         'threshold_mv': number(watch.get('threshold_mv'), 3100, 3900)}},
         'cellular': {'usb_qmi_present': Path('/sys/class/usbmisc/cdc-wdm0/device').exists(),
                      'telemetry_fresh': mf, 'at_fresh': af,
                      'qmi_rc': number(modem.get('collector_rc'), 0, 255),

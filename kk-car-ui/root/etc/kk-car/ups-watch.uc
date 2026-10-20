@@ -27,9 +27,8 @@ function connected_terminals() {
         return count;
     } catch(e) { return null; }
 }
-function orphaned_timer(previous,data,pending) {
-    return !previous?.timestamp && !pending && data?.ok && data.input?.external===true &&
-        data.controller?.shutdown_countdown_s>0;
+function pending_cutoff(data) {
+    return data?.ok===true && data.controller?.shutdown_countdown_s>0;
 }
 function step(config,data,previous,clients,uptime) {
     let prior=previous || {},state={timestamp:time(),enabled:!!config.enabled,
@@ -104,22 +103,27 @@ function step(config,data,previous,clients,uptime) {
 
 function run() {
     let old={};try { old=json(readfile(STATE)||'{}'); } catch(e) {}
-    let config=policy(),measured=sample(true),next=step(config,measured,old,
-        connected_terminals(),uptime_seconds());
+    let config=policy(),measured=sample(true);
+    // An OS reboot does not make a live UPS cutoff an orphan. Preserve the
+    // remaining time on either supply, and complete the stop without extending
+    // it. This check also prevents the normal low/idle path re-arming 180s.
+    if (pending_cutoff(measured)) {
+        let next={timestamp:time(),enabled:config.enabled,status:'shutdown_pending',
+            shutdown_s:measured.controller.shutdown_countdown_s,triggered:true,
+            external:measured.input?.external};
+        if (old.status!='shutdown_pending') record_event('ups_countdown_preserved',
+            {shutdown_s:next.shutdown_s,external:next.external});
+        if (!readfile('/tmp/kk-car-power-intent.json')) {
+            let action=power_action('shutdown','关闭树莓派');
+            next.action_ok=!!action.ok;next.action_error=action.error || null;
+        }
+        writefile(STATE,sprintf('%J',next));chmod(STATE,0600);return next;
+    }
+    let next=step(config,measured,old,connected_terminals(),uptime_seconds());
     if (old.status!=next.status) record_event('ups_transition',{state:next.status,
         controller_mv:next.controller_mv,sensor_mv:next.sensor_mv,battery_mv:next.battery_mv,
         threshold_mv:next.threshold_mv,external:next.external,consecutive:next.consecutive,
         voltage_source:next.voltage_source});
-    // A previous power loss can leave the UPS timer armed in a new OS boot.
-    // Cancel once at watcher startup on external power, but preserve an explicit
-    // power action already issued in this boot (including a service restart).
-    if (orphaned_timer(old,measured,!!readfile('/tmp/kk-car-power-intent.json'))) {
-            let left=measured.controller.shutdown_countdown_s;
-            record_event('ups_countdown_orphaned',{shutdown_s:left,external:true});
-            let cancelled=power_action('cancel_shutdown','');
-            next.startup_countdown_cancelled=!!cancelled.ok;
-            if (cancelled.ok) record_event('ups_countdown_cancelled',{shutdown_s:left,external:true});
-    }
     if (next.should_shutdown) {
         // Power or a client may return during the decision. Recheck before
         // arming the UPS countdown or stopping OpenWrt.
@@ -161,4 +165,4 @@ function run() {
     return next;
 }
 
-export { step,run,orphaned_timer };
+export { step,run,pending_cutoff };

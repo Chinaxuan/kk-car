@@ -2,6 +2,7 @@
 import { readfile, writefile, rename, chmod, mkdir, rmdir, popen } from 'fs';
 import { sample } from '/etc/kk-car/ups-read.uc';
 import { record_event } from '/etc/kk-car/diagnostic-event.uc';
+import { connect } from 'ubus';
 
 const POLICY='/etc/kk-car/private/ups-policy.json';
 const LOCK='/tmp/kk-car-ups-write-lock';
@@ -236,6 +237,10 @@ function set_option(key,value,expected,confirm) {
     return locked(function() {
         let before=sample();
         if (!before.ok) return {ok:false,error:'UPS 当前无法读取，未写入'};
+        if (key=='auto_start_on_ac' && value==1 &&
+            (before.controller.shutdown_countdown_s || before.controller.restart_countdown_s ||
+             readfile('/tmp/kk-car-power-intent.json')))
+            return {ok:false,error:'关机或重启任务已提交，不能开启来电自启'};
         let old=field(before,key);
         if (old!==expected) return {ok:false,error:'设备上的设置已变化，请刷新页面后再操作',current:old};
         if (value==old) return {ok:true,unchanged:true,status:before};
@@ -281,11 +286,50 @@ function rtc_sync() {
     });
 }
 
+// Only runs during an explicit power action. Injected I/O keeps tests away from
+// the I2C bus and the real watchdog. Never extend an inherited cutoff timer.
+function prepare_shutdown(io) {
+    let before=io.read();
+    if (!before?.ok) return {ok:false,stage:'read',error:'UPS 当前无法读取'};
+    let existing=before.controller?.shutdown_countdown_s || 0;
+    if (!io.write(0x19,0)) return {ok:false,stage:'auto_start',error:'无法关闭来电自启，未提交关机'};
+    if (!io.write(0x1a,0)) return {ok:false,stage:'restart_timer',error:'无法清除 UPS 重启倒计时'};
+    if (!existing && !io.write(0x18,180))
+        return {ok:false,stage:'cutoff_timer',error:'无法设置 UPS 断电倒计时'};
+    let after=io.read(),c=after?.controller;
+    if (!after?.ok || c?.auto_start_on_ac!==false || c.restart_countdown_s!=0 ||
+        !(c.shutdown_countdown_s>0 && c.shutdown_countdown_s<=(existing || 180)) ||
+        (!existing && c.shutdown_countdown_s<170))
+        return {ok:false,stage:'readback',error:'断电准备未通过读回核对；不会取消已有断电任务'};
+    let watchdog;
+    try {watchdog=io.stop_watchdog();} catch(e) {watchdog={ok:false};}
+    // Keep a confirmed hardware cutoff even if the OS watchdog cannot be
+    // stopped; returning to a running low battery would be less safe.
+    return {ok:true,stage:'armed',shutdown_s:c.shutdown_countdown_s,
+        preserved:existing>0,auto_start_disabled:true,restart_cancelled:true,
+        watchdog_stopped:watchdog?.ok===true};
+}
+
+function stop_shutdown_watchdog() {
+    try {
+        let bus=connect(),before=bus.call('system','watchdog',{});
+        if (before?.status=='offline') return {ok:true};
+        if (!before || index(['running','stopped'],before.status)<0) return {ok:false};
+        bus.call('system','watchdog',{magicclose:true,stop:true});
+        let checked=bus.call('system','watchdog',{});
+        // procd reports offline after successfully closing the watchdog FD.
+        return {ok:checked && index(['offline','stopped'],checked.status)>=0 &&
+            checked.magicclose===true};
+    } catch(e) {return {ok:false};}
+}
+
 function power_action(action,confirm) {
     let phrases={shutdown:'关闭树莓派',restart_ups:'重启UPS',reboot_pi:'重启树莓派',
         factory_reset:'恢复出厂'};
     if (action=='cancel_shutdown'||action=='cancel_restart') {
         return locked(function() {
+            if (readfile('/tmp/kk-car-power-intent.json'))
+                return {ok:false,error:'系统关机已经提交，保留断电倒计时；不能只取消硬件断电'};
             let reg=action=='cancel_shutdown'?0x18:0x1a;
             if (!write_reg(reg,0)) return {ok:false,error:'取消倒计时失败'};
             let after=sample(), left=action=='cancel_shutdown'?after.controller?.shutdown_countdown_s:after.controller?.restart_countdown_s;
@@ -309,7 +353,18 @@ function power_action(action,confirm) {
             if (!write_reg(0x1b,1)) return {ok:false,error:'恢复出厂指令失败'};
             return {ok:true,accepted:true};
         }
-        if (action=='shutdown'||action=='restart_ups') {
+        let prepared=null;
+        if (action=='shutdown') {
+            prepared=prepare_shutdown({read:()=>sample(),write:write_reg,
+                stop_watchdog:stop_shutdown_watchdog});
+            record_event(prepared.ok?'ups_cutoff_armed':'power_action_failed',
+                {action,stage:prepared.stage,shutdown_s:prepared.shutdown_s,
+                auto_start_disabled:prepared.auto_start_disabled,
+                restart_cancelled:prepared.restart_cancelled,
+                watchdog_stopped:prepared.watchdog_stopped,preserved:prepared.preserved});
+            if (!prepared.ok) return prepared;
+        }
+        if (action=='restart_ups') {
             let reg=action=='shutdown'?0x18:0x1a;
             if (!write_reg(reg,180)) {
                 record_event('power_action_failed',{action});
@@ -324,12 +379,20 @@ function power_action(action,confirm) {
             }
         }
         // The response reaches the browser before the operating system stops.
-        writefile('/tmp/kk-car-power-intent.json',sprintf('%J',{timestamp:time(),action}));
+        let intent={timestamp:time(),action,shutdown:prepared};
+        writefile('/tmp/kk-car-power-intent.json',sprintf('%J',intent));
         chmod('/tmp/kk-car-power-intent.json',0600);
+        // Keep the last verified sequence after reboot. No battery identities,
+        // addresses or arbitrary command text are stored here.
+        if (writefile('/etc/kk-car/private/ups-power-intent.json.new',sprintf('%J',intent))) {
+            chmod('/etc/kk-car/private/ups-power-intent.json.new',0600);
+            rename('/etc/kk-car/private/ups-power-intent.json.new','/etc/kk-car/private/ups-power-intent.json');
+        }
         system('(/bin/sleep 2; /bin/sync; /sbin/'+(action=='reboot_pi'?'reboot':'poweroff')+') </dev/null >/dev/null 2>&1 &');
-        return {ok:true,accepted:true};
+        return {ok:true,accepted:true,shutdown:prepared};
     });
 }
 
 export { policy,save_policy,save_shutdown_policy,save_idle_policy,set_option,battery_voltage_error,battery_settings,
-    battery_revision,battery_expected_matches,battery_settings_error,battery_transaction,save_battery,rtc_sync,power_action };
+    battery_revision,battery_expected_matches,battery_settings_error,battery_transaction,save_battery,rtc_sync,
+    prepare_shutdown,power_action };

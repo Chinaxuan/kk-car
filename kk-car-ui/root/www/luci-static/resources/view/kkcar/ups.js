@@ -21,7 +21,7 @@ function millivolts(mv){return Number.isFinite(mv)?number(mv,0)+' mV':'—';}
 function chargingPower(input,sensor){return input.external===true&&sensor.detected===true&&sensor.overflow!==true&&sensor.conversion_ready===true&&Number.isFinite(sensor.current_ma)&&sensor.current_ma>100&&Number.isFinite(sensor.power_mw)&&sensor.power_mw>=200&&sensor.power_mw<=30000?sensor.power_mw/1000:null;}
 function duration(s){if(!Number.isFinite(s))return '—';var h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h>0?h+' 小时 '+m+' 分钟':m+' 分钟';}
 function yesno(v){return v==null?'未知':v?'是':'否';}
-function watchLabel(v){return ({disabled:'未启用',monitoring:'监测中',external_power:'外部供电中',on_battery:'电池供电中',idle_wait:'无人连接计时中',idle_shutdown:'已触发无人连接关机',clients_unknown:'终端状态未知，暂不计时',low_battery_wait:'低电压复核中',low_battery:'已触发低电关机',low_percent_wait:'低电量复核中',low_percent:'已触发低电量关机',invalid_percent:'百分比无效，保留电压兜底',read_error:'采样失败',invalid_voltage:'电压读数无效',decision_cancelled:'关机前状态变化，已取消'})[v]||'等待首次采样';}
+function watchLabel(v){return ({disabled:'未启用',monitoring:'监测中',external_power:'外部供电中',on_battery:'电池供电中',idle_wait:'无人连接计时中',idle_shutdown:'已触发无人连接关机',clients_unknown:'终端状态未知，暂不计时',low_battery_wait:'低电压复核中',low_battery:'已触发低电关机',low_percent_wait:'低电量复核中',low_percent:'已触发低电量关机',invalid_percent:'百分比无效，保留电压兜底',read_error:'采样失败',invalid_voltage:'电压读数无效',decision_cancelled:'关机前状态变化，已取消',shutdown_pending:'已有输出断电任务，保留倒计时'})[v]||'等待首次采样';}
 function cell(label,value,hint){var children=[E('span',{},label),E('strong',{},value)];if(hint)children.push(E('small',{},hint));return E('div',{'class':'ku-cell'},children);}
 function section(title,nodes,subtitle){var heading=[E('h2',{},title)];if(subtitle)heading.push(E('span',{},subtitle));return E('section',{'class':'ku-panel'},[E('div',{'class':'ku-panel-title'},heading),E('div',{'class':'ku-grid'},nodes)]);}
 function nav(href,title,active){return E('a',{href:href,'class':'ku-nav-item'+(active?' active':''),'aria-current':active?'page':null},title);}
@@ -205,10 +205,10 @@ return view.extend({
             E('div',{'class':'ku-controls-title'},[E('h2',{},'常用设置'),E('p',{},'仅点击保存后写入；低电保护默认关闭。')]),
             E('div',{'class':'ku-settings-grid'},[
                 E('section',{'class':'ku-panel'},[E('h3',{},'日常设置'),
-                    this.controlRow('来电自启','auto_start_on_ac',c.auto_start_on_ac?1:0,0,1,'外部电源恢复后自动启动',false,true),
+                    this.controlRow('来电自启','auto_start_on_ac',c.auto_start_on_ac?1:0,0,1,'开启后外电恢复可启动；安全关机会先将其关闭，之后需手动开机',false,true),
                     this.controlRow('采样周期','sample_minutes',c.sample_minutes,1,1440,'1–1440 分钟；当前设备为 '+c.sample_minutes+' 分钟',false,false),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'RTC 校时'),E('small',{},'将已校准的系统 UTC 时间写入 UPS 时钟')]),E('button',{'class':'ku-button',type:'button',click:function(){if(window.confirm('确认用树莓派当前系统时间同步 UPS 实时时钟？'))self.perform(syncRtc(),'RTC 已与系统时间同步',true);}},'同步时间')])]),
-                E('section',{'class':'ku-panel'},[E('h3',{},'低电安全关机'),E('p',{'class':'ku-helper'},'仅在外电断开时运行。电压模式按参考电压；百分比模式按 UPS 上报电量，同时保留独立电压兜底。任一条件连续 3 次成立才安排正常关机，UPS 180 秒后切断输出。'),
+                E('section',{'class':'ku-panel'},[E('h3',{},'低电安全关机'),E('p',{'class':'ku-helper'},'仅在外电断开时运行。任一低电条件连续 3 次成立后，先关闭来电自启、清除重启任务，再核对 UPS 输出断电倒计时并停止系统。已有倒计时不延长。该流程仍需实物验证；关机后需手动开机，UPS 自身仍会耗电。'),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'启用监控'),E('small',{},'断电后持续监测电池电压')]),policyOn]),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'关机依据'),E('small',{},'新电池曲线已观察到 96%→1%；容量和剩余时间仍只是估算')]),policyMode]),
                     E('div',{'class':'ku-setting'},[E('div',{},[E('strong',{},'电压模式阈值'),E('small',{},'3300–3900 mV；只在电压模式使用')]),policyMv]),
@@ -227,12 +227,12 @@ return view.extend({
             E('div',{'class':'ku-controls-title'},[E('h2',{},'高级维护'),E('p',{},'电池基准和供电操作会影响设备稳定性，请核对后再执行。')]),
             E('div',{'class':'ku-settings-grid'},[
                 this.batteryForm||this.buildBattery(),
-                E('section',{'class':'ku-panel ku-maintenance'},[E('h3',{},'电源操作 · 高级'),E('p',{'class':'ku-helper'},'执行后可能失去远程连接。正常关机与 UPS 重启会先安排 180 秒倒计时，再让系统正常停止；恢复出厂先在设备私有目录保存现有参数。'),
+                E('section',{'class':'ku-panel ku-maintenance'},[E('h3',{},'电源操作 · 高级'),E('p',{'class':'ku-helper'},'执行后可能失去远程连接。安全关机先禁止来电自启并请求 180 秒后切断输出；它不会隔离电芯，长期停放应取出电池。明确选择 UPS 电源循环重启时仍会重新供电。'),
                     action('重启树莓派','reboot_pi','重启树莓派','UPS 保持供电，仅重启 OpenWrt'),
-                    action('安全关机','shutdown','关闭树莓派','UPS 将在倒计时后切断输出'),
+                    action('安全关机','shutdown','关闭树莓派','关闭自启、保留输出断电倒计时；之后需手动开机'),
                     action('UPS 电源循环重启','restart_ups','重启UPS','系统先正常关机，再由 UPS 恢复供电'),
-                    action('取消关机倒计时','cancel_shutdown','','仅取消已安排的 UPS 关机倒计时'),
-                    action('取消重启倒计时','cancel_restart','','仅取消已安排的 UPS 重启倒计时'),
+                    action('取消关机倒计时','cancel_shutdown','','仅供独立硬件计时；系统关机已提交时拒绝取消'),
+                    action('取消重启倒计时','cancel_restart','','系统关机已提交时拒绝只取消硬件任务'),
                     action('恢复 UPS 出厂参数','factory_reset','恢复出厂','可能覆盖当前电池参数；操作前保留私有备份'),
                     E('p',{'class':'ku-helper'},'固件 OTA 不是普通开关：需要匹配固件与断电恢复条件，未开放网页刷写。')])
             ])

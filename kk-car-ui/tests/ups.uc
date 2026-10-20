@@ -1,6 +1,6 @@
 #!/usr/bin/ucode
 'use strict';
-import { step,orphaned_timer } from '/etc/kk-car/ups-watch.uc';
+import { step,pending_cutoff } from '/etc/kk-car/ups-watch.uc';
 import { set_option,battery_voltage_error } from '/etc/kk-car/ups-control.uc';
 import { validRaw,voltage_reference } from '/etc/kk-car/ups-read.uc';
 
@@ -54,11 +54,13 @@ check(step(percentPolicy,floorOnly,step(percentPolicy,floorOnly,floorFirst,1,110
 check(step(percentPolicy,plugged,pctSecond,1,130).percent_consecutive==0,
     'external power resets low percent counter');
 let armed={ok:true,input:{external:true},controller:{shutdown_countdown_s:88}};
-check(orphaned_timer({},armed,false),'cancel orphaned timer on powered startup');
-check(!orphaned_timer({timestamp:1},armed,false),'do not cancel timer during normal running');
-check(!orphaned_timer({},armed,true),'preserve explicit power action');
+check(pending_cutoff(armed),'preserve a live timer on powered startup');
 armed.input.external=false;
-check(!orphaned_timer({},armed,false),'do not cancel hardware protection on battery');
+check(pending_cutoff(armed),'preserve a live timer on battery');
+armed.controller.shutdown_countdown_s=0;
+check(!pending_cutoff(armed),'zero timer does not request shutdown');
+armed.ok=false;armed.controller.shutdown_countdown_s=88;
+check(!pending_cutoff(armed),'invalid reads cannot request a pending shutdown');
 let loaded={ok:true,input:{external:false},battery:{millivolts:3750},
     sensors:{battery:{detected:true,conversion_ready:true,overflow:false,bus_mv:3600}}};
 let sag=step(config,loaded,{});

@@ -109,5 +109,23 @@ class RecorderTests(unittest.TestCase):
         self.assertEqual(len(rows),2)
         self.assertEqual(rows[-1]['details']['action'],'reboot_pi')
 
+    def test_cutoff_preparation_keeps_verified_steps(self):
+        d.event('ups_cutoff_armed', {'action':'shutdown','stage':'armed','shutdown_s':178,
+            'auto_start_disabled':True,'restart_cancelled':True,
+            'watchdog_stopped':False,'preserved':True,'raw':'private'})
+        row=json.loads((d.DIRECTORY/'faults.jsonl').read_text().splitlines()[-1])
+        self.assertEqual(row['details']['stage'],'armed')
+        self.assertEqual(row['details']['shutdown_s'],178)
+        self.assertTrue(row['details']['preserved'])
+        self.assertFalse(row['details']['watchdog_stopped'])
+        self.assertNotIn('private',json.dumps(row))
+
+    def test_percent_floor_and_pending_state_are_not_lost(self):
+        ups={'ok':True,'battery':{'millivolts':3240},'input':{'external':False}}
+        row=d.select_snapshot(ups,{}, {}, {}, {},
+            {'status':'shutdown_pending','threshold_mv':3250}, {},200)
+        self.assertEqual(row['ups']['watch']['threshold_mv'],3250)
+        self.assertEqual(row['ups']['watch']['state'],'shutdown_pending')
+
 if __name__ == '__main__':
     unittest.main()
