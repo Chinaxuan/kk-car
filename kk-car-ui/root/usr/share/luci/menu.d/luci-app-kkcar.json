@@ -102,5 +102,18 @@
         "luci-app-kkcar"
       ]
     }
+  },
+  "admin/kkcar_routing": {
+    "title": "公司白名单",
+    "order": 2.2,
+    "action": {
+      "type": "view",
+      "path": "kkcar/company-routing"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-kkcar"
+      ]
+    }
   }
 }

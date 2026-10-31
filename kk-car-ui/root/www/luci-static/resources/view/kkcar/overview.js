@@ -160,6 +160,7 @@ return view.extend({
                 ]),
                 E('aside',{'class':'kk-side'},[
                     section('VPN 控制','断网后会自动尝试恢复；长时间未恢复时可手动重连。',[
+                        E('a',{'class':'kk-button quiet',href:L.url('admin/kkcar_routing')},'公司域名 / IP 白名单 →'),
                         E('div',{'class':'kk-button-stack'},[vpnButton,pauseButton]),this.confirmArea,
                         E('form',{'class':'kk-auto-form',submit:function(ev){ev.preventDefault();self.request(saveAuto(self.auto.checked),'开机连接设置已保存。');}},[
                             E('label',{'class':'kk-check',for:'kk-auto'},[this.auto,E('span',{},'开机自动连接 VPN')]),

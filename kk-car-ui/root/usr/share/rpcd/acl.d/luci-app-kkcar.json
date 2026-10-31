@@ -37,6 +37,9 @@
         ],
         "kkhealth": [
           "status"
+        ],
+        "kkroute": [
+          "status"
         ]
       }
     },
@@ -89,6 +92,9 @@
         "kkhealth": [
           "save",
           "check"
+        ],
+        "kkroute": [
+          "save"
         ]
       }
     }

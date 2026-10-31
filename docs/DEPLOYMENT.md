@@ -1,5 +1,9 @@
 # 部署与更新
 
+## 2026-10-31 公司白名单增量部署
+
+新增 `company-routing.py`、procd 服务、`kkroute.uc`、前端 JS/CSS；合并菜单、ACL、两份导航和连接页入口。只用于现有表 300 防泄漏与双 VPN 拓扑；无需换装 dnsmasq 软件包。按 [公司白名单部署说明](COMPANY-ROUTING.md#部署) 安装并核对运行态。不要上传设备私有规则、生成的 nft/DNS 文件或域名解析缓存。
+
 当前设备在 2026-10-07 已启用 OpenVPN/TCP 与 WireGuard 双隧道自动选择。以下较早的 IKEv2、单 OpenVPN 部署步骤是历史资料；新部署请先读 [VPN 自动选线](VPN-AUTO-SELECT.md)，并逐项核实当前私有配置与两条隧道，不要直接复制历史参数。新的 `kk-car-vpn-select` 开机服务、脚本和 `/etc/rc.d/` 链接需加入设备的 sysupgrade 保留清单。
 
 ## 这是设备定制源码，不是通用一键固件

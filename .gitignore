@@ -33,3 +33,10 @@ kk-car-ui/root/etc/config/
 **/notify.json
 **/notify-boot.json
 **/kk-car-notify-*.json
+
+# Private company routing configuration and generated device state
+**/company-routing.json
+**/company-routing-china-original.conf
+**/kk-car-company-routing.json
+**/25-kk-car-company.nft
+**/kk-car-company.conf

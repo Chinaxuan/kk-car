@@ -1,10 +1,10 @@
 # KK-Car · 车载网络控制台
 
-把闲置的树莓派 3B+ 变成车载路由器：USB 4G 上网、Wi-Fi 热点、回公司 VPN。管理台按使用场景组织为行车总览、连接设置、网络守护、蜂窝与通信、副卡与 eSIM、电源与设备、通知中心和设置中心；所有页面共用左侧导航、页头、深色界面和操作规范，手机从「功能」按钮切换。
+把闲置的树莓派 3B+ 变成车载路由器：USB 4G 上网、Wi-Fi 热点、回公司 VPN。管理台按使用场景组织为行车总览、连接设置、公司白名单、网络守护、蜂窝与通信、副卡与 eSIM、电源与设备、通知中心和设置中心；所有页面共用左侧导航、页头、深色界面和操作规范，手机从「功能」按钮切换。
 
-本仓库保存 **截至 2026-10-20 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
+本仓库保存 **截至 2026-10-31 的项目源码与维护文档**。这是运行在 OpenWrt / LuCI 上的实际管理面板，使用原有管理员登录；不是演示网页，也不是可以直接刷入 SD 卡的固件。
 
-[使用说明](docs/USAGE.md) · [VPN 自动选线](docs/VPN-AUTO-SELECT.md) · [OpenVPN/TCP 有线接入](docs/OPENVPN-TCP.md) · [统一界面](docs/CONSOLE-UI.md) · [网络守护](docs/NETWORK-HEALTH.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [充放电曲线](docs/BATTERY-HISTORY.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
+[使用说明](docs/USAGE.md) · [公司白名单](docs/COMPANY-ROUTING.md) · [VPN 自动选线](docs/VPN-AUTO-SELECT.md) · [OpenVPN/TCP 有线接入](docs/OPENVPN-TCP.md) · [统一界面](docs/CONSOLE-UI.md) · [网络守护](docs/NETWORK-HEALTH.md) · [设置中心](docs/SETTINGS.md) · [UPS 电源](docs/UPS.md) · [充放电曲线](docs/BATTERY-HISTORY.md) · [DJI 4G 模块控制](docs/DJI-CONTROL.md) · [开源功能与界面对标](docs/DJI-BENCHMARK.md) · [试验性网页电话](docs/VOICE-CALLS.md) · [DJI 4G / QMI 接入](docs/DJI-QMI.md) · [HDMI 状态屏](docs/HDMI.md) · [电子纸与四键](docs/EPAPER.md) · [飞书推送](docs/NOTIFICATIONS.md) · [部署与更新](docs/DEPLOYMENT.md) · [架构与技术说明](docs/ARCHITECTURE.md) · [备份与恢复](docs/BACKUP.md) · [网络故障与 VPN 备用管理](docs/NETWORK-RECOVERY.md) · [验证与限制](docs/VALIDATION.md)
 
 新增 [副卡与 eSIM 使用及恢复说明](docs/ESIM-SECONDARY.md)：第二只 DJI 模块仅用于卡内配置和短信，不作为上网出口。
 
@@ -14,6 +14,7 @@
 | --- | --- |
 | 实时状态面板 | 统一深色布局，电脑优先、兼容手机；下载/上传速度旁同步显示 VPN 延迟与丢包、蜂窝 RSRP/SINR、UPS 电量与输出电压，下方保留系统、出口、VPN、蜂窝和供电详细数据 |
 | VPN 备用管理 | 可选开启 VPN 通道内的管理页、SSH 和 Ping；按当前 VPN 地址维护返回路由，仍需原有管理员认证 |
+| 公司白名单 | 手动添加域名、IPv4 / 网段，批量录入、备注、启停、删除；优先于国内直连，流量和 DNS 跟随当前公司 VPN，显示保存与应用版本和域名解析地址 |
 | VPN 管理 | OpenVPN/TCP 与 WireGuard 同时待命，网络恢复后立即比较、平时每 5 分钟复测；差距明显且连续成立才切换。行车总览与连接页同时展示两路延迟、丢包、可用性、当前分流和 DNS 同路由状态，以及各自隧道配置摘要；可暂停、启动、重连和设置开机连接，旧 IKEv2 配置保留 |
 | 流量与延迟历史 | 单张三层图共用时间轴，速度、VPN 延迟/丢包、LTE RSRP 分别使用独立刻度；支持 5 分钟、1 小时、1 天、30 天 |
 | 网络守护 | 每 30 秒对物理出口与 VPN 多目标探测，单目标失败不重连；连续失败后有限恢复，冷却与每小时限额、手动暂停和通话保护；DNS 分类、私有事件记录和后台开关 |

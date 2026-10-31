@@ -5,6 +5,7 @@
 var pages = [
     ['kkcar', '行车总览', 'overview', '网络'],
     ['kkcar_connections', '连接设置', 'connections', '网络'],
+    ['kkcar_routing', '公司白名单', 'connections', '网络'],
     ['kkcar_health', '网络守护', 'health', '网络'],
     ['kkcar_dji', '蜂窝与通信', 'cellular', '通信与设备'],
     ['kkcar_esim', '副卡与 eSIM', 'esim', '通信与设备'],
